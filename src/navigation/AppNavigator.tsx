@@ -26,11 +26,32 @@ export const AppNavigator: React.FC<AppNavigatorProps> = ({ user }) => {
     return (
         <NavigationContainer>
             <Stack.Navigator
-                screenOptions={{ headerShown: false }}
+                screenOptions={{
+                    headerShown: false,
+                    contentStyle: { flex: 1 },
+                    animation: 'fade',
+                    animationDuration: 200,
+                }}
                 initialRouteName="Login"
             >
-                <Stack.Screen name="Login" component={LoginScreen} />
-                <Stack.Screen name="Signup" component={SignupScreen} />
+                <Stack.Screen
+                    name="Login"
+                    component={LoginScreen}
+                    options={{
+                        animation: 'slide_from_right',
+                        animationDuration: 250,
+                        gestureEnabled: true,
+                    }}
+                />
+                <Stack.Screen
+                    name="Signup"
+                    component={SignupScreen}
+                    options={{
+                        animation: 'slide_from_right',
+                        animationDuration: 250,
+                        gestureEnabled: true,
+                    }}
+                />
                 <Stack.Screen name="CheckEmail" component={CheckEmailScreen} />
                 <Stack.Screen name="Verification" component={VerificationScreen} />
                 <Stack.Screen name="Home" component={HomeScreen} />
