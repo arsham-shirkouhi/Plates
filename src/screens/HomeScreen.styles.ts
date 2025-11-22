@@ -18,7 +18,13 @@ export const styles = StyleSheet.create({
         color: '#666',
         marginBottom: 30,
     },
-    button: {
+    testButton: {
+        marginBottom: 15,
+    },
+    testButtonText: {
+        fontSize: 14,
+    },
+    logoutButton: {
         backgroundColor: '#FF3B30',
         padding: 15,
         borderRadius: 8,

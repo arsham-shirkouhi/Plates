@@ -7,6 +7,7 @@ import { SignupScreen } from '../screens/SignupScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { VerificationScreen } from '../screens/VerificationScreen';
 import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
+import { OnboardingScreen } from '../screens/OnboardingScreen';
 
 export type RootStackParamList = {
     Login: undefined;
@@ -14,6 +15,7 @@ export type RootStackParamList = {
     Home: undefined;
     Verification: { email?: string };
     ForgotPassword: undefined;
+    Onboarding: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -54,6 +56,7 @@ export const AppNavigator: React.FC<AppNavigatorProps> = ({ user }) => {
                 />
                 <Stack.Screen name="Verification" component={VerificationScreen} />
                 <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+                <Stack.Screen name="Onboarding" component={OnboardingScreen} />
                 <Stack.Screen name="Home" component={HomeScreen} />
             </Stack.Navigator>
         </NavigationContainer>

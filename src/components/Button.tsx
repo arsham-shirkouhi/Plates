@@ -31,13 +31,15 @@ export const Button: React.FC<ButtonProps> = ({
             alignSelf: 'center',
         };
 
+        const isDisabled = loading || disabled;
+
         switch (variant) {
             case 'primary':
                 return {
                     ...baseStyle,
-                    backgroundColor: '#526EFF',
+                    backgroundColor: isDisabled ? '#CCCCCC' : '#526EFF',
                     borderWidth: 2,
-                    borderColor: '#000',
+                    borderColor: isDisabled ? '#999' : '#000',
                     width: 360,
                     height: 50,
                     marginTop: 5,
@@ -84,11 +86,13 @@ export const Button: React.FC<ButtonProps> = ({
             textTransform: 'lowercase' as const,
         };
 
+        const isDisabled = disabled || loading;
+
         switch (variant) {
             case 'primary':
                 return {
                     ...baseStyle,
-                    color: '#fff',
+                    color: isDisabled ? '#999' : '#fff',
                     fontSize: 20,
                     fontFamily: fonts.bold,
                 };
@@ -151,12 +155,14 @@ export const Button: React.FC<ButtonProps> = ({
         );
     }
 
+    const isDisabled = disabled || loading;
+
     return (
         <TouchableOpacity
-            style={[getButtonStyle(), containerStyle]}
+            style={[getButtonStyle(), containerStyle, isDisabled && styles.disabledButton]}
             onPress={props.onPress}
-            disabled={disabled || loading}
-            activeOpacity={0.8}
+            disabled={isDisabled}
+            activeOpacity={isDisabled ? 1 : 0.8}
             {...props}
         >
             {loading ? (
@@ -182,6 +188,9 @@ const styles = StyleSheet.create({
         width: 20,
         height: 20,
         marginRight: 10,
+    },
+    disabledButton: {
+        opacity: 0.5,
     },
 });
 

@@ -12,7 +12,7 @@ type VerificationScreenNavigationProp = NativeStackNavigationProp<RootStackParam
 type VerificationScreenRouteProp = RouteProp<RootStackParamList, 'Verification'>;
 
 export const VerificationScreen: React.FC = () => {
-    const { user, sendVerificationEmail } = useAuth();
+    const { user, sendVerificationEmail, reloadUser, hasCompletedOnboarding } = useAuth();
     const navigation = useNavigation<VerificationScreenNavigationProp>();
     const route = useRoute<VerificationScreenRouteProp>();
     const emailFromRoute = route.params?.email;
@@ -112,10 +112,40 @@ export const VerificationScreen: React.FC = () => {
         };
     }, []);
 
+    // Check if email is verified when screen is focused or user changes
     useFocusEffect(
         React.useCallback(() => {
             startLoadAnimations();
-        }, [])
+
+            const checkVerification = async () => {
+                if (user) {
+                    const updatedUser = await reloadUser();
+                    if (updatedUser?.emailVerified) {
+                        // Email is verified, check onboarding status
+                        const onboardingCompleted = await hasCompletedOnboarding();
+                        if (!onboardingCompleted) {
+                            console.log('Email verified, navigating to Onboarding...');
+                            setTimeout(() => {
+                                navigation.replace('Onboarding');
+                            }, 500);
+                        } else {
+                            console.log('Email verified, navigating to Home...');
+                            setTimeout(() => {
+                                navigation.replace('Home');
+                            }, 500);
+                        }
+                    }
+                }
+            };
+
+            // Check immediately
+            checkVerification();
+
+            // Set up interval to check every 3 seconds
+            const interval = setInterval(checkVerification, 3000);
+
+            return () => clearInterval(interval);
+        }, [user, reloadUser, hasCompletedOnboarding, navigation])
     );
 
     const topRightRotation = rotateTopRight.interpolate({

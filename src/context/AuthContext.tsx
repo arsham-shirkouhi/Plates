@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { User, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendEmailVerification, reload, signInWithCredential, GoogleAuthProvider, sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { getGoogleIdToken } from '../services/googleAuth';
+import { hasCompletedOnboarding as checkOnboardingStatus, initializeUser } from '../services/userService';
 
 interface AuthContextType {
     user: User | null;
@@ -13,6 +14,7 @@ interface AuthContextType {
     sendVerificationEmail: () => Promise<void>;
     reloadUser: () => Promise<User | null>;
     resetPassword: (email: string) => Promise<void>;
+    hasCompletedOnboarding: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -38,6 +40,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             if (user) {
                 await reload(user);
                 setUser(user);
+
+                // Update last login timestamp for existing users
+                try {
+                    const { getUserProfile, updateLastLogin } = await import('../services/userService');
+                    const profile = await getUserProfile(user);
+                    if (profile) {
+                        // User exists - update last login
+                        await updateLastLogin(user);
+                    }
+                    // If profile doesn't exist, it will be initialized on next signup/login
+                } catch (error) {
+                    console.error('Error updating last login:', error);
+                    // Don't block auth state change
+                }
             } else {
                 setUser(null);
             }
@@ -69,8 +85,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const signup = async (email: string, password: string) => {
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const newUser = userCredential.user;
+
+            // Initialize user document in Firestore
             try {
-                await sendEmailVerification(userCredential.user);
+                await initializeUser(newUser);
+                console.log('User document initialized');
+            } catch (initError) {
+                console.error('Error initializing user document:', initError);
+                // Don't throw - initialization failure shouldn't block signup
+            }
+
+            try {
+                await sendEmailVerification(newUser);
                 console.log('Verification email sent successfully');
                 await signOut(auth);
             } catch (verifyError: any) {
@@ -117,7 +144,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 throw new Error('Google sign-in was cancelled or failed - no ID token received');
             }
             const credential = GoogleAuthProvider.credential(idToken);
-            await signInWithCredential(auth, credential);
+            const userCredential = await signInWithCredential(auth, credential);
+            const user = userCredential.user;
+
+            // Check if this is a new user (first time Google sign-in)
+            // If user document doesn't exist, initialize it
+            try {
+                const { getUserProfile } = await import('../services/userService');
+                const existingProfile = await getUserProfile(user);
+                if (!existingProfile) {
+                    // New user - initialize document
+                    await initializeUser(user);
+                    console.log('New Google user - document initialized');
+                } else {
+                    // Existing user - update last login
+                    const { updateLastLogin } = await import('../services/userService');
+                    await updateLastLogin(user);
+                }
+            } catch (userError) {
+                console.error('Error checking/initializing user document:', userError);
+                // Don't throw - this shouldn't block login
+            }
         } catch (error: any) {
             console.error('Google sign-in error:', error);
             // Re-throw with more context if it's a redirect URI error
@@ -142,6 +189,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
     };
 
+    const hasCompletedOnboarding = async (): Promise<boolean> => {
+        if (!user) {
+            return false;
+        }
+        return await checkOnboardingStatus(user);
+    };
+
     const value = {
         user,
         loading,
@@ -152,6 +206,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         sendVerificationEmail,
         reloadUser,
         resetPassword,
+        hasCompletedOnboarding,
     };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -160,23 +160,48 @@ export const LoginScreen: React.FC = () => {
             console.log('Login successful, user verified:', updatedUser?.emailVerified);
             if (updatedUser) {
                 if (updatedUser.emailVerified) {
-                    console.log('Navigating to Home...');
-                    setTimeout(() => {
-                        navigation.replace('Home');
-                    }, 100);
+                    // Check if onboarding is completed - use updatedUser directly
+                    console.log('Checking onboarding status...');
+                    let onboardingCompleted = false;
+                    try {
+                        // Import and use the function directly with the user object
+                        const { hasCompletedOnboarding: checkOnboarding } = await import('../services/userService');
+                        onboardingCompleted = await checkOnboarding(updatedUser);
+                        console.log('Onboarding completed:', onboardingCompleted);
+                    } catch (onboardingError) {
+                        console.error('Error checking onboarding status:', onboardingError);
+                        // If check fails, assume not completed and let user go through onboarding
+                        onboardingCompleted = false;
+                    }
+
+                    if (!onboardingCompleted) {
+                        console.log('Navigating to Onboarding...');
+                        setLoading(false); // Stop loading before navigation
+                        setTimeout(() => {
+                            navigation.replace('Onboarding');
+                        }, 100);
+                    } else {
+                        console.log('Navigating to Home...');
+                        setLoading(false); // Stop loading before navigation
+                        setTimeout(() => {
+                            navigation.replace('Home');
+                        }, 100);
+                    }
                 } else {
                     console.log('Navigating to Verification...');
+                    setLoading(false); // Stop loading before navigation
                     setTimeout(() => {
                         navigation.replace('Verification', {});
                     }, 100);
                 }
+            } else {
+                setLoading(false);
             }
         } catch (error: any) {
             console.error('Login error:', error);
             const errorMessage = getAuthErrorMessage(error);
             setError(errorMessage);
             Alert.alert('Login Failed', errorMessage);
-        } finally {
             setLoading(false);
         }
     };
@@ -189,16 +214,41 @@ export const LoginScreen: React.FC = () => {
             const updatedUser = await reloadUser();
             console.log('Google login successful, user verified:', updatedUser?.emailVerified);
             if (updatedUser) {
-                setTimeout(() => {
-                    navigation.replace('Home');
-                }, 100);
+                // Google sign-in users are automatically verified, check onboarding
+                console.log('Checking onboarding status...');
+                let onboardingCompleted = false;
+                try {
+                    // Import and use the function directly with the user object
+                    const { hasCompletedOnboarding: checkOnboarding } = await import('../services/userService');
+                    onboardingCompleted = await checkOnboarding(updatedUser);
+                    console.log('Onboarding completed:', onboardingCompleted);
+                } catch (onboardingError) {
+                    console.error('Error checking onboarding status:', onboardingError);
+                    // If check fails, assume not completed and let user go through onboarding
+                    onboardingCompleted = false;
+                }
+
+                if (!onboardingCompleted) {
+                    console.log('Navigating to Onboarding...');
+                    setGoogleLoading(false); // Stop loading before navigation
+                    setTimeout(() => {
+                        navigation.replace('Onboarding');
+                    }, 100);
+                } else {
+                    console.log('Navigating to Home...');
+                    setGoogleLoading(false); // Stop loading before navigation
+                    setTimeout(() => {
+                        navigation.replace('Home');
+                    }, 100);
+                }
+            } else {
+                setGoogleLoading(false);
             }
         } catch (error: any) {
             console.error('Google login error:', error);
             const errorMessage = error?.message || 'Google sign-in failed. Please try again.';
             setError(errorMessage);
             Alert.alert('Google Sign-In Failed', errorMessage);
-        } finally {
             setGoogleLoading(false);
         }
     };
