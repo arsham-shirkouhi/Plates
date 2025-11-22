@@ -1,6 +1,7 @@
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import * as Crypto from 'expo-crypto';
+import Constants from 'expo-constants';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -18,11 +19,25 @@ export const getGoogleIdToken = async (): Promise<string | null> => {
             throw new Error('Google Client ID is not set. Please add EXPO_PUBLIC_GOOGLE_CLIENT_ID to your .env file.');
         }
 
-        // Generate redirect URI - Expo will use the appropriate one for the platform
-        const redirectUri = AuthSession.makeRedirectUri({
-            scheme: 'plates',
-            path: 'redirect',
-        });
+        // Generate redirect URI - Use Expo's auth proxy for HTTPS URL
+        // Google OAuth requires an HTTPS domain, not exp://
+        const baseRedirectUri = AuthSession.makeRedirectUri();
+
+        // If we got an exp:// URL, convert it to HTTPS proxy format
+        // Otherwise, use it as-is (might already be HTTPS)
+        let redirectUri: string;
+        if (baseRedirectUri.startsWith('exp://')) {
+            // Convert exp:// to https://auth.expo.io proxy format
+            const appSlug = Constants.expoConfig?.slug || 'plates';
+            const expoUsername =
+                Constants.expoConfig?.owner ||
+                Constants.manifest2?.extra?.expoClient?.owner ||
+                process.env.EXPO_PUBLIC_EXPO_OWNER ||
+                'anonymous';
+            redirectUri = `https://auth.expo.io/@${expoUsername}/${appSlug}`;
+        } else {
+            redirectUri = baseRedirectUri;
+        }
 
         // Make redirect URI VERY visible
         console.log('');
@@ -32,6 +47,15 @@ export const getGoogleIdToken = async (): Promise<string | null> => {
         console.log('Redirect URI:', redirectUri);
         console.log('═══════════════════════════════════════════════════════');
         console.log('Client ID:', clientId.substring(0, 30) + '...');
+        console.log('');
+        console.log('📋 SETUP INSTRUCTIONS:');
+        console.log('1. Go to: https://console.cloud.google.com/apis/credentials');
+        console.log('2. Find your OAuth 2.0 Client ID (must be "Web application" type)');
+        console.log('3. Click "Edit" → Add the redirect URI above to "Authorized redirect URIs"');
+        console.log('4. Click "SAVE" and wait 2-3 minutes');
+        console.log('5. Restart Expo and try again');
+        console.log('');
+        console.log('⚠️  The redirect URI must match EXACTLY');
         console.log('');
 
         // Generate a nonce for ID token flow (required by Google)
@@ -45,9 +69,9 @@ export const getGoogleIdToken = async (): Promise<string | null> => {
             scopes: ['openid', 'profile', 'email'],
             responseType: AuthSession.ResponseType.IdToken,
             redirectUri,
-            usePKCE: false, // PKCE not needed for ID token flow
+            usePKCE: false, // PKCE not supported with ID token flow
             extraParams: {
-                nonce: nonce, // Add nonce explicitly
+                nonce: nonce, // Add nonce explicitly (required for ID token flow)
             },
         });
 
@@ -63,7 +87,19 @@ export const getGoogleIdToken = async (): Promise<string | null> => {
                 errorCode: result.errorCode,
                 params: result.params,
             });
-            throw new Error(`Google sign-in failed: ${result.error || 'Unknown error'}. Error code: ${result.errorCode || 'N/A'}`);
+
+            // Provide specific guidance for common errors
+            const errorMsg = typeof result.error === 'string' ? result.error : result.error?.message || 'Unknown error';
+            const errorStr = String(errorMsg);
+            if (errorStr.includes('invalid_request') || errorStr.includes('redirect_uri_mismatch')) {
+                console.error('');
+                console.error('❌ REDIRECT URI MISMATCH ERROR');
+                console.error('The redirect URI above must be added to Google Cloud Console.');
+                console.error('Make sure your OAuth client is configured as "Web application" type.');
+                console.error('');
+            }
+
+            throw new Error(`Google sign-in failed: ${errorMsg}. Error code: ${result.errorCode || 'N/A'}`);
         }
 
         if (result.type === 'cancel') {

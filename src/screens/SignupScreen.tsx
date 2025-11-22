@@ -2,21 +2,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
-    TextInput,
-    TouchableOpacity,
-    StyleSheet,
     Alert,
-    ActivityIndicator,
-    Image,
     Animated,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { getAuthErrorMessage, validateEmail, validatePassword } from '../utils/errorHandler';
-import { fonts } from '../constants/fonts';
+import { Button } from '../components/Button';
+import { TextInput } from '../components/TextInput';
+import { styles } from './SignupScreen.styles';
 
 type SignupScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Signup'>;
 
@@ -171,7 +167,7 @@ export const SignupScreen: React.FC = () => {
         setLoading(true);
         try {
             await signup(email, password);
-            navigation.navigate('CheckEmail', { email });
+            navigation.navigate('Verification', { email });
         } catch (error: any) {
             console.error('Signup error:', error);
             const errorMessage = getAuthErrorMessage(error);
@@ -249,7 +245,6 @@ export const SignupScreen: React.FC = () => {
                     <View style={styles.inputContainer}>
                         <Text style={styles.label}>email</Text>
                         <TextInput
-                            style={styles.input}
                             placeholder=""
                             value={email}
                             onChangeText={(text) => {
@@ -258,88 +253,65 @@ export const SignupScreen: React.FC = () => {
                             }}
                             autoCapitalize="none"
                             keyboardType="email-address"
-                            placeholderTextColor="#999"
                         />
                     </View>
 
                     <View style={styles.inputContainer}>
                         <Text style={styles.label}>password</Text>
-                        <View style={styles.passwordContainer}>
-                            <TextInput
-                                style={styles.passwordInput}
-                                placeholder=""
-                                value={showPassword ? password : '*'.repeat(password.length)}
-                                onChangeText={(text) => {
-                                    if (showPassword) {
-                                        setPassword(text);
-                                    } else {
-                                        // When masked, handle input changes
-                                        const currentLength = password.length;
-                                        if (text.length > currentLength) {
-                                            // User is adding a character - append the last character typed
-                                            const newChar = text.slice(-1);
-                                            setPassword(password + newChar);
-                                        } else if (text.length < currentLength) {
-                                            // User is deleting - remove last character
-                                            setPassword(password.slice(0, text.length));
-                                        }
+                        <TextInput
+                            variant="password"
+                            placeholder=""
+                            value={showPassword ? password : '*'.repeat(password.length)}
+                            onChangeText={(text) => {
+                                if (showPassword) {
+                                    setPassword(text);
+                                } else {
+                                    // When masked, handle input changes
+                                    const currentLength = password.length;
+                                    if (text.length > currentLength) {
+                                        // User is adding a character - append the last character typed
+                                        const newChar = text.slice(-1);
+                                        setPassword(password + newChar);
+                                    } else if (text.length < currentLength) {
+                                        // User is deleting - remove last character
+                                        setPassword(password.slice(0, text.length));
                                     }
-                                    setError(null);
-                                }}
-                                secureTextEntry={false}
-                                placeholderTextColor="#999"
-                            />
-                            <TouchableOpacity
-                                onPress={() => setShowPassword(!showPassword)}
-                                style={styles.eyeIcon}
-                            >
-                                <Ionicons
-                                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                                    size={20}
-                                    color="#000"
-                                />
-                            </TouchableOpacity>
-                        </View>
+                                }
+                                setError(null);
+                            }}
+                            showPasswordToggle={true}
+                            isPasswordVisible={showPassword}
+                            onTogglePassword={() => setShowPassword(!showPassword)}
+                        />
                     </View>
 
                     <View style={styles.inputContainer}>
                         <Text style={styles.label}>confirm password</Text>
-                        <View style={styles.passwordContainer}>
-                            <TextInput
-                                style={styles.passwordInput}
-                                placeholder=""
-                                value={showConfirmPassword ? confirmPassword : '*'.repeat(confirmPassword.length)}
-                                onChangeText={(text) => {
-                                    if (showConfirmPassword) {
-                                        setConfirmPassword(text);
-                                    } else {
-                                        // When masked, handle input changes
-                                        const currentLength = confirmPassword.length;
-                                        if (text.length > currentLength) {
-                                            // User is adding a character - append the last character typed
-                                            const newChar = text.slice(-1);
-                                            setConfirmPassword(confirmPassword + newChar);
-                                        } else if (text.length < currentLength) {
-                                            // User is deleting - remove last character
-                                            setConfirmPassword(confirmPassword.slice(0, text.length));
-                                        }
+                        <TextInput
+                            variant="password"
+                            placeholder=""
+                            value={showConfirmPassword ? confirmPassword : '*'.repeat(confirmPassword.length)}
+                            onChangeText={(text) => {
+                                if (showConfirmPassword) {
+                                    setConfirmPassword(text);
+                                } else {
+                                    // When masked, handle input changes
+                                    const currentLength = confirmPassword.length;
+                                    if (text.length > currentLength) {
+                                        // User is adding a character - append the last character typed
+                                        const newChar = text.slice(-1);
+                                        setConfirmPassword(confirmPassword + newChar);
+                                    } else if (text.length < currentLength) {
+                                        // User is deleting - remove last character
+                                        setConfirmPassword(confirmPassword.slice(0, text.length));
                                     }
-                                    setError(null);
-                                }}
-                                secureTextEntry={false}
-                                placeholderTextColor="#999"
-                            />
-                            <TouchableOpacity
-                                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                                style={styles.eyeIcon}
-                            >
-                                <Ionicons
-                                    name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
-                                    size={20}
-                                    color="#000"
-                                />
-                            </TouchableOpacity>
-                        </View>
+                                }
+                                setError(null);
+                            }}
+                            showPasswordToggle={true}
+                            isPasswordVisible={showConfirmPassword}
+                            onTogglePassword={() => setShowConfirmPassword(!showConfirmPassword)}
+                        />
                     </View>
 
                     {error && (
@@ -355,18 +327,13 @@ export const SignupScreen: React.FC = () => {
                         transform: [{ translateY: buttonSlide }],
                     }}
                 >
-                    <TouchableOpacity
-                        style={styles.button}
+                    <Button
+                        variant="primary"
+                        title="sign up!"
                         onPress={handleSignup}
+                        loading={loading}
                         disabled={loading}
-                        activeOpacity={0.7}
-                    >
-                        {loading ? (
-                            <ActivityIndicator color="#fff" />
-                        ) : (
-                            <Text style={styles.buttonText}>sign up!</Text>
-                        )}
-                    </TouchableOpacity>
+                    />
                 </Animated.View>
 
                 <Animated.View
@@ -388,25 +355,14 @@ export const SignupScreen: React.FC = () => {
                         transform: [{ translateY: googleSlide }],
                     }}
                 >
-                    <TouchableOpacity
-                        style={styles.googleButton}
+                    <Button
+                        variant="google"
+                        title="continue with google"
                         onPress={handleGoogleSignup}
+                        loading={googleLoading}
                         disabled={googleLoading}
-                        activeOpacity={0.7}
-                    >
-                        {googleLoading ? (
-                            <ActivityIndicator color="#4285F4" />
-                        ) : (
-                            <>
-                                <Image
-                                    source={require('../../assets/images/google_logo.png')}
-                                    style={styles.googleLogo}
-                                    resizeMode="contain"
-                                />
-                                <Text style={styles.googleButtonText}>continue with google</Text>
-                            </>
-                        )}
-                    </TouchableOpacity>
+                        icon={require('../../assets/images/google_logo.png')}
+                    />
                 </Animated.View>
 
                 <Animated.View
@@ -417,15 +373,15 @@ export const SignupScreen: React.FC = () => {
                 >
                     <View style={styles.registerContainer}>
                         <Text style={styles.registerText}>already have an account? </Text>
-                        <TouchableOpacity
+                        <Button
+                            variant="link"
+                            title="login"
                             onPress={() => {
                                 console.log('Navigating to Login...');
                                 navigation.goBack();
                             }}
-                            activeOpacity={0.7}
-                        >
-                            <Text style={styles.registerLink}>login</Text>
-                        </TouchableOpacity>
+                            textStyle={styles.registerLink}
+                        />
                     </View>
                 </Animated.View>
             </View>
@@ -433,197 +389,4 @@ export const SignupScreen: React.FC = () => {
     );
 };
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 20,
-        backgroundColor: '#fff',
-        position: 'relative',
-        overflow: 'hidden',
-    },
-    auraBallTopRight: {
-        position: 'absolute',
-        top: -250,
-        right: -250,
-        width: 500,
-        height: 500,
-    },
-    auraBallBottomLeft: {
-        position: 'absolute',
-        bottom: -250,
-        left: -250,
-        width: 500,
-        height: 500,
-    },
-    contentBox: {
-        width: '100%',
-        maxWidth: 400,
-        zIndex: 1,
-        justifyContent: 'center',
-    },
-    title: {
-        fontSize: 42,
-        fontFamily: fonts.bold,
-        color: '#000',
-        textAlign: 'center',
-        marginBottom: 8,
-        textTransform: 'lowercase',
-    },
-    subtitle: {
-        fontSize: 18,
-        fontFamily: fonts.regular,
-        color: '#ADADAD',
-        textAlign: 'center',
-        marginBottom: 20,
-        textTransform: 'lowercase',
-    },
-    inputContainer: {
-        marginBottom: 12,
-        width: 360,
-        alignSelf: 'center',
-    },
-    label: {
-        fontSize: 18,
-        fontFamily: fonts.bold,
-        color: '#333',
-        marginBottom: 5,
-        textTransform: 'lowercase',
-    },
-    input: {
-        backgroundColor: '#F5F5F5',
-        borderWidth: 2,
-        borderColor: '#000',
-        borderRadius: 10,
-        paddingHorizontal: 15,
-        paddingVertical: 15,
-        fontSize: 18,
-        fontFamily: fonts.regular,
-        color: '#000',
-        width: 360,
-        height: 50,
-    },
-    passwordContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#F5F5F5',
-        borderWidth: 2,
-        borderColor: '#000',
-        borderRadius: 10,
-        width: 360,
-        height: 50,
-    },
-    passwordInput: {
-        flex: 1,
-        paddingHorizontal: 15,
-        paddingVertical: 15,
-        fontSize: 18,
-        fontFamily: fonts.regular,
-        color: '#000',
-    },
-    eyeIcon: {
-        paddingRight: 15,
-        paddingLeft: 10,
-    },
-    button: {
-        backgroundColor: '#526EFF',
-        borderWidth: 2,
-        borderColor: '#000',
-        borderRadius: 10,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: 5,
-        marginBottom: 12,
-        width: 360,
-        height: 50,
-        alignSelf: 'center',
-    },
-    buttonText: {
-        color: '#fff',
-        fontSize: 20,
-        fontFamily: fonts.bold,
-        textTransform: 'lowercase',
-    },
-    registerContainer: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginTop: 12,
-    },
-    registerText: {
-        fontSize: 18,
-        fontFamily: fonts.regular,
-        color: '#333',
-        textTransform: 'lowercase',
-    },
-    registerLink: {
-        fontSize: 18,
-        fontFamily: fonts.bold,
-        color: '#4285F4',
-        textTransform: 'lowercase',
-    },
-    errorContainer: {
-        backgroundColor: '#FFEBEE',
-        borderColor: '#F44336',
-        borderWidth: 1,
-        borderRadius: 10,
-        paddingHorizontal: 15,
-        paddingVertical: 15,
-        marginBottom: 15,
-        marginTop: 5,
-        width: 360,
-        height: 50,
-        alignSelf: 'center',
-        justifyContent: 'center',
-    },
-    errorText: {
-        color: '#C62828',
-        fontSize: 18,
-        textAlign: 'left',
-        fontFamily: fonts.regular,
-    },
-    divider: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginVertical: 12,
-        width: 360,
-        alignSelf: 'center',
-    },
-    dividerLine: {
-        flex: 1,
-        height: 1,
-        backgroundColor: '#ddd',
-    },
-    dividerText: {
-        marginHorizontal: 15,
-        color: '#666',
-        fontSize: 18,
-        fontFamily: fonts.regular,
-        textTransform: 'lowercase',
-    },
-    googleButton: {
-        flexDirection: 'row',
-        backgroundColor: '#fff',
-        borderWidth: 2,
-        borderColor: '#000',
-        borderRadius: 10,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 10,
-        width: 360,
-        height: 50,
-        alignSelf: 'center',
-    },
-    googleLogo: {
-        width: 20,
-        height: 20,
-        marginRight: 10,
-    },
-    googleButtonText: {
-        color: '#000',
-        fontSize: 20,
-        fontFamily: fonts.regular,
-    },
-});
 

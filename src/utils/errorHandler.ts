@@ -20,50 +20,50 @@ export const getAuthErrorMessage = (error: any): string => {
     switch (errorCode) {
         // Login errors
         case 'auth/user-not-found':
-            return 'No account found with this email address. Please sign up first.';
+            return 'wrong email/password';
 
         case 'auth/wrong-password':
-            return 'Incorrect password. Please try again.';
+            return 'wrong email/password';
 
         case 'auth/invalid-email':
-            return 'Invalid email address. Please check and try again.';
+            return 'invalid email';
 
         case 'auth/user-disabled':
-            return 'This account has been disabled. Please contact support.';
+            return 'account disabled';
 
         case 'auth/invalid-credential':
-            return 'Invalid email or password. Please check your credentials and try again.';
+            return 'wrong email/password';
 
         // Signup errors
         case 'auth/email-already-in-use':
-            return 'An account with this email already exists. Please log in instead.';
+            return 'email already exists';
 
         case 'auth/weak-password':
-            return 'Password is too weak. Please use a stronger password (at least 6 characters).';
+            return 'password too weak';
 
         case 'auth/operation-not-allowed':
-            return 'Email/password accounts are not enabled. Please contact support.';
+            return 'operation not allowed';
 
         // Network errors
         case 'auth/network-request-failed':
-            return 'Network error. Please check your internet connection and try again.';
+            return 'network error';
 
         case 'auth/too-many-requests':
-            return 'Too many requests. Please wait a few minutes before trying again.';
+            return 'too many requests';
 
         // Verification errors
         case 'auth/email-already-verified':
-            return 'This email is already verified.';
+            return 'email verified';
 
         // Generic errors
         case 'auth/internal-error':
-            return 'An internal error occurred. Please try again later.';
+            return 'internal error';
 
         case 'auth/invalid-action-code':
-            return 'Invalid verification link. The link may have expired.';
+            return 'invalid link';
 
         case 'auth/expired-action-code':
-            return 'This verification link has expired. Please request a new one.';
+            return 'link expired';
 
         default:
             // Try to extract a user-friendly message from the error
@@ -71,21 +71,22 @@ export const getAuthErrorMessage = (error: any): string => {
                 // Remove Firebase error prefix if present
                 const message = error.message.replace(/^Firebase:?\s*/i, '');
                 if (message && message !== errorCode) {
-                    return message;
+                    // Shorten default messages too
+                    return message.length > 20 ? 'error occurred' : message;
                 }
             }
-            return 'An error occurred. Please try again.';
+            return 'error occurred';
     }
 };
 
 export const validateEmail = (email: string): { valid: boolean; message?: string } => {
     if (!email) {
-        return { valid: false, message: 'Email is required' };
+        return { valid: false, message: 'email required' };
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-        return { valid: false, message: 'Please enter a valid email address' };
+        return { valid: false, message: 'invalid email' };
     }
 
     return { valid: true };
@@ -93,11 +94,11 @@ export const validateEmail = (email: string): { valid: boolean; message?: string
 
 export const validatePassword = (password: string): { valid: boolean; message?: string } => {
     if (!password) {
-        return { valid: false, message: 'Password is required' };
+        return { valid: false, message: 'password required' };
     }
 
     if (password.length < 6) {
-        return { valid: false, message: 'Password must be at least 6 characters' };
+        return { valid: false, message: 'password too short' };
     }
 
     return { valid: true };

@@ -6,14 +6,14 @@ import { LoginScreen } from '../screens/LoginScreen';
 import { SignupScreen } from '../screens/SignupScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { VerificationScreen } from '../screens/VerificationScreen';
-import { CheckEmailScreen } from '../screens/CheckEmailScreen';
+import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 
 export type RootStackParamList = {
     Login: undefined;
     Signup: undefined;
     Home: undefined;
-    Verification: undefined;
-    CheckEmail: { email?: string };
+    Verification: { email?: string };
+    ForgotPassword: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -52,8 +52,8 @@ export const AppNavigator: React.FC<AppNavigatorProps> = ({ user }) => {
                         gestureEnabled: true,
                     }}
                 />
-                <Stack.Screen name="CheckEmail" component={CheckEmailScreen} />
                 <Stack.Screen name="Verification" component={VerificationScreen} />
+                <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
                 <Stack.Screen name="Home" component={HomeScreen} />
             </Stack.Navigator>
         </NavigationContainer>

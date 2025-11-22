@@ -1,0 +1,131 @@
+import { StyleSheet } from 'react-native';
+import { fonts } from '../constants/fonts';
+
+export const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+        backgroundColor: '#fff',
+        position: 'relative',
+        overflow: 'hidden',
+    },
+    auraBallTopRight: {
+        position: 'absolute',
+        top: -250,
+        right: -250,
+        width: 500,
+        height: 500,
+    },
+    auraBallBottomLeft: {
+        position: 'absolute',
+        bottom: -250,
+        left: -250,
+        width: 500,
+        height: 500,
+    },
+    contentBox: {
+        width: '100%',
+        maxWidth: 400,
+        zIndex: 1,
+        overflow: 'hidden',
+        justifyContent: 'center',
+    },
+    title: {
+        fontSize: 42,
+        fontFamily: fonts.bold,
+        color: '#000',
+        textAlign: 'center',
+        marginBottom: 8,
+        textTransform: 'lowercase',
+    },
+    subtitle: {
+        fontSize: 18,
+        fontFamily: fonts.regular,
+        color: '#ADADAD',
+        textAlign: 'center',
+        marginBottom: 20,
+        textTransform: 'lowercase',
+    },
+    inputContainer: {
+        marginBottom: 12,
+        width: 360,
+        alignSelf: 'center',
+    },
+    label: {
+        fontSize: 18,
+        fontFamily: fonts.bold,
+        color: '#333',
+        marginBottom: 5,
+        textTransform: 'lowercase',
+    },
+    errorForgotContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        width: 360,
+        alignSelf: 'center',
+        marginTop: 5,
+        marginBottom: 12,
+        minHeight: 20,
+    },
+    errorContainer: {
+        flex: 1,
+        marginRight: 10,
+    },
+    errorText: {
+        color: '#C62828',
+        fontSize: 16,
+        textAlign: 'left',
+        fontFamily: fonts.regular,
+    },
+    forgotPasswordContainer: {
+        marginTop: 0,
+        marginBottom: 0,
+    },
+    divider: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: 12,
+        width: 360,
+        alignSelf: 'center',
+    },
+    dividerLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: '#ddd',
+    },
+    dividerText: {
+        marginHorizontal: 15,
+        color: '#666',
+        fontSize: 18,
+        fontFamily: fonts.regular,
+    },
+    registerContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 12,
+    },
+    registerText: {
+        fontSize: 18,
+        fontFamily: fonts.regular,
+        color: '#333',
+        textTransform: 'lowercase',
+    },
+    registerLink: {
+        fontSize: 18,
+        fontFamily: fonts.bold,
+        color: '#4285F4',
+        textTransform: 'lowercase',
+    },
+    forgotPasswordLink: {
+        fontSize: 16,
+        fontFamily: fonts.regular,
+        color: '#526EFF',
+        textTransform: 'lowercase',
+        textAlign: 'right',
+    },
+});
+

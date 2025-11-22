@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendEmailVerification, reload, signInWithCredential, GoogleAuthProvider } from 'firebase/auth';
+import { User, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendEmailVerification, reload, signInWithCredential, GoogleAuthProvider, sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { getGoogleIdToken } from '../services/googleAuth';
 
@@ -12,6 +12,7 @@ interface AuthContextType {
     logout: () => Promise<void>;
     sendVerificationEmail: () => Promise<void>;
     reloadUser: () => Promise<User | null>;
+    resetPassword: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -47,7 +48,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }, []);
 
     const login = async (email: string, password: string) => {
-        await signInWithEmailAndPassword(auth, email, password);
+        try {
+            console.log('Attempting login for email:', email);
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            console.log('Login successful, user ID:', userCredential.user.uid);
+            console.log('Email verified:', userCredential.user.emailVerified);
+            // Note: Firebase allows login even if email isn't verified
+            // The app will handle redirecting to verification screen if needed
+        } catch (error: any) {
+            console.error('Login error details:', {
+                code: error.code,
+                message: error.message,
+                email: email,
+            });
+            // Re-throw to let the UI handle the error
+            throw error;
+        }
     };
 
     const signup = async (email: string, password: string) => {
@@ -116,6 +132,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         await signOut(auth);
     };
 
+    const resetPassword = async (email: string) => {
+        try {
+            await sendPasswordResetEmail(auth, email);
+            console.log('Password reset email sent successfully');
+        } catch (error: any) {
+            console.error('Error sending password reset email:', error);
+            throw error;
+        }
+    };
+
     const value = {
         user,
         loading,
@@ -125,6 +151,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         logout,
         sendVerificationEmail,
         reloadUser,
+        resetPassword,
     };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

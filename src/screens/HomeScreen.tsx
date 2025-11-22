@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, Alert } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { Button } from '../components/Button';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 
@@ -33,18 +34,15 @@ export const HomeScreen: React.FC = () => {
         <View style={styles.container}>
             <Text style={styles.title}>Home</Text>
             <Text style={styles.subtitle}>Welcome, {user?.email}</Text>
-            <TouchableOpacity
-                style={styles.button}
+            <Button
+                variant="primary"
+                title="Logout"
                 onPress={handleLogout}
+                loading={loggingOut}
                 disabled={loggingOut}
-                activeOpacity={0.7}
-            >
-                {loggingOut ? (
-                    <ActivityIndicator color="#fff" />
-                ) : (
-                    <Text style={styles.buttonText}>Logout</Text>
-                )}
-            </TouchableOpacity>
+                containerStyle={styles.button}
+                textStyle={styles.buttonText}
+            />
         </View>
     );
 };

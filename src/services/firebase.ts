@@ -15,5 +15,6 @@ if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
 }
 
 const app = initializeApp(firebaseConfig);
+// AsyncStorage is installed - Firebase v12 will automatically use it for persistence
 export const auth = getAuth(app);
 

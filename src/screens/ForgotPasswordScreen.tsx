@@ -1,26 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, Alert, Animated } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { getAuthErrorMessage } from '../utils/errorHandler';
+import { getAuthErrorMessage, validateEmail } from '../utils/errorHandler';
 import { Button } from '../components/Button';
-import { styles } from './VerificationScreen.styles';
+import { TextInput } from '../components/TextInput';
+import { styles } from './ForgotPasswordScreen.styles';
 
-type VerificationScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Verification'>;
-type VerificationScreenRouteProp = RouteProp<RootStackParamList, 'Verification'>;
+type ForgotPasswordScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'ForgotPassword'>;
 
-export const VerificationScreen: React.FC = () => {
-    const { user, sendVerificationEmail } = useAuth();
-    const navigation = useNavigation<VerificationScreenNavigationProp>();
-    const route = useRoute<VerificationScreenRouteProp>();
-    const emailFromRoute = route.params?.email;
+export const ForgotPasswordScreen: React.FC = () => {
+    const { resetPassword } = useAuth();
+    const navigation = useNavigation<ForgotPasswordScreenNavigationProp>();
+    const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
-
-    // Use email from route params (after signup) or from auth context (after login)
-    const displayEmail = user?.email || emailFromRoute || 'your email address';
-    const isSignedIn = !!user;
+    const [emailSent, setEmailSent] = useState(false);
 
     // Rotation animations for aura balls
     const rotateTopRight = useRef(new Animated.Value(0)).current;
@@ -31,10 +27,8 @@ export const VerificationScreen: React.FC = () => {
     const titleSlide = useRef(new Animated.Value(20)).current;
     const subtitleFade = useRef(new Animated.Value(0)).current;
     const subtitleSlide = useRef(new Animated.Value(20)).current;
-    const emailFade = useRef(new Animated.Value(0)).current;
-    const emailSlide = useRef(new Animated.Value(20)).current;
-    const instructionFade = useRef(new Animated.Value(0)).current;
-    const instructionSlide = useRef(new Animated.Value(20)).current;
+    const inputFade = useRef(new Animated.Value(0)).current;
+    const inputSlide = useRef(new Animated.Value(20)).current;
     const buttonFade = useRef(new Animated.Value(0)).current;
     const buttonSlide = useRef(new Animated.Value(20)).current;
     const linkFade = useRef(new Animated.Value(0)).current;
@@ -47,10 +41,8 @@ export const VerificationScreen: React.FC = () => {
         titleSlide.setValue(20);
         subtitleFade.setValue(0);
         subtitleSlide.setValue(20);
-        emailFade.setValue(0);
-        emailSlide.setValue(20);
-        instructionFade.setValue(0);
-        instructionSlide.setValue(20);
+        inputFade.setValue(0);
+        inputSlide.setValue(20);
         buttonFade.setValue(0);
         buttonSlide.setValue(20);
         linkFade.setValue(0);
@@ -77,10 +69,9 @@ export const VerificationScreen: React.FC = () => {
         // Start all animations in parallel with very small delays
         createAnimation(titleFade, titleSlide, 0).start();
         createAnimation(subtitleFade, subtitleSlide, 20).start();
-        createAnimation(emailFade, emailSlide, 40).start();
-        createAnimation(instructionFade, instructionSlide, 60).start();
+        createAnimation(inputFade, inputSlide, 40).start();
+        createAnimation(buttonFade, buttonSlide, 60).start();
         createAnimation(linkFade, linkSlide, 80).start();
-        createAnimation(buttonFade, buttonSlide, 100).start();
     };
 
     useEffect(() => {
@@ -128,28 +119,34 @@ export const VerificationScreen: React.FC = () => {
         outputRange: ['360deg', '0deg'], // Rotate opposite direction
     });
 
-    const handleResendEmail = async () => {
-        if (!isSignedIn) {
-            Alert.alert(
-                'Sign In Required',
-                'Please log in first to resend the verification email. After logging in, you can resend the email from this screen.'
-            );
+    const handleResetPassword = async () => {
+        if (!email) {
+            Alert.alert('Error', 'Please enter your email address');
+            return;
+        }
+
+        const emailValidation = validateEmail(email);
+        if (!emailValidation.valid) {
+            Alert.alert('Invalid Email', emailValidation.message || 'Please enter a valid email address');
             return;
         }
 
         setLoading(true);
         try {
-            await sendVerificationEmail();
-            Alert.alert('Success', 'Verification email sent! Please check your inbox and spam folder.');
+            await resetPassword(email);
+            setEmailSent(true);
+            Alert.alert(
+                'Email Sent',
+                'Password reset instructions have been sent to your email. Please check your inbox and spam folder.'
+            );
         } catch (error: any) {
-            console.error('Send verification email error:', error);
+            console.error('Reset password error:', error);
             const errorMessage = getAuthErrorMessage(error);
             Alert.alert('Error', errorMessage);
         } finally {
             setLoading(false);
         }
     };
-
 
     return (
         <View style={styles.container}>
@@ -176,7 +173,7 @@ export const VerificationScreen: React.FC = () => {
                         transform: [{ translateY: titleSlide }],
                     }}
                 >
-                    <Text style={styles.title}>verify your email</Text>
+                    <Text style={styles.title}>forgot password?</Text>
                 </Animated.View>
 
                 <Animated.View
@@ -185,44 +182,49 @@ export const VerificationScreen: React.FC = () => {
                         transform: [{ translateY: subtitleSlide }],
                     }}
                 >
-                    <Text style={styles.subtitle}>we've sent a verification email to:</Text>
-                </Animated.View>
-
-                <Animated.View
-                    style={{
-                        opacity: emailFade,
-                        transform: [{ translateY: emailSlide }],
-                    }}
-                >
-                    <Text style={styles.email}>{displayEmail}</Text>
-                </Animated.View>
-
-                <Animated.View
-                    style={{
-                        opacity: instructionFade,
-                        transform: [{ translateY: instructionSlide }],
-                    }}
-                >
-                    <Text style={styles.instruction}>
-                        please check your inbox and click the verification link to activate your account.
-                        {'\n\n'}if you don't see the email, check your spam/junk folder. you can resend the email after a few minutes if needed.
+                    <Text style={styles.subtitle}>
+                        {emailSent
+                            ? 'check your email for reset instructions'
+                            : "enter your email and we'll send you reset instructions"}
                     </Text>
                 </Animated.View>
 
-                <Animated.View
-                    style={{
-                        opacity: buttonFade,
-                        transform: [{ translateY: buttonSlide }],
-                    }}
-                >
-                    <Button
-                        variant="primary"
-                        title="resend email"
-                        onPress={handleResendEmail}
-                        loading={loading}
-                        disabled={loading}
-                    />
-                </Animated.View>
+                {!emailSent && (
+                    <Animated.View
+                        style={{
+                            opacity: inputFade,
+                            transform: [{ translateY: inputSlide }],
+                        }}
+                    >
+                        <View style={styles.inputContainer}>
+                            <Text style={styles.label}>email</Text>
+                            <TextInput
+                                placeholder=""
+                                value={email}
+                                onChangeText={setEmail}
+                                autoCapitalize="none"
+                                keyboardType="email-address"
+                            />
+                        </View>
+                    </Animated.View>
+                )}
+
+                {!emailSent && (
+                    <Animated.View
+                        style={{
+                            opacity: buttonFade,
+                            transform: [{ translateY: buttonSlide }],
+                        }}
+                    >
+                        <Button
+                            variant="primary"
+                            title="send reset link"
+                            onPress={handleResetPassword}
+                            loading={loading}
+                            disabled={loading}
+                        />
+                    </Animated.View>
+                )}
 
                 <Animated.View
                     style={{
@@ -235,7 +237,7 @@ export const VerificationScreen: React.FC = () => {
                         title="back to login"
                         onPress={() => {
                             console.log('Navigating to Login...');
-                            navigation.navigate('Login');
+                            navigation.goBack();
                         }}
                         textStyle={styles.backToLoginText}
                     />
