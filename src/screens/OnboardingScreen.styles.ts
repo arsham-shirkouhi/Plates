@@ -114,9 +114,16 @@ export const styles = StyleSheet.create({
         justifyContent: 'center',
         marginTop: 20,
         marginBottom: 20,
-        height: 200,
+        height: 280,
         position: 'relative',
         width: '100%',
+    },
+    agePickerMask: {
+        height: 300,
+        width: '100%',
+        overflow: 'hidden',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     ageScrollIndicator: {
         position: 'absolute',
@@ -135,7 +142,7 @@ export const styles = StyleSheet.create({
     },
     ageScrollView: {
         width: '100%',
-        height: 200,
+        height: 180,
     },
     ageScrollContent: {
         alignItems: 'center',
@@ -148,24 +155,21 @@ export const styles = StyleSheet.create({
     ageItemSelected: {
         // Selected item styling
     },
-    agePickerText: {
-        fontSize: 72,
+    agePickerTextBase: {
         fontFamily: fonts.bold,
-        color: '#000',
         textAlign: 'center',
     },
     agePickerTextSelected: {
-        fontSize: 72,
+        fontSize: 96,
         fontFamily: fonts.bold,
         color: '#526EFF',
         textAlign: 'center',
     },
     agePickerNumberSecondary: {
-        fontSize: 48,
+        fontSize: 40,
         fontFamily: fonts.regular,
         color: '#CCCCCC',
         textAlign: 'center',
-        opacity: 0.5,
     },
     // Slider styles
     sliderContainer: {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, Animated, ScrollView, TouchableOpacity, Alert, PanResponder } from 'react-native';
+import { View, Text, Animated, ScrollView, TouchableOpacity, Alert, PanResponder, Easing } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -74,10 +74,9 @@ export const OnboardingScreen: React.FC = () => {
 
     // Age picker refs
     const ageScrollViewRef = useRef<ScrollView>(null);
-    const ITEM_HEIGHT = 60; // Height of each number item
+    const ITEM_HEIGHT = 100; // Height of each number item - increased for more spacing
     const ages = Array.from({ length: 99 - 18 + 1 }, (_, i) => 18 + i); // 18 to 99
-    const ageScaleAnim = useRef(new Animated.Value(1)).current;
-    const ageScaleStatic = useRef(new Animated.Value(1)).current; // Static value for non-selected items
+    const scrollY = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
         // Start aura ball rotations
@@ -127,6 +126,7 @@ export const OnboardingScreen: React.FC = () => {
             const currentIndex = ages.indexOf(data.age);
             if (currentIndex >= 0) {
                 const offset = currentIndex * ITEM_HEIGHT;
+                scrollY.setValue(offset);
                 // Use a longer timeout to ensure the view is fully rendered
                 setTimeout(() => {
                     ageScrollViewRef.current?.scrollTo({
@@ -138,19 +138,34 @@ export const OnboardingScreen: React.FC = () => {
         }
     }, [currentStep]);
 
-    // Animate scale when age changes
+    // Snap to center when age changes
     useEffect(() => {
-        if (currentStep === 3) {
-            // Reset and animate to scale up
-            ageScaleAnim.setValue(1);
-            Animated.spring(ageScaleAnim, {
-                toValue: 1.2,
-                tension: 50,
-                friction: 7,
-                useNativeDriver: true,
-            }).start();
+        if (currentStep === 3 && ageScrollViewRef.current) {
+            const currentIndex = ages.indexOf(data.age);
+            if (currentIndex >= 0) {
+                const offset = currentIndex * ITEM_HEIGHT;
+                // Use spring animation for smooth feel
+                Animated.spring(scrollY, {
+                    toValue: offset,
+                    tension: 68,
+                    friction: 8,
+                    useNativeDriver: false,
+                }).start(() => {
+                    scrollY.setValue(offset);
+                });
+
+                // Small delay to ensure scroll view is ready
+                const timeoutId = setTimeout(() => {
+                    ageScrollViewRef.current?.scrollTo({
+                        y: offset,
+                        animated: true,
+                    });
+                }, 50);
+                return () => clearTimeout(timeoutId);
+            }
         }
     }, [data.age, currentStep]);
+
 
     // Track if this is the first time the screen is mounted
     const isFirstMount = useRef(true);
@@ -466,19 +481,58 @@ export const OnboardingScreen: React.FC = () => {
     const renderAgeStep = () => {
         const currentAge = data.age;
 
+        const updateSelectedAge = (offsetY: number) => {
+            const index = Math.round(offsetY / ITEM_HEIGHT);
+            const clampedIndex = Math.max(0, Math.min(ages.length - 1, index));
+            const targetAge = ages[clampedIndex];
+
+            if (targetAge && targetAge !== data.age) {
+                updateData('age', targetAge);
+            }
+        };
+
+        const handleScroll = Animated.event(
+            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+            {
+                useNativeDriver: false,
+                listener: (event: any) => {
+                    const offsetY = event.nativeEvent.contentOffset.y;
+                    updateSelectedAge(offsetY);
+                },
+            }
+        );
+
+        const snapToCenter = (targetIndex: number) => {
+            if (ageScrollViewRef.current) {
+                const targetOffset = targetIndex * ITEM_HEIGHT;
+
+                // Use spring animation for smooth Apple-like feel
+                Animated.spring(scrollY, {
+                    toValue: targetOffset,
+                    tension: 68,
+                    friction: 8,
+                    useNativeDriver: false,
+                }).start(() => {
+                    // Ensure final position is exact
+                    scrollY.setValue(targetOffset);
+                });
+
+                // Animate the scroll view with smooth easing
+                ageScrollViewRef.current.scrollTo({
+                    y: targetOffset,
+                    animated: true,
+                });
+            }
+        };
+
         const handleMomentumScrollEnd = (event: any) => {
             const offsetY = event.nativeEvent.contentOffset.y;
             const index = Math.round(offsetY / ITEM_HEIGHT);
             const clampedIndex = Math.max(0, Math.min(ages.length - 1, index));
             const targetAge = ages[clampedIndex];
 
-            if (targetAge && ageScrollViewRef.current) {
-                const targetOffset = clampedIndex * ITEM_HEIGHT;
-                ageScrollViewRef.current.scrollTo({
-                    y: targetOffset,
-                    animated: true,
-                });
-
+            if (targetAge) {
+                snapToCenter(clampedIndex);
                 if (targetAge !== data.age) {
                     updateData('age', targetAge);
                 }
@@ -491,13 +545,8 @@ export const OnboardingScreen: React.FC = () => {
             const clampedIndex = Math.max(0, Math.min(ages.length - 1, index));
             const targetAge = ages[clampedIndex];
 
-            if (targetAge && ageScrollViewRef.current) {
-                const targetOffset = clampedIndex * ITEM_HEIGHT;
-                ageScrollViewRef.current.scrollTo({
-                    y: targetOffset,
-                    animated: true,
-                });
-
+            if (targetAge) {
+                snapToCenter(clampedIndex);
                 if (targetAge !== data.age) {
                     updateData('age', targetAge);
                 }
@@ -508,52 +557,56 @@ export const OnboardingScreen: React.FC = () => {
             <View style={styles.stepContent}>
                 <Text style={styles.stepTitle}>how old are you?</Text>
                 <View style={styles.agePickerContainer}>
-                    {/* Scrollable age list */}
-                    <ScrollView
-                        ref={ageScrollViewRef}
-                        style={styles.ageScrollView}
-                        contentContainerStyle={styles.ageScrollContent}
-                        showsVerticalScrollIndicator={false}
-                        snapToInterval={ITEM_HEIGHT}
-                        snapToAlignment="center"
-                        decelerationRate="fast"
-                        onMomentumScrollEnd={handleMomentumScrollEnd}
-                        onScrollEndDrag={handleScrollEndDrag}
-                    >
-                        {/* Top padding to center first item */}
-                        <View style={{ height: (200 - ITEM_HEIGHT) / 2 }} />
+                    {/* Mask to only show 3 items */}
+                    <View style={styles.agePickerMask}>
+                        {/* Scrollable age list */}
+                        <Animated.ScrollView
+                            ref={ageScrollViewRef}
+                            style={styles.ageScrollView}
+                            contentContainerStyle={styles.ageScrollContent}
+                            showsVerticalScrollIndicator={false}
+                            snapToInterval={ITEM_HEIGHT}
+                            snapToAlignment="start"
+                            decelerationRate="normal"
+                            bounces={false}
+                            onScroll={handleScroll}
+                            scrollEventThrottle={8}
+                            onMomentumScrollEnd={handleMomentumScrollEnd}
+                            onScrollEndDrag={handleScrollEndDrag}
+                            removeClippedSubviews={false}
+                        >
+                            {/* Top padding to center middle item */}
+                            <View style={{ height: 100 }} />
 
-                        {/* Age numbers */}
-                        {ages.map((age) => {
-                            const isSelected = age === currentAge;
+                            {/* Age numbers - render all for scrolling, mask shows only 3 */}
+                            {ages.map((age, index) => {
+                                const isSelected = age === currentAge;
 
-                            return (
-                                <Animated.View
-                                    key={age}
-                                    style={[
-                                        styles.ageItem,
-                                        {
-                                            height: ITEM_HEIGHT,
-                                            transform: [{ scale: isSelected ? ageScaleAnim : ageScaleStatic }],
-                                            opacity: isSelected ? 1 : 0.5,
-                                        },
-                                        isSelected && styles.ageItemSelected
-                                    ]}
-                                >
-                                    <Text
+                                return (
+                                    <View
+                                        key={age}
                                         style={[
-                                            isSelected ? styles.agePickerTextSelected : styles.agePickerNumberSecondary
+                                            styles.ageItem,
+                                            {
+                                                height: ITEM_HEIGHT,
+                                            },
                                         ]}
                                     >
-                                        {age}
-                                    </Text>
-                                </Animated.View>
-                            );
-                        })}
+                                        <Text
+                                            style={[
+                                                isSelected ? styles.agePickerTextSelected : styles.agePickerNumberSecondary,
+                                            ]}
+                                        >
+                                            {age}
+                                        </Text>
+                                    </View>
+                                );
+                            })}
 
-                        {/* Bottom padding to center last item */}
-                        <View style={{ height: (200 - ITEM_HEIGHT) / 2 }} />
-                    </ScrollView>
+                            {/* Bottom padding to center middle item */}
+                            <View style={{ height: 100 }} />
+                        </Animated.ScrollView>
+                    </View>
                 </View>
             </View>
         );
