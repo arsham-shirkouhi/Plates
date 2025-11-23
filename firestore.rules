@@ -11,6 +11,14 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
     
+    // Usernames collection - public read for checking availability, authenticated write
+    match /usernames/{username} {
+      // Anyone can read to check username availability
+      allow read: if isAuthenticated();
+      // Only the owner can write their own username
+      allow write: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+    }
+    
     // Users collection - users can only read/write their own data
     match /users/{userId} {
       // Allow read and write only if the user is the owner

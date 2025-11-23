@@ -51,8 +51,11 @@ export const Slider: React.FC<SliderProps> = ({
             if (formatValue) {
                 // Extract just the number part (remove unit)
                 const formatted = formatValue(value);
-                setTextValue(formatted.replace(unit ? ' ' + unit : '', ''));
+                // Remove unit and any special characters like ' and "
+                const cleaned = formatted.replace(unit ? ' ' + unit : '', '').replace(/'/g, '').replace(/"/g, '').trim();
+                setTextValue(cleaned);
             } else {
+                // Store just the number without unit
                 setTextValue(value.toString());
             }
         }
@@ -121,9 +124,28 @@ export const Slider: React.FC<SliderProps> = ({
     ).current;
 
     const handleTextChange = (text: string) => {
-        setTextValue(text);
-        // Handle decimal values for weight (kg can have 0.5 steps)
-        const numValue = parseFloat(text);
+        // Only allow digits, max 3 digits
+        const digitsOnly = text.replace(/[^\d]/g, '');
+        if (digitsOnly.length > 3) {
+            return; // Don't update if more than 3 digits
+        }
+        setTextValue(digitsOnly);
+
+        // Extract number from text (text should only contain numbers now, no unit)
+        // Handle feet and inches format (e.g., "5'11" or "5'11\"")
+        let numValue: number;
+
+        // Check if it's in feet and inches format
+        const feetInchesMatch = digitsOnly.match(/(\d+)'(\d+)"/);
+        if (feetInchesMatch) {
+            const feet = parseInt(feetInchesMatch[1], 10);
+            const inches = parseInt(feetInchesMatch[2], 10);
+            numValue = feet * 12 + inches; // Convert to inches
+        } else {
+            // Just parse the number (no unit to remove)
+            numValue = parseFloat(digitsOnly);
+        }
+
         if (!isNaN(numValue)) {
             const clampedValue = Math.max(minimumValue, Math.min(maximumValue, numValue));
             // Round to step for integer steps, or round to nearest 0.5 for decimal steps
@@ -136,22 +158,34 @@ export const Slider: React.FC<SliderProps> = ({
 
     const handleTextBlur = () => {
         setIsEditing(false);
-        const numValue = parseFloat(textValue);
+
+        // Handle feet and inches format
+        let numValue: number;
+        const feetInchesMatch = textValue.match(/(\d+)'(\d+)"/);
+        if (feetInchesMatch) {
+            const feet = parseInt(feetInchesMatch[1], 10);
+            const inches = parseInt(feetInchesMatch[2], 10);
+            numValue = feet * 12 + inches; // Convert to inches
+        } else {
+            // Just parse the number (no unit to remove)
+            numValue = parseFloat(textValue);
+        }
+
         if (isNaN(numValue) || numValue < minimumValue || numValue > maximumValue) {
-            // Reset to current value if invalid
-            setTextValue(formatValue ? formatValue(value).replace(unit ? ' ' + unit : '', '') : value.toString());
+            // Reset to current value (number only, no unit)
+            if (formatValue) {
+                const formatted = formatValue(value);
+                const cleaned = formatted.replace(unit ? ' ' + unit : '', '').replace(/'/g, '').replace(/"/g, '').trim();
+                setTextValue(cleaned);
+            } else {
+                setTextValue(value.toString());
+            }
         } else {
             // Round to step for integer steps, or round to nearest 0.5 for decimal steps
             const steppedValue = step >= 1
                 ? Math.round(numValue / step) * step
                 : Math.round(numValue * 2) / 2;
             onValueChange(steppedValue);
-            // Format the display value correctly
-            if (formatValue) {
-                setTextValue(formatValue(steppedValue).replace(unit ? ' ' + unit : '', ''));
-            } else {
-                setTextValue(steppedValue.toString());
-            }
         }
     };
 
@@ -196,10 +230,6 @@ export const Slider: React.FC<SliderProps> = ({
                     ]}
                 />
             </View>
-            <View style={styles.labels}>
-                <Text style={styles.label}>{minimumValue}</Text>
-                <Text style={styles.label}>{maximumValue}</Text>
-            </View>
         </View>
     );
 };
@@ -209,18 +239,49 @@ const styles = StyleSheet.create({
         width: SLIDER_WIDTH,
         alignSelf: 'center',
     },
+    valueContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 0,
+        marginBottom: 20,
+    },
     valueText: {
         fontSize: 48,
         fontFamily: fonts.bold,
         color: '#526EFF',
         textAlign: 'center',
-        marginBottom: 30,
+        marginTop: 0,
+        marginBottom: 20,
+    },
+    valueTextEditable: {
+        borderBottomWidth: 2,
+        borderBottomColor: '#526EFF',
+        paddingBottom: 4,
+        maxWidth: 90, // Max width for 3 digits
+        textAlign: 'center',
+    },
+    editingContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    unitText: {
+        fontSize: 48,
+        fontFamily: fonts.bold,
+        color: '#526EFF',
+        marginLeft: 8,
+    },
+    editButton: {
+        marginLeft: 12,
+        padding: 4,
     },
     editableValueContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 30,
+        marginTop: 20,
+        marginBottom: 20,
         position: 'relative',
     },
     editableValueText: {
@@ -242,9 +303,11 @@ const styles = StyleSheet.create({
         opacity: 0.6,
     },
     sliderTrack: {
-        height: 8,
-        backgroundColor: '#F5F5F5',
-        borderRadius: 4,
+        height: 12,
+        backgroundColor: '#fff',
+        borderWidth: 2,
+        borderColor: '#000',
+        borderRadius: 6,
         position: 'relative',
         marginBottom: 10,
         width: '100%',

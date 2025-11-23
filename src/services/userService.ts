@@ -19,7 +19,6 @@ export interface OnboardingData {
     weightUnit: 'kg' | 'lbs';
     goal: 'lose' | 'maintain' | 'build' | '';
     activityLevel: 'sedentary' | 'lightly' | 'moderate' | 'very' | '';
-    workoutFrequency: '0-1' | '2-3' | '4-5' | '6+' | '';
     dietPreference: 'regular' | 'high-protein' | 'vegetarian' | 'vegan' | 'keto' | 'halal' | '';
     allergies: string[];
     goalIntensity: 'mild' | 'moderate' | 'aggressive' | '';
@@ -152,9 +151,13 @@ export const saveOnboardingData = async (user: User, onboardingData: OnboardingD
     try {
         const userDocRef = doc(db, 'users', user.uid);
 
-        // Get existing document to preserve createdAt
+        // Get existing document to preserve createdAt and check for existing username
         const existingDoc = await getDoc(userDocRef);
         const existingData = existingDoc.exists() ? existingDoc.data() : null;
+        const existingUsername = existingData?.onboardingData?.name?.trim().toLowerCase();
+
+        // Normalize the new username
+        const newUsername = onboardingData.name.trim().toLowerCase();
 
         // Calculate target macros if auto-setup was selected
         let targetMacros = undefined;
@@ -199,9 +202,29 @@ export const saveOnboardingData = async (user: User, onboardingData: OnboardingD
         // Remove any remaining undefined values (Firestore doesn't allow undefined)
         const cleanData = removeUndefinedValues(updateData);
 
+        // Save user data
         await setDoc(userDocRef, cleanData, { merge: true });
 
+        // Update usernames collection
+        // If username changed, remove old username and add new one
+        if (existingUsername && existingUsername !== newUsername) {
+            const oldUsernameRef = doc(db, 'usernames', existingUsername);
+            await setDoc(oldUsernameRef, deleteField(), { merge: true });
+        }
+
+        // Add/update username in usernames collection
+        const usernameRef = doc(db, 'usernames', newUsername);
+        await setDoc(usernameRef, {
+            userId: user.uid,
+            username: onboardingData.name.trim(), // Store original case
+            createdAt: existingUsername === newUsername && existingData?.createdAt
+                ? existingData.createdAt
+                : serverTimestamp(),
+            updatedAt: serverTimestamp(),
+        });
+
         console.log('✅ Onboarding data saved successfully');
+        console.log('✅ Username registered in usernames collection');
         console.log('✅ onboardingCompleted flag set to: true');
         console.log('📊 Target macros calculated:', targetMacros);
     } catch (error) {
@@ -266,6 +289,14 @@ export const resetOnboarding = async (user: User): Promise<void> => {
         // Use merge: true to update only specified fields and delete the ones marked with deleteField()
         await setDoc(userDocRef, resetData, { merge: true });
 
+        // Remove username from usernames collection if it exists
+        if (existingData?.onboardingData?.name) {
+            const username = existingData.onboardingData.name.trim().toLowerCase();
+            const usernameRef = doc(db, 'usernames', username);
+            await setDoc(usernameRef, deleteField(), { merge: true });
+            console.log('🗑️ Username removed from usernames collection');
+        }
+
         console.log('✅ Onboarding data reset successfully - all onboarding data cleared');
     } catch (error) {
         console.error('❌ Error resetting onboarding data:', error);
@@ -285,6 +316,40 @@ export const updateLastLogin = async (user: User): Promise<void> => {
     } catch (error) {
         console.error('Error updating last login:', error);
         // Don't throw - this is not critical
+    }
+};
+
+/**
+ * Check if a username already exists in Firestore
+ * Uses the usernames collection for efficient lookup
+ * @param username - The username to check
+ * @param currentUserId - Optional: current user's ID to exclude from check (for editing own username)
+ * @returns true if username exists, false otherwise
+ */
+export const checkUsernameExists = async (username: string, currentUserId?: string): Promise<boolean> => {
+    try {
+        if (!username || username.trim().length === 0) {
+            return false;
+        }
+
+        const normalizedUsername = username.trim().toLowerCase();
+        const usernameDocRef = doc(db, 'usernames', normalizedUsername);
+        const usernameDoc = await getDoc(usernameDocRef);
+
+        if (usernameDoc.exists()) {
+            const data = usernameDoc.data();
+            // If checking for current user, allow them to keep their own username
+            if (currentUserId && data.userId === currentUserId) {
+                return false; // It's their own username, so it's available to them
+            }
+            return true; // Username exists and belongs to someone else
+        }
+
+        return false; // Username is available
+    } catch (error) {
+        console.error('Error checking username existence:', error);
+        // Return false on error to allow user to proceed (fail open)
+        return false;
     }
 };
 
