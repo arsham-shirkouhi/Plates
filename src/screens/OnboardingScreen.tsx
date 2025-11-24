@@ -76,6 +76,8 @@ export const OnboardingScreen: React.FC = () => {
     const contentScale = useRef(new Animated.Value(1)).current;
     const unitToggleSlide = useRef(new Animated.Value(data.heightUnit === 'cm' ? 0 : 1)).current;
     const weightUnitToggleSlide = useRef(new Animated.Value(data.weightUnit === 'kg' ? 0 : 1)).current;
+    const unitPreferenceWeightToggleSlide = useRef(new Animated.Value(data.unitPreference.weight === 'kg' ? 0 : 1)).current;
+    const unitPreferenceHeightToggleSlide = useRef(new Animated.Value(data.unitPreference.height === 'cm' ? 0 : 1)).current;
 
     // Welcome step animation refs
     const welcomeTextOpacity = useRef(new Animated.Value(0)).current;
@@ -166,6 +168,78 @@ export const OnboardingScreen: React.FC = () => {
     const veganCardColorOpacity = useRef(new Animated.Value(0)).current;
     const ketoCardColorOpacity = useRef(new Animated.Value(0)).current;
     const halalCardColorOpacity = useRef(new Animated.Value(0)).current;
+
+    // Animation refs for goal intensity cards
+    const mildIntensityCardTranslateY = useRef(new Animated.Value(0)).current;
+    const moderateIntensityCardTranslateY = useRef(new Animated.Value(0)).current;
+    const aggressiveIntensityCardTranslateY = useRef(new Animated.Value(0)).current;
+    const mildIntensityCardShadowHeight = useRef(new Animated.Value(4)).current;
+    const moderateIntensityCardShadowHeight = useRef(new Animated.Value(4)).current;
+    const aggressiveIntensityCardShadowHeight = useRef(new Animated.Value(4)).current;
+    const [mildIntensityCardShadowHeightState, setMildIntensityCardShadowHeightState] = useState(4);
+    const [moderateIntensityCardShadowHeightState, setModerateIntensityCardShadowHeightState] = useState(4);
+    const [aggressiveIntensityCardShadowHeightState, setAggressiveIntensityCardShadowHeightState] = useState(4);
+    const mildIntensityCardColorOpacity = useRef(new Animated.Value(0)).current;
+    const moderateIntensityCardColorOpacity = useRef(new Animated.Value(0)).current;
+    const aggressiveIntensityCardColorOpacity = useRef(new Animated.Value(0)).current;
+
+    // Animation refs for purpose cards
+    const mealsPurposeCardTranslateY = useRef(new Animated.Value(0)).current;
+    const workoutsPurposeCardTranslateY = useRef(new Animated.Value(0)).current;
+    const bothPurposeCardTranslateY = useRef(new Animated.Value(0)).current;
+    const disciplinePurposeCardTranslateY = useRef(new Animated.Value(0)).current;
+    const mealsPurposeCardShadowHeight = useRef(new Animated.Value(4)).current;
+    const workoutsPurposeCardShadowHeight = useRef(new Animated.Value(4)).current;
+    const bothPurposeCardShadowHeight = useRef(new Animated.Value(4)).current;
+    const disciplinePurposeCardShadowHeight = useRef(new Animated.Value(4)).current;
+    const [mealsPurposeCardShadowHeightState, setMealsPurposeCardShadowHeightState] = useState(4);
+    const [workoutsPurposeCardShadowHeightState, setWorkoutsPurposeCardShadowHeightState] = useState(4);
+    const [bothPurposeCardShadowHeightState, setBothPurposeCardShadowHeightState] = useState(4);
+    const [disciplinePurposeCardShadowHeightState, setDisciplinePurposeCardShadowHeightState] = useState(4);
+    const mealsPurposeCardColorOpacity = useRef(new Animated.Value(0)).current;
+    const workoutsPurposeCardColorOpacity = useRef(new Animated.Value(0)).current;
+    const bothPurposeCardColorOpacity = useRef(new Animated.Value(0)).current;
+    const disciplinePurposeCardColorOpacity = useRef(new Animated.Value(0)).current;
+
+    // Animation refs for macro cards
+    const autoMacroCardTranslateY = useRef(new Animated.Value(0)).current;
+    const manualMacroCardTranslateY = useRef(new Animated.Value(0)).current;
+    const autoMacroCardShadowHeight = useRef(new Animated.Value(4)).current;
+    const manualMacroCardShadowHeight = useRef(new Animated.Value(4)).current;
+    const [autoMacroCardShadowHeightState, setAutoMacroCardShadowHeightState] = useState(4);
+    const [manualMacroCardShadowHeightState, setManualMacroCardShadowHeightState] = useState(4);
+    const autoMacroCardColorOpacity = useRef(new Animated.Value(0)).current;
+    const manualMacroCardColorOpacity = useRef(new Animated.Value(0)).current;
+
+    // Animation refs for allergy chips
+    const nutsChipTranslateY = useRef(new Animated.Value(0)).current;
+    const lactoseChipTranslateY = useRef(new Animated.Value(0)).current;
+    const glutenChipTranslateY = useRef(new Animated.Value(0)).current;
+    const shellfishChipTranslateY = useRef(new Animated.Value(0)).current;
+    const eggsChipTranslateY = useRef(new Animated.Value(0)).current;
+    const soyChipTranslateY = useRef(new Animated.Value(0)).current;
+    const fishChipTranslateY = useRef(new Animated.Value(0)).current;
+    const nutsChipShadowHeight = useRef(new Animated.Value(4)).current;
+    const lactoseChipShadowHeight = useRef(new Animated.Value(4)).current;
+    const glutenChipShadowHeight = useRef(new Animated.Value(4)).current;
+    const shellfishChipShadowHeight = useRef(new Animated.Value(4)).current;
+    const eggsChipShadowHeight = useRef(new Animated.Value(4)).current;
+    const soyChipShadowHeight = useRef(new Animated.Value(4)).current;
+    const fishChipShadowHeight = useRef(new Animated.Value(4)).current;
+    const [nutsChipShadowHeightState, setNutsChipShadowHeightState] = useState(4);
+    const [lactoseChipShadowHeightState, setLactoseChipShadowHeightState] = useState(4);
+    const [glutenChipShadowHeightState, setGlutenChipShadowHeightState] = useState(4);
+    const [shellfishChipShadowHeightState, setShellfishChipShadowHeightState] = useState(4);
+    const [eggsChipShadowHeightState, setEggsChipShadowHeightState] = useState(4);
+    const [soyChipShadowHeightState, setSoyChipShadowHeightState] = useState(4);
+    const [fishChipShadowHeightState, setFishChipShadowHeightState] = useState(4);
+    const nutsChipColorOpacity = useRef(new Animated.Value(0)).current;
+    const lactoseChipColorOpacity = useRef(new Animated.Value(0)).current;
+    const glutenChipColorOpacity = useRef(new Animated.Value(0)).current;
+    const shellfishChipColorOpacity = useRef(new Animated.Value(0)).current;
+    const eggsChipColorOpacity = useRef(new Animated.Value(0)).current;
+    const soyChipColorOpacity = useRef(new Animated.Value(0)).current;
+    const fishChipColorOpacity = useRef(new Animated.Value(0)).current;
 
     // Age picker refs
     // Date picker state
@@ -616,25 +690,25 @@ export const OnboardingScreen: React.FC = () => {
                     return { valid: false, message: 'please select your diet preference' };
                 }
                 break;
-            case 11: // Allergies - OPTIONAL, can skip
+            case 10: // Allergies - OPTIONAL, can skip
                 // No validation needed - optional field
                 break;
-            case 12: // Goal Intensity - REQUIRED
+            case 11: // Goal Intensity - REQUIRED
                 if (data.goalIntensity === '') {
                     return { valid: false, message: 'please select goal intensity' };
                 }
                 break;
-            case 13: // Unit Preferences - REQUIRED (has defaults, but validate)
+            case 12: // Unit Preferences - REQUIRED (has defaults, but validate)
                 if (!data.unitPreference || !data.unitPreference.weight || !data.unitPreference.height) {
                     return { valid: false, message: 'please select unit preferences' };
                 }
                 break;
-            case 14: // Purpose - REQUIRED
+            case 13: // Purpose - REQUIRED
                 if (data.purpose === '') {
                     return { valid: false, message: 'please select what you\'re here for' };
                 }
                 break;
-            case 15: // Macros Setup - REQUIRED
+            case 14: // Macros Setup - This step still exists as step 14
                 if (data.macrosSetup === '') {
                     return { valid: false, message: 'please select macros setup' };
                 }
@@ -670,7 +744,7 @@ export const OnboardingScreen: React.FC = () => {
 
     const handleComplete = async () => {
         console.log('═══════════════════════════════════════════════════════');
-        console.log('🎯 ONBOARDING COMPLETION - Step 15');
+        console.log(`🎯 ONBOARDING COMPLETION - Step ${TOTAL_STEPS}`);
         console.log('═══════════════════════════════════════════════════════');
 
         if (!user) {
@@ -871,9 +945,9 @@ export const OnboardingScreen: React.FC = () => {
                 return renderGoalIntensityStep();
             case 12:
                 return renderUnitPreferencesStep();
-            case 14:
+            case 13:
                 return renderPurposeStep();
-            case 15:
+            case 14:
                 return renderMacrosStep();
             default:
                 return null;
@@ -1180,6 +1254,48 @@ export const OnboardingScreen: React.FC = () => {
         const halalListenerId = halalCardShadowHeight.addListener(({ value }) => {
             setHalalCardShadowHeightState(value);
         });
+        const nutsChipListenerId = nutsChipShadowHeight.addListener(({ value }) => {
+            setNutsChipShadowHeightState(value);
+        });
+        const lactoseChipListenerId = lactoseChipShadowHeight.addListener(({ value }) => {
+            setLactoseChipShadowHeightState(value);
+        });
+        const glutenChipListenerId = glutenChipShadowHeight.addListener(({ value }) => {
+            setGlutenChipShadowHeightState(value);
+        });
+        const shellfishChipListenerId = shellfishChipShadowHeight.addListener(({ value }) => {
+            setShellfishChipShadowHeightState(value);
+        });
+        const eggsChipListenerId = eggsChipShadowHeight.addListener(({ value }) => {
+            setEggsChipShadowHeightState(value);
+        });
+        const soyChipListenerId = soyChipShadowHeight.addListener(({ value }) => {
+            setSoyChipShadowHeightState(value);
+        });
+        const fishChipListenerId = fishChipShadowHeight.addListener(({ value }) => {
+            setFishChipShadowHeightState(value);
+        });
+        const mildIntensityListenerId = mildIntensityCardShadowHeight.addListener(({ value }) => {
+            setMildIntensityCardShadowHeightState(value);
+        });
+        const moderateIntensityListenerId = moderateIntensityCardShadowHeight.addListener(({ value }) => {
+            setModerateIntensityCardShadowHeightState(value);
+        });
+        const aggressiveIntensityListenerId = aggressiveIntensityCardShadowHeight.addListener(({ value }) => {
+            setAggressiveIntensityCardShadowHeightState(value);
+        });
+        const mealsPurposeListenerId = mealsPurposeCardShadowHeight.addListener(({ value }) => {
+            setMealsPurposeCardShadowHeightState(value);
+        });
+        const workoutsPurposeListenerId = workoutsPurposeCardShadowHeight.addListener(({ value }) => {
+            setWorkoutsPurposeCardShadowHeightState(value);
+        });
+        const bothPurposeListenerId = bothPurposeCardShadowHeight.addListener(({ value }) => {
+            setBothPurposeCardShadowHeightState(value);
+        });
+        const disciplinePurposeListenerId = disciplinePurposeCardShadowHeight.addListener(({ value }) => {
+            setDisciplinePurposeCardShadowHeightState(value);
+        });
         return () => {
             maleCardShadowHeight.removeListener(maleListenerId);
             femaleCardShadowHeight.removeListener(femaleListenerId);
@@ -1196,6 +1312,59 @@ export const OnboardingScreen: React.FC = () => {
             veganCardShadowHeight.removeListener(veganListenerId);
             ketoCardShadowHeight.removeListener(ketoListenerId);
             halalCardShadowHeight.removeListener(halalListenerId);
+            nutsChipShadowHeight.removeListener(nutsChipListenerId);
+            lactoseChipShadowHeight.removeListener(lactoseChipListenerId);
+            glutenChipShadowHeight.removeListener(glutenChipListenerId);
+            shellfishChipShadowHeight.removeListener(shellfishChipListenerId);
+            eggsChipShadowHeight.removeListener(eggsChipListenerId);
+            soyChipShadowHeight.removeListener(soyChipListenerId);
+            fishChipShadowHeight.removeListener(fishChipListenerId);
+            mildIntensityCardShadowHeight.removeListener(mildIntensityListenerId);
+            moderateIntensityCardShadowHeight.removeListener(moderateIntensityListenerId);
+            aggressiveIntensityCardShadowHeight.removeListener(aggressiveIntensityListenerId);
+            mealsPurposeCardShadowHeight.removeListener(mealsPurposeListenerId);
+            workoutsPurposeCardShadowHeight.removeListener(workoutsPurposeListenerId);
+            bothPurposeCardShadowHeight.removeListener(bothPurposeListenerId);
+            disciplinePurposeCardShadowHeight.removeListener(disciplinePurposeListenerId);
+        };
+        const autoMacroListenerId = autoMacroCardShadowHeight.addListener(({ value }) => {
+            setAutoMacroCardShadowHeightState(value);
+        });
+        const manualMacroListenerId = manualMacroCardShadowHeight.addListener(({ value }) => {
+            setManualMacroCardShadowHeightState(value);
+        });
+        return () => {
+            maleCardShadowHeight.removeListener(maleListenerId);
+            femaleCardShadowHeight.removeListener(femaleListenerId);
+            loseCardShadowHeight.removeListener(loseListenerId);
+            maintainCardShadowHeight.removeListener(maintainListenerId);
+            buildCardShadowHeight.removeListener(buildListenerId);
+            sedentaryCardShadowHeight.removeListener(sedentaryListenerId);
+            lightlyCardShadowHeight.removeListener(lightlyListenerId);
+            moderateCardShadowHeight.removeListener(moderateListenerId);
+            veryCardShadowHeight.removeListener(veryListenerId);
+            regularCardShadowHeight.removeListener(regularListenerId);
+            highProteinCardShadowHeight.removeListener(highProteinListenerId);
+            vegetarianCardShadowHeight.removeListener(vegetarianListenerId);
+            veganCardShadowHeight.removeListener(veganListenerId);
+            ketoCardShadowHeight.removeListener(ketoListenerId);
+            halalCardShadowHeight.removeListener(halalListenerId);
+            nutsChipShadowHeight.removeListener(nutsChipListenerId);
+            lactoseChipShadowHeight.removeListener(lactoseChipListenerId);
+            glutenChipShadowHeight.removeListener(glutenChipListenerId);
+            shellfishChipShadowHeight.removeListener(shellfishChipListenerId);
+            eggsChipShadowHeight.removeListener(eggsChipListenerId);
+            soyChipShadowHeight.removeListener(soyChipListenerId);
+            fishChipShadowHeight.removeListener(fishChipListenerId);
+            mildIntensityCardShadowHeight.removeListener(mildIntensityListenerId);
+            moderateIntensityCardShadowHeight.removeListener(moderateIntensityListenerId);
+            aggressiveIntensityCardShadowHeight.removeListener(aggressiveIntensityListenerId);
+            mealsPurposeCardShadowHeight.removeListener(mealsPurposeListenerId);
+            workoutsPurposeCardShadowHeight.removeListener(workoutsPurposeListenerId);
+            bothPurposeCardShadowHeight.removeListener(bothPurposeListenerId);
+            disciplinePurposeCardShadowHeight.removeListener(disciplinePurposeListenerId);
+            autoMacroCardShadowHeight.removeListener(autoMacroListenerId);
+            manualMacroCardShadowHeight.removeListener(manualMacroListenerId);
         };
     }, []);
 
@@ -1581,6 +1750,388 @@ export const OnboardingScreen: React.FC = () => {
         }
     }, [data.dietPreference, currentStep]);
 
+    // Animate allergy chips when selection changes - pressed button state when selected
+    useEffect(() => {
+        // Always run animations when on step 10, or when allergies change
+        if (currentStep === 10) { // Allergies step is step 10
+            const isNutsSelected = data.allergies.includes('nuts');
+            const isLactoseSelected = data.allergies.includes('lactose');
+            const isGlutenSelected = data.allergies.includes('gluten');
+            const isShellfishSelected = data.allergies.includes('shellfish');
+            const isEggsSelected = data.allergies.includes('eggs');
+            const isSoySelected = data.allergies.includes('soy');
+            const isFishSelected = data.allergies.includes('fish');
+
+            const animations: Animated.CompositeAnimation[] = [
+                Animated.parallel([
+                    Animated.timing(nutsChipTranslateY, {
+                        toValue: isNutsSelected ? 4 : 0,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(nutsChipShadowHeight, {
+                        toValue: isNutsSelected ? 0 : 4,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                    Animated.timing(nutsChipColorOpacity, {
+                        toValue: isNutsSelected ? 1 : 0,
+                        duration: 300,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                ]),
+                Animated.parallel([
+                    Animated.timing(lactoseChipTranslateY, {
+                        toValue: isLactoseSelected ? 4 : 0,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(lactoseChipShadowHeight, {
+                        toValue: isLactoseSelected ? 0 : 4,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                    Animated.timing(lactoseChipColorOpacity, {
+                        toValue: isLactoseSelected ? 1 : 0,
+                        duration: 300,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                ]),
+                Animated.parallel([
+                    Animated.timing(glutenChipTranslateY, {
+                        toValue: isGlutenSelected ? 4 : 0,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(glutenChipShadowHeight, {
+                        toValue: isGlutenSelected ? 0 : 4,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                    Animated.timing(glutenChipColorOpacity, {
+                        toValue: isGlutenSelected ? 1 : 0,
+                        duration: 300,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                ]),
+                Animated.parallel([
+                    Animated.timing(shellfishChipTranslateY, {
+                        toValue: isShellfishSelected ? 4 : 0,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(shellfishChipShadowHeight, {
+                        toValue: isShellfishSelected ? 0 : 4,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                    Animated.timing(shellfishChipColorOpacity, {
+                        toValue: isShellfishSelected ? 1 : 0,
+                        duration: 300,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                ]),
+                Animated.parallel([
+                    Animated.timing(eggsChipTranslateY, {
+                        toValue: isEggsSelected ? 4 : 0,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(eggsChipShadowHeight, {
+                        toValue: isEggsSelected ? 0 : 4,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                    Animated.timing(eggsChipColorOpacity, {
+                        toValue: isEggsSelected ? 1 : 0,
+                        duration: 300,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                ]),
+                Animated.parallel([
+                    Animated.timing(soyChipTranslateY, {
+                        toValue: isSoySelected ? 4 : 0,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(soyChipShadowHeight, {
+                        toValue: isSoySelected ? 0 : 4,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                    Animated.timing(soyChipColorOpacity, {
+                        toValue: isSoySelected ? 1 : 0,
+                        duration: 300,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                ]),
+                Animated.parallel([
+                    Animated.timing(fishChipTranslateY, {
+                        toValue: isFishSelected ? 4 : 0,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(fishChipShadowHeight, {
+                        toValue: isFishSelected ? 0 : 4,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                    Animated.timing(fishChipColorOpacity, {
+                        toValue: isFishSelected ? 1 : 0,
+                        duration: 300,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                ]),
+            ];
+
+            Animated.parallel(animations).start();
+        }
+    }, [data.allergies, currentStep]);
+
+    // Animate goal intensity cards when selection changes - pressed button state when selected
+    useEffect(() => {
+        if (currentStep === 11) { // Goal intensity step is step 11
+            const isMildSelected = data.goalIntensity === 'mild';
+            const isModerateSelected = data.goalIntensity === 'moderate';
+            const isAggressiveSelected = data.goalIntensity === 'aggressive';
+
+            const animations: Animated.CompositeAnimation[] = [
+                Animated.parallel([
+                    Animated.timing(mildIntensityCardTranslateY, {
+                        toValue: isMildSelected ? 4 : 0,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(mildIntensityCardShadowHeight, {
+                        toValue: isMildSelected ? 0 : 4,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                    Animated.timing(mildIntensityCardColorOpacity, {
+                        toValue: isMildSelected ? 1 : 0,
+                        duration: 300,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                ]),
+                Animated.parallel([
+                    Animated.timing(moderateIntensityCardTranslateY, {
+                        toValue: isModerateSelected ? 4 : 0,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(moderateIntensityCardShadowHeight, {
+                        toValue: isModerateSelected ? 0 : 4,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                    Animated.timing(moderateIntensityCardColorOpacity, {
+                        toValue: isModerateSelected ? 1 : 0,
+                        duration: 300,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                ]),
+                Animated.parallel([
+                    Animated.timing(aggressiveIntensityCardTranslateY, {
+                        toValue: isAggressiveSelected ? 4 : 0,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(aggressiveIntensityCardShadowHeight, {
+                        toValue: isAggressiveSelected ? 0 : 4,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                    Animated.timing(aggressiveIntensityCardColorOpacity, {
+                        toValue: isAggressiveSelected ? 1 : 0,
+                        duration: 300,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                ]),
+            ];
+
+            Animated.parallel(animations).start();
+        }
+    }, [data.goalIntensity, currentStep]);
+
+    // Animate purpose cards when selection changes - pressed button state when selected
+    useEffect(() => {
+        if (currentStep === 13) { // Purpose step is step 13
+            const isMealsSelected = data.purpose === 'meals';
+            const isWorkoutsSelected = data.purpose === 'workouts';
+            const isBothSelected = data.purpose === 'both';
+            const isDisciplineSelected = data.purpose === 'discipline';
+
+            const animations: Animated.CompositeAnimation[] = [
+                Animated.parallel([
+                    Animated.timing(mealsPurposeCardTranslateY, {
+                        toValue: isMealsSelected ? 4 : 0,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(mealsPurposeCardShadowHeight, {
+                        toValue: isMealsSelected ? 0 : 4,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                    Animated.timing(mealsPurposeCardColorOpacity, {
+                        toValue: isMealsSelected ? 1 : 0,
+                        duration: 300,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                ]),
+                Animated.parallel([
+                    Animated.timing(workoutsPurposeCardTranslateY, {
+                        toValue: isWorkoutsSelected ? 4 : 0,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(workoutsPurposeCardShadowHeight, {
+                        toValue: isWorkoutsSelected ? 0 : 4,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                    Animated.timing(workoutsPurposeCardColorOpacity, {
+                        toValue: isWorkoutsSelected ? 1 : 0,
+                        duration: 300,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                ]),
+                Animated.parallel([
+                    Animated.timing(bothPurposeCardTranslateY, {
+                        toValue: isBothSelected ? 4 : 0,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(bothPurposeCardShadowHeight, {
+                        toValue: isBothSelected ? 0 : 4,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                    Animated.timing(bothPurposeCardColorOpacity, {
+                        toValue: isBothSelected ? 1 : 0,
+                        duration: 300,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                ]),
+                Animated.parallel([
+                    Animated.timing(disciplinePurposeCardTranslateY, {
+                        toValue: isDisciplineSelected ? 4 : 0,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(disciplinePurposeCardShadowHeight, {
+                        toValue: isDisciplineSelected ? 0 : 4,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                    Animated.timing(disciplinePurposeCardColorOpacity, {
+                        toValue: isDisciplineSelected ? 1 : 0,
+                        duration: 300,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                ]),
+            ];
+
+            Animated.parallel(animations).start();
+        }
+    }, [data.macrosSetup, currentStep]);
+
+    // Animate macro cards when selection changes - pressed button state when selected
+    useEffect(() => {
+        // Always run animations when on step 14, or when macrosSetup changes
+        if (currentStep === 14) { // Macros step is step 14
+            const isAutoSelected = data.macrosSetup === 'auto';
+            const isManualSelected = data.macrosSetup === 'manual';
+
+            const animations: Animated.CompositeAnimation[] = [
+                Animated.parallel([
+                    Animated.timing(autoMacroCardTranslateY, {
+                        toValue: isAutoSelected ? 4 : 0,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(autoMacroCardShadowHeight, {
+                        toValue: isAutoSelected ? 0 : 4,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                    Animated.timing(autoMacroCardColorOpacity, {
+                        toValue: isAutoSelected ? 1 : 0,
+                        duration: 300,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                ]),
+                Animated.parallel([
+                    Animated.timing(manualMacroCardTranslateY, {
+                        toValue: isManualSelected ? 4 : 0,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(manualMacroCardShadowHeight, {
+                        toValue: isManualSelected ? 0 : 4,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                    Animated.timing(manualMacroCardColorOpacity, {
+                        toValue: isManualSelected ? 1 : 0,
+                        duration: 300,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                ]),
+            ];
+
+            Animated.parallel(animations).start();
+        }
+    }, [data.macrosSetup, currentStep]);
+
     const renderSexStep = () => {
         return (
             <View style={styles.stepContent}>
@@ -1691,6 +2242,27 @@ export const OnboardingScreen: React.FC = () => {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [data.weightUnit, currentStep]);
+
+    // Animate unit preference toggles sliding background when unit changes (only on unit preferences step)
+    useEffect(() => {
+        if (currentStep === 12) { // Unit preferences step is step 12
+            Animated.parallel([
+                Animated.timing(unitPreferenceWeightToggleSlide, {
+                    toValue: data.unitPreference.weight === 'kg' ? 0 : 1,
+                    duration: 300,
+                    easing: Easing.out(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(unitPreferenceHeightToggleSlide, {
+                    toValue: data.unitPreference.height === 'cm' ? 0 : 1,
+                    duration: 300,
+                    easing: Easing.out(Easing.ease),
+                    useNativeDriver: true,
+                }),
+            ]).start();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [data.unitPreference, currentStep]);
 
     const renderHeightStep = () => {
         // For ft, we store height in inches (e.g., 71 inches = 5'11")
@@ -2269,34 +2841,224 @@ export const OnboardingScreen: React.FC = () => {
     };
 
     const renderAllergiesStep = () => {
-        const allergies = ['nuts', 'lactose', 'gluten', 'shellfish', 'eggs', 'soy'];
+        const allergies = ['nuts', 'lactose', 'gluten', 'shellfish', 'eggs', 'soy', 'fish'];
+        const topRow = ['nuts', 'eggs', 'soy', 'fish'];
+        const bottomRow = ['lactose', 'gluten', 'shellfish'];
+
+        const getChipAnimations = (allergy: string) => {
+            switch (allergy) {
+                case 'nuts':
+                    return {
+                        translateY: nutsChipTranslateY,
+                        shadowHeight: nutsChipShadowHeightState,
+                        colorOpacity: nutsChipColorOpacity,
+                    };
+                case 'lactose':
+                    return {
+                        translateY: lactoseChipTranslateY,
+                        shadowHeight: lactoseChipShadowHeightState,
+                        colorOpacity: lactoseChipColorOpacity,
+                    };
+                case 'gluten':
+                    return {
+                        translateY: glutenChipTranslateY,
+                        shadowHeight: glutenChipShadowHeightState,
+                        colorOpacity: glutenChipColorOpacity,
+                    };
+                case 'shellfish':
+                    return {
+                        translateY: shellfishChipTranslateY,
+                        shadowHeight: shellfishChipShadowHeightState,
+                        colorOpacity: shellfishChipColorOpacity,
+                    };
+                case 'eggs':
+                    return {
+                        translateY: eggsChipTranslateY,
+                        shadowHeight: eggsChipShadowHeightState,
+                        colorOpacity: eggsChipColorOpacity,
+                    };
+                case 'soy':
+                    return {
+                        translateY: soyChipTranslateY,
+                        shadowHeight: soyChipShadowHeightState,
+                        colorOpacity: soyChipColorOpacity,
+                    };
+                case 'fish':
+                    return {
+                        translateY: fishChipTranslateY,
+                        shadowHeight: fishChipShadowHeightState,
+                        colorOpacity: fishChipColorOpacity,
+                    };
+                default:
+                    return {
+                        translateY: nutsChipTranslateY,
+                        shadowHeight: nutsChipShadowHeightState,
+                        colorOpacity: nutsChipColorOpacity,
+                    };
+            }
+        };
+
+        const renderChip = (allergy: string) => {
+            const isSelected = data.allergies.includes(allergy);
+            const animations = getChipAnimations(allergy);
+
+            return (
+                <TouchableOpacity
+                    key={allergy}
+                    onPress={() => {
+                        if (isSelected) {
+                            updateData('allergies', data.allergies.filter(a => a !== allergy));
+                        } else {
+                            updateData('allergies', [...data.allergies, allergy]);
+                        }
+                    }}
+                    activeOpacity={1}
+                >
+                    <Animated.View
+                        style={[
+                            styles.chip,
+                            {
+                                transform: [{ translateY: animations.translateY }],
+                                shadowColor: '#000',
+                                shadowOffset: {
+                                    width: 0,
+                                    height: animations.shadowHeight,
+                                },
+                                shadowOpacity: 1,
+                                shadowRadius: 0,
+                                elevation: animations.shadowHeight,
+                            },
+                        ]}
+                    >
+                        {/* Color overlay that fades in when selected */}
+                        <Animated.View
+                            style={[
+                                StyleSheet.absoluteFill,
+                                {
+                                    backgroundColor: '#526EFF',
+                                    borderRadius: 12,
+                                    opacity: animations.colorOpacity,
+                                },
+                            ]}
+                            pointerEvents="none"
+                        />
+                        <Text style={[
+                            styles.chipText,
+                            isSelected && styles.chipTextSelected
+                        ]}>
+                            {allergy}
+                        </Text>
+                    </Animated.View>
+                </TouchableOpacity>
+            );
+        };
+
         return (
             <View style={styles.stepContent}>
                 <Text style={styles.stepTitle}>any allergies?</Text>
                 <View style={styles.chipContainer}>
-                    {allergies.map((allergy) => {
-                        const isSelected = data.allergies.includes(allergy);
+                    <View style={styles.chipRow}>
+                        {topRow.map(renderChip)}
+                    </View>
+                    <View style={[styles.chipRow, styles.chipRowBottom]}>
+                        {bottomRow.map(renderChip)}
+                    </View>
+                </View>
+            </View>
+        );
+    };
+
+    const renderGoalIntensityStep = () => {
+        const intensityOptions = [
+            { key: 'mild', label: 'mild', desc: 'slow & steady', color: '#526EFF' },
+            { key: 'moderate', label: 'moderate', desc: 'balanced approach', color: '#526EFF' },
+            { key: 'aggressive', label: 'aggressive', desc: 'fast results', color: '#526EFF' },
+        ] as const;
+
+        const getCardAnimations = (key: string) => {
+            switch (key) {
+                case 'mild':
+                    return {
+                        translateY: mildIntensityCardTranslateY,
+                        shadowHeight: mildIntensityCardShadowHeightState,
+                        colorOpacity: mildIntensityCardColorOpacity,
+                    };
+                case 'moderate':
+                    return {
+                        translateY: moderateIntensityCardTranslateY,
+                        shadowHeight: moderateIntensityCardShadowHeightState,
+                        colorOpacity: moderateIntensityCardColorOpacity,
+                    };
+                case 'aggressive':
+                    return {
+                        translateY: aggressiveIntensityCardTranslateY,
+                        shadowHeight: aggressiveIntensityCardShadowHeightState,
+                        colorOpacity: aggressiveIntensityCardColorOpacity,
+                    };
+                default:
+                    return {
+                        translateY: mildIntensityCardTranslateY,
+                        shadowHeight: mildIntensityCardShadowHeightState,
+                        colorOpacity: mildIntensityCardColorOpacity,
+                    };
+            }
+        };
+
+        return (
+            <View style={styles.stepContent}>
+                <Text style={styles.stepTitle}>goal intensity?</Text>
+                <View style={styles.activityCardContainer}>
+                    {intensityOptions.map((option) => {
+                        const animations = getCardAnimations(option.key);
+                        const isSelected = data.goalIntensity === option.key;
+
                         return (
                             <TouchableOpacity
-                                key={allergy}
-                                style={[
-                                    styles.chip,
-                                    isSelected && styles.chipSelected
-                                ]}
-                                onPress={() => {
-                                    if (isSelected) {
-                                        updateData('allergies', data.allergies.filter(a => a !== allergy));
-                                    } else {
-                                        updateData('allergies', [...data.allergies, allergy]);
-                                    }
-                                }}
+                                key={option.key}
+                                onPress={() => updateData('goalIntensity', option.key)}
+                                activeOpacity={1}
                             >
-                                <Text style={[
-                                    styles.chipText,
-                                    isSelected && styles.chipTextSelected
-                                ]}>
-                                    {allergy}
-                                </Text>
+                                <Animated.View
+                                    style={[
+                                        styles.activityCard,
+                                        {
+                                            transform: [{ translateY: animations.translateY }],
+                                            shadowColor: '#000',
+                                            shadowOffset: {
+                                                width: 0,
+                                                height: animations.shadowHeight,
+                                            },
+                                            shadowOpacity: 1,
+                                            shadowRadius: 0,
+                                            elevation: animations.shadowHeight,
+                                        },
+                                    ]}
+                                >
+                                    {/* Color overlay that fades in when selected */}
+                                    <Animated.View
+                                        style={[
+                                            StyleSheet.absoluteFill,
+                                            {
+                                                backgroundColor: option.color,
+                                                borderRadius: 12,
+                                                opacity: animations.colorOpacity,
+                                            },
+                                        ]}
+                                        pointerEvents="none"
+                                    />
+                                    <Text style={[
+                                        styles.activityCardTitle,
+                                        isSelected && styles.activityCardTitleSelected
+                                    ]}>
+                                        {option.label}
+                                    </Text>
+                                    <Text style={[
+                                        styles.activityCardDesc,
+                                        isSelected && styles.activityCardDescSelected
+                                    ]}>
+                                        {option.desc}
+                                    </Text>
+                                </Animated.View>
                             </TouchableOpacity>
                         );
                     })}
@@ -2305,219 +3067,371 @@ export const OnboardingScreen: React.FC = () => {
         );
     };
 
-    const renderGoalIntensityStep = () => (
-        <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>goal intensity?</Text>
-            <View style={styles.cardContainer}>
-                {([
-                    { key: 'mild', label: 'mild', desc: 'slow & steady' },
-                    { key: 'moderate', label: 'moderate', desc: 'balanced approach' },
-                    { key: 'aggressive', label: 'aggressive', desc: 'fast results' },
-                ] as const).map((option) => (
-                    <TouchableOpacity
-                        key={option.key}
-                        style={[
-                            styles.intensityCard,
-                            data.goalIntensity === option.key && styles.intensityCardSelected
-                        ]}
-                        onPress={() => updateData('goalIntensity', option.key)}
-                    >
-                        <Text style={[
-                            styles.intensityCardTitle,
-                            data.goalIntensity === option.key && styles.intensityCardTitleSelected
-                        ]}>
-                            {option.label}
-                        </Text>
-                        <Text style={[
-                            styles.intensityCardDesc,
-                            data.goalIntensity === option.key && styles.intensityCardDescSelected
-                        ]}>
-                            {option.desc}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
-        </View>
-    );
-
     const renderUnitPreferencesStep = () => (
         <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>unit preferences?</Text>
             <View style={styles.unitSection}>
                 <Text style={styles.unitSectionTitle}>weight</Text>
                 <View style={styles.unitToggle}>
+                    <Animated.View
+                        style={[
+                            styles.unitToggleBackground,
+                            {
+                                left: unitPreferenceWeightToggleSlide.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [4, 180], // 4px from left when kg, 180px when lbs
+                                }),
+                                right: unitPreferenceWeightToggleSlide.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [180, 4], // 180px from right when kg, 4px from right when lbs
+                                }),
+                            },
+                        ]}
+                    />
                     <TouchableOpacity
-                        style={[styles.unitButton, data.unitPreference.weight === 'kg' && styles.unitButtonActive]}
+                        style={styles.unitButton}
                         onPress={() => updateData('unitPreference', { ...data.unitPreference, weight: 'kg' })}
                     >
-                        <Text style={[styles.unitButtonText, data.unitPreference.weight === 'kg' && styles.unitButtonTextActive]}>kg</Text>
+                        <Text style={[
+                            styles.unitButtonText,
+                            data.unitPreference.weight === 'kg' && styles.unitButtonTextActive
+                        ]}>
+                            kg
+                        </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                        style={[styles.unitButton, data.unitPreference.weight === 'lbs' && styles.unitButtonActive]}
+                        style={styles.unitButton}
                         onPress={() => updateData('unitPreference', { ...data.unitPreference, weight: 'lbs' })}
                     >
-                        <Text style={[styles.unitButtonText, data.unitPreference.weight === 'lbs' && styles.unitButtonTextActive]}>lbs</Text>
+                        <Text style={[
+                            styles.unitButtonText,
+                            data.unitPreference.weight === 'lbs' && styles.unitButtonTextActive
+                        ]}>
+                            lbs
+                        </Text>
                     </TouchableOpacity>
                 </View>
             </View>
             <View style={styles.unitSection}>
                 <Text style={styles.unitSectionTitle}>height</Text>
                 <View style={styles.unitToggle}>
+                    <Animated.View
+                        style={[
+                            styles.unitToggleBackground,
+                            {
+                                left: unitPreferenceHeightToggleSlide.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [4, 180], // 4px from left when cm, 180px when ft
+                                }),
+                                right: unitPreferenceHeightToggleSlide.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [180, 4], // 180px from right when cm, 4px from right when ft
+                                }),
+                            },
+                        ]}
+                    />
                     <TouchableOpacity
-                        style={[styles.unitButton, data.unitPreference.height === 'cm' && styles.unitButtonActive]}
+                        style={styles.unitButton}
                         onPress={() => updateData('unitPreference', { ...data.unitPreference, height: 'cm' })}
                     >
-                        <Text style={[styles.unitButtonText, data.unitPreference.height === 'cm' && styles.unitButtonTextActive]}>cm</Text>
+                        <Text style={[
+                            styles.unitButtonText,
+                            data.unitPreference.height === 'cm' && styles.unitButtonTextActive
+                        ]}>
+                            cm
+                        </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                        style={[styles.unitButton, data.unitPreference.height === 'ft' && styles.unitButtonActive]}
+                        style={styles.unitButton}
                         onPress={() => updateData('unitPreference', { ...data.unitPreference, height: 'ft' })}
                     >
-                        <Text style={[styles.unitButtonText, data.unitPreference.height === 'ft' && styles.unitButtonTextActive]}>ft</Text>
+                        <Text style={[
+                            styles.unitButtonText,
+                            data.unitPreference.height === 'ft' && styles.unitButtonTextActive
+                        ]}>
+                            ft
+                        </Text>
                     </TouchableOpacity>
                 </View>
             </View>
         </View>
     );
 
-    const renderPurposeStep = () => (
-        <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>what are you here for?</Text>
-            <View style={styles.cardContainer}>
-                {([
-                    { key: 'meals', label: 'track my meals', icon: '🍎' },
-                    { key: 'workouts', label: 'track my workouts', icon: '🏋️' },
-                    { key: 'both', label: 'track both', icon: '🎯' },
-                    { key: 'discipline', label: 'build discipline', icon: '🔥' },
-                ] as const).map((option) => (
-                    <TouchableOpacity
-                        key={option.key}
+    const renderPurposeStep = () => {
+        const purposeOptions = [
+            { key: 'meals', label: 'track my meals', icon: '🍎', color: '#526EFF' },
+            { key: 'workouts', label: 'track my workouts', icon: '🏋️', color: '#526EFF' },
+            { key: 'both', label: 'track both', icon: '🎯', color: '#526EFF' },
+            { key: 'discipline', label: 'build discipline', icon: '🔥', color: '#526EFF' },
+        ] as const;
+
+        const getCardAnimations = (key: string) => {
+            switch (key) {
+                case 'meals':
+                    return {
+                        translateY: mealsPurposeCardTranslateY,
+                        shadowHeight: mealsPurposeCardShadowHeightState,
+                        colorOpacity: mealsPurposeCardColorOpacity,
+                    };
+                case 'workouts':
+                    return {
+                        translateY: workoutsPurposeCardTranslateY,
+                        shadowHeight: workoutsPurposeCardShadowHeightState,
+                        colorOpacity: workoutsPurposeCardColorOpacity,
+                    };
+                case 'both':
+                    return {
+                        translateY: bothPurposeCardTranslateY,
+                        shadowHeight: bothPurposeCardShadowHeightState,
+                        colorOpacity: bothPurposeCardColorOpacity,
+                    };
+                case 'discipline':
+                    return {
+                        translateY: disciplinePurposeCardTranslateY,
+                        shadowHeight: disciplinePurposeCardShadowHeightState,
+                        colorOpacity: disciplinePurposeCardColorOpacity,
+                    };
+                default:
+                    return {
+                        translateY: mealsPurposeCardTranslateY,
+                        shadowHeight: mealsPurposeCardShadowHeightState,
+                        colorOpacity: mealsPurposeCardColorOpacity,
+                    };
+            }
+        };
+
+        const firstRow = purposeOptions.slice(0, 2);
+        const secondRow = purposeOptions.slice(2);
+
+        const renderCard = (option: { key: string; label: string; icon: string; color: string }) => {
+            const animations = getCardAnimations(option.key);
+            const isSelected = data.purpose === option.key;
+
+            return (
+                <TouchableOpacity
+                    key={option.key}
+                    onPress={() => updateData('purpose', option.key)}
+                    activeOpacity={1}
+                >
+                    <Animated.View
                         style={[
-                            styles.purposeCard,
-                            data.purpose === option.key && styles.purposeCardSelected
+                            styles.goalCard,
+                            {
+                                transform: [{ translateY: animations.translateY }],
+                                shadowColor: '#000',
+                                shadowOffset: {
+                                    width: 0,
+                                    height: animations.shadowHeight,
+                                },
+                                shadowOpacity: 1,
+                                shadowRadius: 0,
+                                elevation: animations.shadowHeight,
+                            },
                         ]}
-                        onPress={() => updateData('purpose', option.key)}
                     >
-                        <Text style={styles.purposeIcon}>{option.icon}</Text>
+                        {/* Color overlay that fades in when selected */}
+                        <Animated.View
+                            style={[
+                                StyleSheet.absoluteFill,
+                                {
+                                    backgroundColor: option.color,
+                                    borderRadius: 12,
+                                    opacity: animations.colorOpacity,
+                                },
+                            ]}
+                            pointerEvents="none"
+                        />
+                        <Text style={styles.goalIcon}>{option.icon}</Text>
                         <Text style={[
-                            styles.purposeCardText,
-                            data.purpose === option.key && styles.purposeCardTextSelected
+                            styles.goalCardText,
+                            isSelected && styles.goalCardTextSelected
                         ]}>
                             {option.label}
                         </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
-        </View>
-    );
+                    </Animated.View>
+                </TouchableOpacity>
+            );
+        };
 
-    const renderMacrosStep = () => (
-        <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>macros setup?</Text>
-            <View style={styles.cardContainer}>
-                <TouchableOpacity
-                    style={[
-                        styles.macroCard,
-                        data.macrosSetup === 'auto' && styles.macroCardSelected
-                    ]}
-                    onPress={() => updateData('macrosSetup', 'auto')}
-                >
-                    <Ionicons name="calculator-outline" size={32} color={data.macrosSetup === 'auto' ? '#526EFF' : '#666'} />
-                    <Text style={[
-                        styles.macroCardTitle,
-                        data.macrosSetup === 'auto' && styles.macroCardTitleSelected
-                    ]}>
-                        auto calculate
-                    </Text>
-                    <Text style={[
-                        styles.macroCardDesc,
-                        data.macrosSetup === 'auto' && styles.macroCardDescSelected
-                    ]}>
-                        we'll calculate based on your goals
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[
-                        styles.macroCard,
-                        data.macrosSetup === 'manual' && styles.macroCardSelected
-                    ]}
-                    onPress={() => updateData('macrosSetup', 'manual')}
-                >
-                    <Ionicons name="settings-outline" size={32} color={data.macrosSetup === 'manual' ? '#526EFF' : '#666'} />
-                    <Text style={[
-                        styles.macroCardTitle,
-                        data.macrosSetup === 'manual' && styles.macroCardTitleSelected
-                    ]}>
-                        custom macros
-                    </Text>
-                    <Text style={[
-                        styles.macroCardDesc,
-                        data.macrosSetup === 'manual' && styles.macroCardDescSelected
-                    ]}>
-                        set your own protein, carbs, fats
-                    </Text>
-                </TouchableOpacity>
-            </View>
-            {data.macrosSetup === 'manual' && (
-                <View style={styles.macroInputsContainer}>
-                    <View style={styles.macroInputRow}>
-                        <Text style={styles.macroLabel}>protein (g)</Text>
-                        <View style={styles.macroInputWrapper}>
-                            <TextInput
-                                placeholder="0"
-                                keyboardType="numeric"
-                                value={data.customMacros?.protein?.toString() || ''}
-                                onChangeText={(text) => {
-                                    const protein = parseInt(text) || 0;
-                                    updateData('customMacros', {
-                                        protein,
-                                        carbs: data.customMacros?.carbs || 0,
-                                        fats: data.customMacros?.fats || 0,
-                                    });
-                                }}
-                            />
-                        </View>
+        return (
+            <View style={styles.stepContent}>
+                <Text style={styles.stepTitle}>what are you here for?</Text>
+                <View style={styles.goalContainer}>
+                    <View style={styles.goalRow}>
+                        {firstRow.map(renderCard)}
                     </View>
-                    <View style={styles.macroInputRow}>
-                        <Text style={styles.macroLabel}>carbs (g)</Text>
-                        <View style={styles.macroInputWrapper}>
-                            <TextInput
-                                placeholder="0"
-                                keyboardType="numeric"
-                                value={data.customMacros?.carbs?.toString() || ''}
-                                onChangeText={(text) => {
-                                    const carbs = parseInt(text) || 0;
-                                    updateData('customMacros', {
-                                        protein: data.customMacros?.protein || 0,
-                                        carbs,
-                                        fats: data.customMacros?.fats || 0,
-                                    });
-                                }}
-                            />
-                        </View>
-                    </View>
-                    <View style={styles.macroInputRow}>
-                        <Text style={styles.macroLabel}>fats (g)</Text>
-                        <View style={styles.macroInputWrapper}>
-                            <TextInput
-                                placeholder="0"
-                                keyboardType="numeric"
-                                value={data.customMacros?.fats?.toString() || ''}
-                                onChangeText={(text) => {
-                                    const fats = parseInt(text) || 0;
-                                    updateData('customMacros', {
-                                        protein: data.customMacros?.protein || 0,
-                                        carbs: data.customMacros?.carbs || 0,
-                                        fats,
-                                    });
-                                }}
-                            />
-                        </View>
+                    <View style={styles.goalRow}>
+                        {secondRow.map(renderCard)}
                     </View>
                 </View>
-            )}
-        </View>
-    );
+            </View>
+        );
+    };
+
+    const renderMacrosStep = () => {
+        const macroOptions = [
+            { key: 'auto', label: 'auto calculate', desc: 'we\'ll calculate based on your goals', color: '#526EFF' },
+            { key: 'manual', label: 'custom macros', desc: 'set your own protein, carbs, fats', color: '#526EFF' },
+        ] as const;
+
+        const getCardAnimations = (key: string) => {
+            switch (key) {
+                case 'auto':
+                    return {
+                        translateY: autoMacroCardTranslateY,
+                        shadowHeight: autoMacroCardShadowHeightState,
+                        colorOpacity: autoMacroCardColorOpacity,
+                    };
+                case 'manual':
+                    return {
+                        translateY: manualMacroCardTranslateY,
+                        shadowHeight: manualMacroCardShadowHeightState,
+                        colorOpacity: manualMacroCardColorOpacity,
+                    };
+                default:
+                    return {
+                        translateY: autoMacroCardTranslateY,
+                        shadowHeight: autoMacroCardShadowHeightState,
+                        colorOpacity: autoMacroCardColorOpacity,
+                    };
+            }
+        };
+
+        return (
+            <View style={styles.stepContent}>
+                <Text style={styles.stepTitle}>macros setup?</Text>
+                <View style={styles.activityCardContainer}>
+                    {macroOptions.map((option) => {
+                        const animations = getCardAnimations(option.key);
+                        const isSelected = data.macrosSetup === option.key;
+
+                        return (
+                            <TouchableOpacity
+                                key={option.key}
+                                onPress={() => updateData('macrosSetup', option.key)}
+                                activeOpacity={1}
+                            >
+                                <Animated.View
+                                    style={[
+                                        {
+                                            width: '100%',
+                                            backgroundColor: '#fff',
+                                            borderWidth: 2,
+                                            borderColor: '#000',
+                                            borderRadius: 12,
+                                            padding: 24,
+                                            marginBottom: 12,
+                                            overflow: 'hidden',
+                                        },
+                                        {
+                                            transform: [{ translateY: animations.translateY }],
+                                            shadowColor: '#000',
+                                            shadowOffset: {
+                                                width: 0,
+                                                height: animations.shadowHeight,
+                                            },
+                                            shadowOpacity: 1,
+                                            shadowRadius: 0,
+                                            elevation: animations.shadowHeight,
+                                        },
+                                    ]}
+                                >
+                                    {/* Color overlay that fades in when selected */}
+                                    <Animated.View
+                                        style={[
+                                            StyleSheet.absoluteFill,
+                                            {
+                                                backgroundColor: option.color,
+                                                borderRadius: 12,
+                                                opacity: animations.colorOpacity,
+                                            },
+                                        ]}
+                                        pointerEvents="none"
+                                    />
+                                    <Text style={[
+                                        styles.activityCardTitle,
+                                        isSelected && styles.activityCardTitleSelected
+                                    ]}>
+                                        {option.label}
+                                    </Text>
+                                    <Text style={[
+                                        styles.activityCardDesc,
+                                        isSelected && styles.activityCardDescSelected
+                                    ]}>
+                                        {option.desc}
+                                    </Text>
+                                </Animated.View>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+                {data.macrosSetup === 'manual' && (
+                    <View style={styles.macroInputsContainer}>
+                        <View style={styles.macroInputRow}>
+                            <Text style={styles.macroLabel}>protein (g)</Text>
+                            <View style={styles.macroInputWrapper}>
+                                <RNTextInput
+                                    style={styles.macroInput}
+                                    placeholder="0"
+                                    placeholderTextColor="#999"
+                                    keyboardType="numeric"
+                                    value={data.customMacros?.protein?.toString() || ''}
+                                    onChangeText={(text) => {
+                                        const protein = parseInt(text) || 0;
+                                        updateData('customMacros', {
+                                            protein,
+                                            carbs: data.customMacros?.carbs || 0,
+                                            fats: data.customMacros?.fats || 0,
+                                        });
+                                    }}
+                                />
+                            </View>
+                        </View>
+                        <View style={styles.macroInputRow}>
+                            <Text style={styles.macroLabel}>carbs (g)</Text>
+                            <View style={styles.macroInputWrapper}>
+                                <RNTextInput
+                                    style={styles.macroInput}
+                                    placeholder="0"
+                                    placeholderTextColor="#999"
+                                    keyboardType="numeric"
+                                    value={data.customMacros?.carbs?.toString() || ''}
+                                    onChangeText={(text) => {
+                                        const carbs = parseInt(text) || 0;
+                                        updateData('customMacros', {
+                                            protein: data.customMacros?.protein || 0,
+                                            carbs,
+                                            fats: data.customMacros?.fats || 0,
+                                        });
+                                    }}
+                                />
+                            </View>
+                        </View>
+                        <View style={styles.macroInputRow}>
+                            <Text style={styles.macroLabel}>fats (g)</Text>
+                            <View style={styles.macroInputWrapper}>
+                                <RNTextInput
+                                    style={styles.macroInput}
+                                    placeholder="0"
+                                    placeholderTextColor="#999"
+                                    keyboardType="numeric"
+                                    value={data.customMacros?.fats?.toString() || ''}
+                                    onChangeText={(text) => {
+                                        const fats = parseInt(text) || 0;
+                                        updateData('customMacros', {
+                                            protein: data.customMacros?.protein || 0,
+                                            carbs: data.customMacros?.carbs || 0,
+                                            fats,
+                                        });
+                                    }}
+                                />
+                            </View>
+                        </View>
+                    </View>
+                )}
+            </View>
+        );
+    };
 
     return (
         <View style={styles.container}>
@@ -2572,7 +3486,7 @@ export const OnboardingScreen: React.FC = () => {
                         title={currentStep === 1 ? "get started!" : currentStep === TOTAL_STEPS ? "let's go!" : `continue (${currentStep}/${TOTAL_STEPS})`}
                         onPress={() => {
                             if (currentStep === TOTAL_STEPS) {
-                                console.log('🎯 Step 15 - "let\'s go!" button clicked');
+                                console.log(`🎯 Step ${TOTAL_STEPS} - "let's go!" button clicked`);
                                 handleComplete();
                             } else {
                                 nextStep();
@@ -2580,7 +3494,7 @@ export const OnboardingScreen: React.FC = () => {
                         }}
                         containerStyle={styles.nextButton}
                         loading={saving && currentStep === TOTAL_STEPS}
-                        disabled={saving || !validateCurrentStep().valid}
+                        disabled={saving || checkingUsername || !validateCurrentStep().valid}
                     />
                 </View>
             </View>

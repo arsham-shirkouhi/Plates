@@ -534,7 +534,7 @@ export const styles = StyleSheet.create({
     activityCardTitle: {
         fontSize: 24,
         fontFamily: fonts.bold,
-        color: '#333',
+        color: '#000',
         textTransform: 'lowercase',
         marginBottom: 8,
     },
@@ -544,7 +544,7 @@ export const styles = StyleSheet.create({
     activityCardDesc: {
         fontSize: 16,
         fontFamily: fonts.regular,
-        color: '#666',
+        color: '#000',
         textTransform: 'lowercase',
     },
     activityCardDescSelected: {
@@ -631,18 +631,27 @@ export const styles = StyleSheet.create({
     chipContainer: {
         width: 360,
         alignSelf: 'center',
+        alignItems: 'center',
+    },
+    chipRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
+        justifyContent: 'center',
         gap: 10,
+        marginBottom: 10,
+        width: '100%',
+    },
+    chipRowBottom: {
+        // No additional styling needed - justifyContent: 'center' from chipRow will center the 3 items
     },
     chip: {
         backgroundColor: '#F5F5F5',
         borderWidth: 2,
         borderColor: '#000',
-        borderRadius: 20,
+        borderRadius: 12,
         paddingHorizontal: 20,
         paddingVertical: 12,
-        marginBottom: 10,
+        overflow: 'hidden',
     },
     chipSelected: {
         backgroundColor: '#526EFF',
@@ -650,7 +659,7 @@ export const styles = StyleSheet.create({
     chipText: {
         fontSize: 16,
         fontFamily: fonts.regular,
-        color: '#333',
+        color: '#000',
         textTransform: 'lowercase',
     },
     chipTextSelected: {
@@ -827,6 +836,18 @@ export const styles = StyleSheet.create({
     },
     macroInputWrapper: {
         flex: 1,
+    },
+    macroInput: {
+        borderWidth: 2,
+        borderColor: '#000',
+        borderRadius: 10,
+        backgroundColor: '#F5F5F5',
+        paddingHorizontal: 15,
+        paddingVertical: 12,
+        fontSize: 18,
+        fontFamily: fonts.regular,
+        color: '#000',
+        minHeight: 50,
     },
     // Top back button
     topBackButton: {
