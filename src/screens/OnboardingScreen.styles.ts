@@ -102,6 +102,7 @@ export const styles = StyleSheet.create({
         alignItems: 'center',
         paddingBottom: 20,
         paddingTop: 60, // Space for back button
+        minHeight: '100%',
     },
     stepContent: {
         width: '100%',
@@ -141,14 +142,14 @@ export const styles = StyleSheet.create({
     },
     usernameErrorText: {
         color: '#FF5151',
-        fontSize: 14,
+        fontSize: 18,
         fontFamily: fonts.regular,
         marginTop: 8,
         textAlign: 'center',
     },
     usernameSuccessText: {
         color: '#26F170',
-        fontSize: 14,
+        fontSize: 18,
         fontFamily: fonts.regular,
         marginTop: 8,
         textAlign: 'center',
@@ -271,6 +272,18 @@ export const styles = StyleSheet.create({
         minHeight: 50,
         flexDirection: 'row',
     },
+    dateDropdownDay: {
+        flex: 0.5,
+        backgroundColor: '#fff',
+        borderWidth: 2,
+        borderColor: '#000',
+        borderRadius: 10,
+        padding: 15,
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 50,
+        flexDirection: 'row',
+    },
     dateDropdownText: {
         fontSize: 18,
         fontFamily: fonts.regular,
@@ -284,6 +297,14 @@ export const styles = StyleSheet.create({
     },
     dateDropdownIcon: {
         marginLeft: 8,
+    },
+    ageErrorText: {
+        color: '#FF5151',
+        fontSize: 18,
+        fontFamily: fonts.regular,
+        marginTop: 12,
+        textAlign: 'center',
+        textTransform: 'lowercase',
     },
     modalOverlay: {
         flex: 1,
@@ -516,8 +537,8 @@ export const styles = StyleSheet.create({
         borderWidth: 2,
         borderColor: '#000',
         borderRadius: 12,
-        padding: 24,
-        marginBottom: 12,
+        padding: 20,
+        marginBottom: 18,
         shadowColor: '#000',
         shadowOffset: {
             width: 0,

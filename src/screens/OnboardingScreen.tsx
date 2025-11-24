@@ -12,35 +12,10 @@ import { fonts } from '../constants/fonts';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { saveOnboardingData, OnboardingData as OnboardingDataType, hasCompletedOnboarding, checkUsernameExists } from '../services/userService';
+import { OnboardingData } from './onboarding/types';
+import { TOTAL_STEPS } from './onboarding/constants';
 
 type OnboardingScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Onboarding'>;
-
-interface OnboardingData {
-    name: string;
-    birthMonth: number;
-    birthDay: number;
-    birthYear: number;
-    sex: 'male' | 'female' | 'other' | '';
-    height: number;
-    heightUnit: 'cm' | 'ft';
-    weight: number;
-    weightUnit: 'kg' | 'lbs';
-    goal: 'lose' | 'maintain' | 'build' | '';
-    activityLevel: 'sedentary' | 'lightly' | 'moderate' | 'very' | '';
-    dietPreference: 'regular' | 'high-protein' | 'vegetarian' | 'vegan' | 'keto' | 'halal' | '';
-    allergies: string[];
-    goalIntensity: 'mild' | 'moderate' | 'aggressive' | '';
-    unitPreference: { weight: 'kg' | 'lbs'; height: 'cm' | 'ft' };
-    purpose: 'meals' | 'workouts' | 'both' | 'discipline' | '';
-    macrosSetup: 'auto' | 'manual' | '';
-    customMacros?: {
-        protein: number;
-        carbs: number;
-        fats: number;
-    };
-}
-
-const TOTAL_STEPS = 14;
 
 export const OnboardingScreen: React.FC = () => {
     const navigation = useNavigation<OnboardingScreenNavigationProp>();
@@ -210,6 +185,9 @@ export const OnboardingScreen: React.FC = () => {
     const [manualMacroCardShadowHeightState, setManualMacroCardShadowHeightState] = useState(4);
     const autoMacroCardColorOpacity = useRef(new Animated.Value(0)).current;
     const manualMacroCardColorOpacity = useRef(new Animated.Value(0)).current;
+    const macroInputsOpacity = useRef(new Animated.Value(0)).current;
+    const macroInputsTranslateY = useRef(new Animated.Value(-20)).current;
+    const macrosStepContentTranslateY = useRef(new Animated.Value(60)).current;
 
     // Animation refs for allergy chips
     const nutsChipTranslateY = useRef(new Animated.Value(0)).current;
@@ -606,7 +584,7 @@ export const OnboardingScreen: React.FC = () => {
                 try {
                     const exists = await checkUsernameExists(username, user.uid);
                     if (exists) {
-                        setUsernameError('this username is already taken');
+                        setUsernameError('this username is not available!');
                     } else {
                         setUsernameError('');
                     }
@@ -654,7 +632,7 @@ export const OnboardingScreen: React.FC = () => {
                     (today.getMonth() < birthDate.getMonth() ||
                         (today.getMonth() === birthDate.getMonth() && today.getDate() < birthDate.getDate()) ? 1 : 0);
                 if (age < 13) {
-                    return { valid: false, message: 'you must be at least 13 years old' };
+                    return { valid: false, message: "you're not old enough" };
                 }
                 if (age > 120) {
                     return { valid: false, message: 'please enter a valid birthdate' };
@@ -984,7 +962,7 @@ export const OnboardingScreen: React.FC = () => {
                         <Text style={styles.usernameErrorText}>{usernameError}</Text>
                     )}
                     {!usernameError && !checkingUsername && data.name.trim().length >= 3 && (
-                        <Text style={styles.usernameSuccessText}>✓ username available</Text>
+                        <Text style={styles.usernameSuccessText}>this username is available!</Text>
                     )}
                 </View>
             </View>
@@ -1001,12 +979,13 @@ export const OnboardingScreen: React.FC = () => {
             placeholder: string,
             value: string,
             onPress: () => void,
-            style?: any
+            style?: any,
+            baseStyle?: any
         ) => {
             const isPlaceholder = value === placeholder;
             return (
                 <TouchableOpacity
-                    style={[styles.dateDropdown, style]}
+                    style={[baseStyle || styles.dateDropdown, style]}
                     onPress={onPress}
                 >
                     <Text style={[
@@ -1127,6 +1106,17 @@ export const OnboardingScreen: React.FC = () => {
             ? Array.from({ length: getDaysInMonth(data.birthMonth, data.birthYear) }, (_, i) => i + 1)
             : days;
 
+        // Calculate age and check if under 13
+        let isUnderAge = false;
+        if (data.birthMonth && data.birthDay && data.birthYear) {
+            const today = new Date();
+            const birthDate = new Date(data.birthYear, data.birthMonth - 1, data.birthDay);
+            const age = today.getFullYear() - birthDate.getFullYear() -
+                (today.getMonth() < birthDate.getMonth() ||
+                    (today.getMonth() === birthDate.getMonth() && today.getDate() < birthDate.getDate()) ? 1 : 0);
+            isUnderAge = age < 13;
+        }
+
         return (
             <View style={styles.stepContent}>
                 <Text style={styles.stepTitle}>how old are you?</Text>
@@ -1143,7 +1133,8 @@ export const OnboardingScreen: React.FC = () => {
                         'day',
                         data.birthDay ? data.birthDay.toString() : 'day',
                         () => setDayModalVisible(true),
-                        { marginRight: 8 }
+                        { marginRight: 8 },
+                        styles.dateDropdownDay
                     )}
                     {renderDropdown(
                         'Year',
@@ -1152,6 +1143,9 @@ export const OnboardingScreen: React.FC = () => {
                         () => setYearModalVisible(true)
                     )}
                 </View>
+                {isUnderAge && (
+                    <Text style={styles.ageErrorText}>you're not old enough</Text>
+                )}
 
                 {renderPickerModal(
                     monthModalVisible,
@@ -2076,7 +2070,7 @@ export const OnboardingScreen: React.FC = () => {
 
             Animated.parallel(animations).start();
         }
-    }, [data.macrosSetup, currentStep]);
+    }, [data.purpose, currentStep]);
 
     // Animate macro cards when selection changes - pressed button state when selected
     useEffect(() => {
@@ -2129,6 +2123,42 @@ export const OnboardingScreen: React.FC = () => {
             ];
 
             Animated.parallel(animations).start();
+        }
+    }, [data.macrosSetup, currentStep]);
+
+    // Animate macro inputs container when manual is selected
+    useEffect(() => {
+        if (currentStep === 14) { // Macros step is step 14
+            const isManual = data.macrosSetup === 'manual';
+
+            // Reset to lower position when entering the step
+            if (!isManual) {
+                macrosStepContentTranslateY.setValue(60);
+            }
+
+            Animated.parallel([
+                Animated.timing(macroInputsOpacity, {
+                    toValue: isManual ? 1 : 0,
+                    duration: 300,
+                    easing: Easing.out(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(macroInputsTranslateY, {
+                    toValue: isManual ? 0 : -20,
+                    duration: 300,
+                    easing: Easing.out(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(macrosStepContentTranslateY, {
+                    toValue: isManual ? -40 : 60,
+                    duration: 300,
+                    easing: Easing.out(Easing.ease),
+                    useNativeDriver: true,
+                }),
+            ]).start();
+        } else {
+            // Reset when not on this step
+            macrosStepContentTranslateY.setValue(60);
         }
     }, [data.macrosSetup, currentStep]);
 
@@ -2462,7 +2492,15 @@ export const OnboardingScreen: React.FC = () => {
                     maximumValue={maxWeight}
                     step={step}
                     unit={data.weightUnit}
-                    formatValue={(val) => data.weightUnit === 'kg' ? `${val.toFixed(1)} kg` : `${Math.round(val)} lbs`}
+                    formatValue={(val) => {
+                        if (data.weightUnit === 'kg') {
+                            const formatted = typeof val === 'number' ? val.toFixed(1) : String(val);
+                            return `${formatted} kg`;
+                        } else {
+                            const rounded = typeof val === 'number' ? Math.round(val) : val;
+                            return `${rounded} lbs`;
+                        }
+                    }}
                     editableText={false}
                 />
             </View>
@@ -3255,7 +3293,7 @@ export const OnboardingScreen: React.FC = () => {
 
         return (
             <View style={styles.stepContent}>
-                <Text style={styles.stepTitle}>what are you here for?</Text>
+                <Text style={styles.stepTitle}>what's your purpose?</Text>
                 <View style={styles.goalContainer}>
                     <View style={styles.goalRow}>
                         {firstRow.map(renderCard)}
@@ -3298,7 +3336,14 @@ export const OnboardingScreen: React.FC = () => {
         };
 
         return (
-            <View style={styles.stepContent}>
+            <Animated.View
+                style={[
+                    styles.stepContent,
+                    {
+                        transform: [{ translateY: macrosStepContentTranslateY }],
+                    },
+                ]}
+            >
                 <Text style={styles.stepTitle}>macros setup?</Text>
                 <View style={styles.activityCardContainer}>
                     {macroOptions.map((option) => {
@@ -3313,26 +3358,17 @@ export const OnboardingScreen: React.FC = () => {
                             >
                                 <Animated.View
                                     style={[
-                                        {
-                                            width: '100%',
-                                            backgroundColor: '#fff',
-                                            borderWidth: 2,
-                                            borderColor: '#000',
-                                            borderRadius: 12,
-                                            padding: 24,
-                                            marginBottom: 12,
-                                            overflow: 'hidden',
-                                        },
+                                        styles.activityCard,
                                         {
                                             transform: [{ translateY: animations.translateY }],
-                                            shadowColor: '#000',
+                                            shadowColor: isSelected ? 'transparent' : '#000',
                                             shadowOffset: {
                                                 width: 0,
                                                 height: animations.shadowHeight,
                                             },
-                                            shadowOpacity: 1,
+                                            shadowOpacity: isSelected ? 0 : 1,
                                             shadowRadius: 0,
-                                            elevation: animations.shadowHeight,
+                                            elevation: isSelected ? 0 : animations.shadowHeight,
                                         },
                                     ]}
                                 >
@@ -3365,71 +3401,78 @@ export const OnboardingScreen: React.FC = () => {
                         );
                     })}
                 </View>
-                {data.macrosSetup === 'manual' && (
-                    <View style={styles.macroInputsContainer}>
-                        <View style={styles.macroInputRow}>
-                            <Text style={styles.macroLabel}>protein (g)</Text>
-                            <View style={styles.macroInputWrapper}>
-                                <RNTextInput
-                                    style={styles.macroInput}
-                                    placeholder="0"
-                                    placeholderTextColor="#999"
-                                    keyboardType="numeric"
-                                    value={data.customMacros?.protein?.toString() || ''}
-                                    onChangeText={(text) => {
-                                        const protein = parseInt(text) || 0;
-                                        updateData('customMacros', {
-                                            protein,
-                                            carbs: data.customMacros?.carbs || 0,
-                                            fats: data.customMacros?.fats || 0,
-                                        });
-                                    }}
-                                />
-                            </View>
-                        </View>
-                        <View style={styles.macroInputRow}>
-                            <Text style={styles.macroLabel}>carbs (g)</Text>
-                            <View style={styles.macroInputWrapper}>
-                                <RNTextInput
-                                    style={styles.macroInput}
-                                    placeholder="0"
-                                    placeholderTextColor="#999"
-                                    keyboardType="numeric"
-                                    value={data.customMacros?.carbs?.toString() || ''}
-                                    onChangeText={(text) => {
-                                        const carbs = parseInt(text) || 0;
-                                        updateData('customMacros', {
-                                            protein: data.customMacros?.protein || 0,
-                                            carbs,
-                                            fats: data.customMacros?.fats || 0,
-                                        });
-                                    }}
-                                />
-                            </View>
-                        </View>
-                        <View style={styles.macroInputRow}>
-                            <Text style={styles.macroLabel}>fats (g)</Text>
-                            <View style={styles.macroInputWrapper}>
-                                <RNTextInput
-                                    style={styles.macroInput}
-                                    placeholder="0"
-                                    placeholderTextColor="#999"
-                                    keyboardType="numeric"
-                                    value={data.customMacros?.fats?.toString() || ''}
-                                    onChangeText={(text) => {
-                                        const fats = parseInt(text) || 0;
-                                        updateData('customMacros', {
-                                            protein: data.customMacros?.protein || 0,
-                                            carbs: data.customMacros?.carbs || 0,
-                                            fats,
-                                        });
-                                    }}
-                                />
-                            </View>
+                <Animated.View
+                    style={[
+                        styles.macroInputsContainer,
+                        {
+                            opacity: macroInputsOpacity,
+                            transform: [{ translateY: macroInputsTranslateY }],
+                        },
+                    ]}
+                    pointerEvents={data.macrosSetup === 'manual' ? 'auto' : 'none'}
+                >
+                    <View style={styles.macroInputRow}>
+                        <Text style={styles.macroLabel}>protein (g)</Text>
+                        <View style={styles.macroInputWrapper}>
+                            <RNTextInput
+                                style={styles.macroInput}
+                                placeholder="0"
+                                placeholderTextColor="#999"
+                                keyboardType="numeric"
+                                value={data.customMacros?.protein?.toString() || ''}
+                                onChangeText={(text) => {
+                                    const protein = Math.min(parseInt(text) || 0, 500);
+                                    updateData('customMacros', {
+                                        protein,
+                                        carbs: data.customMacros?.carbs || 0,
+                                        fats: data.customMacros?.fats || 0,
+                                    });
+                                }}
+                            />
                         </View>
                     </View>
-                )}
-            </View>
+                    <View style={styles.macroInputRow}>
+                        <Text style={styles.macroLabel}>carbs (g)</Text>
+                        <View style={styles.macroInputWrapper}>
+                            <RNTextInput
+                                style={styles.macroInput}
+                                placeholder="0"
+                                placeholderTextColor="#999"
+                                keyboardType="numeric"
+                                value={data.customMacros?.carbs?.toString() || ''}
+                                onChangeText={(text) => {
+                                    const carbs = Math.min(parseInt(text) || 0, 500);
+                                    updateData('customMacros', {
+                                        protein: data.customMacros?.protein || 0,
+                                        carbs,
+                                        fats: data.customMacros?.fats || 0,
+                                    });
+                                }}
+                            />
+                        </View>
+                    </View>
+                    <View style={styles.macroInputRow}>
+                        <Text style={styles.macroLabel}>fats (g)</Text>
+                        <View style={styles.macroInputWrapper}>
+                            <RNTextInput
+                                style={styles.macroInput}
+                                placeholder="0"
+                                placeholderTextColor="#999"
+                                keyboardType="numeric"
+                                value={data.customMacros?.fats?.toString() || ''}
+                                onChangeText={(text) => {
+                                    const fats = Math.min(parseInt(text) || 0, 500);
+                                    updateData('customMacros', {
+                                        protein: data.customMacros?.protein || 0,
+                                        carbs: data.customMacros?.carbs || 0,
+                                        fats,
+                                    });
+                                }}
+                            />
+                        </View>
+                    </View>
+                </Animated.View>
+            </Animated.View>
         );
     };
 
