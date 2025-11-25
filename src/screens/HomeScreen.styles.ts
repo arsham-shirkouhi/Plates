@@ -1,96 +1,59 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Dimensions } from 'react-native';
 
 export const styles = StyleSheet.create({
     container: {
         flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 20,
         backgroundColor: '#fff',
     },
-    title: {
-        fontSize: 32,
-        fontWeight: 'bold',
-        marginBottom: 10,
+    scrollView: {
+        flex: 1,
     },
-    subtitle: {
-        fontSize: 16,
-        color: '#666',
-        marginBottom: 30,
+    scrollContent: {
+        flexGrow: 1,
+        paddingLeft: 25,
+        paddingRight: 25,
+        paddingTop: 0,
+        paddingBottom: 16,
     },
-    testButton: {
-        marginBottom: 15,
-    },
-    testButtonText: {
-        fontSize: 14,
-    },
-    logoutButton: {
-        backgroundColor: '#FF3B30',
+    contentCard: {
+        backgroundColor: '#fff',
+        borderRadius: 10,
         padding: 15,
-        borderRadius: 8,
-        minWidth: 120,
-        alignItems: 'center',
-    },
-    buttonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    macrosContainer: {
-        width: '100%',
-        maxWidth: 400,
-        backgroundColor: '#F5F5F5',
-        borderRadius: 12,
-        padding: 20,
-        marginBottom: 30,
+        marginTop: 0,
+        height: 170,
         borderWidth: 2,
         borderColor: '#000',
+        shadowColor: '#000',
+        // shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 4,
+        zIndex: 1,
+        overflow: 'hidden',
     },
-    macrosTitle: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        marginBottom: 16,
-        textAlign: 'center',
-        textTransform: 'lowercase',
-    },
-    macroRow: {
+    cardContent: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: '#E0E0E0',
+        width: '100%',
+        height: '100%',
     },
-    macroLabel: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#333',
-        textTransform: 'lowercase',
-    },
-    macroValue: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#526EFF',
-    },
-    baseTDEEContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
+    calorieSection: {
+        flex: 0.8,
         alignItems: 'center',
-        paddingVertical: 12,
-        marginBottom: 8,
-        borderBottomWidth: 2,
-        borderBottomColor: '#E0E0E0',
+        justifyContent: 'center',
+        paddingRight: 10,
+        overflow: 'hidden',
     },
-    baseTDEELabel: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#666',
-        textTransform: 'lowercase',
+    macrosSection: {
+        flex: 1.2,
+        paddingLeft: 10,
+        overflow: 'hidden',
     },
-    baseTDEEValue: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
+    testButton: {
+        marginTop: 16,
+    },
+    logoutButton: {
+        marginTop: 12,
     },
 });
-

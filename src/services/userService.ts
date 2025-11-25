@@ -63,6 +63,10 @@ export interface UserProfile {
     updatedAt: any;
     lastLoginAt?: any;
 
+    // Streak tracking
+    streak?: number; // Current streak count
+    lastMealLogDate?: string; // Last date a meal was logged (YYYY-MM-DD)
+
     // Calculated macros (from onboarding or manual)
     targetMacros?: {
         calories: number;
@@ -113,6 +117,10 @@ export const initializeUser = async (user: User): Promise<void> => {
 
             // No target macros yet (will be set after onboarding)
             targetMacros: undefined,
+
+            // Streak tracking - default to 0
+            streak: 0,
+            lastMealLogDate: undefined,
 
             // Metadata
             createdAt: serverTimestamp(),
@@ -471,9 +479,70 @@ export const addToDailyMacroLog = async (
         };
 
         await saveDailyMacroLog(user, updatedMacros, dateStr);
+
+        // Update streak when meal is logged
+        await updateStreak(user, dateStr);
     } catch (error) {
         console.error('Error adding to daily macro log:', error);
         throw error;
+    }
+};
+
+/**
+ * Update user streak when a meal is logged
+ * Streak increases if logging on a new day, resets if gap > 1 day
+ * @param user - Firebase user
+ * @param date - Date string in format YYYY-MM-DD (defaults to today)
+ */
+export const updateStreak = async (user: User, date?: string): Promise<void> => {
+    try {
+        const dateStr = date || getTodayDateString();
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+
+        if (!userDoc.exists()) {
+            return;
+        }
+
+        const profile = userDoc.data() as UserProfile;
+        const currentStreak = profile.streak || 0;
+        const lastMealDate = profile.lastMealLogDate;
+
+        let newStreak = currentStreak;
+
+        if (!lastMealDate) {
+            // First meal ever logged
+            newStreak = 1;
+        } else {
+            // Calculate days between last meal and today
+            const lastDate = new Date(lastMealDate);
+            const today = new Date(dateStr);
+            const diffTime = today.getTime() - lastDate.getTime();
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+            if (diffDays === 0) {
+                // Same day - no change to streak
+                return;
+            } else if (diffDays === 1) {
+                // Consecutive day - increment streak
+                newStreak = currentStreak + 1;
+            } else {
+                // Gap of more than 1 day - reset streak
+                newStreak = 1;
+            }
+        }
+
+        // Update streak and last meal date
+        await setDoc(userDocRef, {
+            streak: newStreak,
+            lastMealLogDate: dateStr,
+            updatedAt: serverTimestamp(),
+        }, { merge: true });
+
+        console.log(`Streak updated to ${newStreak} for ${dateStr}`);
+    } catch (error) {
+        console.error('Error updating streak:', error);
+        // Don't throw - streak update failure shouldn't block meal logging
     }
 };
 

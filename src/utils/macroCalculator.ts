@@ -147,7 +147,7 @@ const calculateTargetCalories = (
  * - Fats: 25% of finalCalories
  * - Carbs: Remaining calories after protein and fats
  */
-const calculateMacros = (
+export const calculateMacros = (
     calories: number,
     weightKg: number
 ): {

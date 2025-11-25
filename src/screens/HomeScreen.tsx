@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Alert } from 'react-native';
+import { View, Alert, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { Button } from '../components/Button';
-import { resetOnboarding, getUserProfile, UserProfile } from '../services/userService';
+import { HeaderSection } from '../components/HeaderSection';
+import { MacrosCard } from '../components/MacrosCard';
+import { TestControls } from '../components/TestControls';
+import { GradientBackground } from '../components/GradientBackground';
+import { resetOnboarding, getUserProfile, UserProfile, getDailyMacroLog, getTodayDateString, DailyMacroLog } from '../services/userService';
 import { styles } from './HomeScreen.styles';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
@@ -13,10 +18,21 @@ type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'H
 export const HomeScreen: React.FC = () => {
     const { user, logout } = useAuth();
     const navigation = useNavigation<HomeScreenNavigationProp>();
+    const insets = useSafeAreaInsets();
     const [loggingOut, setLoggingOut] = useState(false);
     const [resettingOnboarding, setResettingOnboarding] = useState(false);
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [loadingProfile, setLoadingProfile] = useState(true);
+    const [dailyLog, setDailyLog] = useState<DailyMacroLog | null>(null);
+    const [loadingLog, setLoadingLog] = useState(true);
+
+    // Test values for manual adjustment
+    const [testValues, setTestValues] = useState({
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fats: 0,
+    });
 
     const handleLogout = async () => {
         setLoggingOut(true);
@@ -53,15 +69,36 @@ export const HomeScreen: React.FC = () => {
         }
     };
 
+    // Load today's daily log
+    const loadDailyLog = async () => {
+        if (!user) {
+            setLoadingLog(false);
+            return;
+        }
+
+        try {
+            setLoadingLog(true);
+            const today = getTodayDateString();
+            const log = await getDailyMacroLog(user, today);
+            setDailyLog(log);
+        } catch (error) {
+            console.error('Error loading daily log:', error);
+        } finally {
+            setLoadingLog(false);
+        }
+    };
+
     // Load on mount
     useEffect(() => {
         loadUserProfile();
+        loadDailyLog();
     }, [user]);
 
     // Reload when screen comes into focus (e.g., after completing onboarding)
     useFocusEffect(
         React.useCallback(() => {
             loadUserProfile();
+            loadDailyLog();
         }, [user])
     );
 
@@ -104,68 +141,82 @@ export const HomeScreen: React.FC = () => {
         );
     };
 
+    const macros = userProfile?.userSettings?.macros || userProfile?.targetMacros;
+    const streak = userProfile?.streak || 0;
+    const baseConsumed = dailyLog || { calories: 0, protein: 0, carbs: 0, fats: 0 };
+    const consumed = {
+        calories: baseConsumed.calories + testValues.calories,
+        protein: baseConsumed.protein + testValues.protein,
+        carbs: baseConsumed.carbs + testValues.carbs,
+        fats: baseConsumed.fats + testValues.fats,
+    };
+
+    const handleTestUpdate = (type: 'calories' | 'protein' | 'carbs' | 'fats', amount: number) => {
+        setTestValues(prev => ({
+            ...prev,
+            [type]: Math.max(0, prev[type] + amount),
+        }));
+    };
+
+    const handleTestReset = () => {
+        setTestValues({ calories: 0, protein: 0, carbs: 0, fats: 0 });
+    };
+
     return (
         <View style={styles.container}>
-            <Text style={styles.title}>Home</Text>
-            <Text style={styles.subtitle}>Welcome, {user?.email}</Text>
+            <ScrollView
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+                style={styles.scrollView}
+            >
+                {/* Gradient background */}
+                <GradientBackground />
 
-            {/* Macros Display */}
-            {!loadingProfile && (userProfile?.userSettings?.macros || userProfile?.targetMacros) && (
-                <View style={styles.macrosContainer}>
-                    <Text style={styles.macrosTitle}>Daily Macros</Text>
-                    {(() => {
-                        const macros = userProfile?.userSettings?.macros || userProfile?.targetMacros;
-                        return (
-                            <>
-                                {/* Base TDEE (Maintenance) */}
-                                {macros?.baseTDEE && (
-                                    <View style={styles.baseTDEEContainer}>
-                                        <Text style={styles.baseTDEELabel}>Maintenance Calories:</Text>
-                                        <Text style={styles.baseTDEEValue}>{macros.baseTDEE}</Text>
-                                    </View>
-                                )}
-                                <View style={styles.macroRow}>
-                                    <Text style={styles.macroLabel}>Calories:</Text>
-                                    <Text style={styles.macroValue}>{macros?.calories}</Text>
-                                </View>
-                                <View style={styles.macroRow}>
-                                    <Text style={styles.macroLabel}>Protein:</Text>
-                                    <Text style={styles.macroValue}>{macros?.protein} g</Text>
-                                </View>
-                                <View style={styles.macroRow}>
-                                    <Text style={styles.macroLabel}>Carbs:</Text>
-                                    <Text style={styles.macroValue}>{macros?.carbs} g</Text>
-                                </View>
-                                <View style={styles.macroRow}>
-                                    <Text style={styles.macroLabel}>Fats:</Text>
-                                    <Text style={styles.macroValue}>{macros?.fats} g</Text>
-                                </View>
-                            </>
-                        );
-                    })()}
-                </View>
-            )}
+                {/* Header with streak, date, and profile */}
+                {!loadingProfile && (
+                    <HeaderSection
+                        streak={streak}
+                        topInset={insets.top}
+                        onProfilePress={() => {
+                            // TODO: Navigate to profile screen
+                            Alert.alert('Profile', 'Profile screen coming soon');
+                        }}
+                    />
+                )}
 
-            {/* Testing Button - Reset Onboarding */}
-            <Button
-                variant="secondary"
-                title="Reset Onboarding (Testing)"
-                onPress={handleResetOnboarding}
-                loading={resettingOnboarding}
-                disabled={resettingOnboarding}
-                containerStyle={styles.testButton}
-                textStyle={styles.testButtonText}
-            />
+                {/* Main Content Card */}
+                {!loadingProfile && macros && (
+                    <MacrosCard macros={macros} consumed={consumed} />
+                )}
 
-            <Button
-                variant="primary"
-                title="Logout"
-                onPress={handleLogout}
-                loading={loggingOut}
-                disabled={loggingOut}
-                containerStyle={styles.logoutButton}
-                textStyle={styles.buttonText}
-            />
+                {/* Test Controls */}
+                {!loadingProfile && macros && (
+                    <TestControls
+                        consumed={consumed}
+                        onUpdate={handleTestUpdate}
+                        onReset={handleTestReset}
+                    />
+                )}
+
+                {/* Testing Button - Reset Onboarding */}
+                <Button
+                    variant="secondary"
+                    title="Reset Onboarding (Testing)"
+                    onPress={handleResetOnboarding}
+                    loading={resettingOnboarding}
+                    disabled={resettingOnboarding}
+                    containerStyle={styles.testButton}
+                />
+
+                <Button
+                    variant="primary"
+                    title="Logout"
+                    onPress={handleLogout}
+                    loading={loggingOut}
+                    disabled={loggingOut}
+                    containerStyle={styles.logoutButton}
+                />
+            </ScrollView>
         </View>
     );
 };
