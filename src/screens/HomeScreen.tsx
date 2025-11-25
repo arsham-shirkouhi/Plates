@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, Alert } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { Button } from '../components/Button';
-import { resetOnboarding } from '../services/userService';
+import { resetOnboarding, getUserProfile, UserProfile } from '../services/userService';
 import { styles } from './HomeScreen.styles';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
@@ -15,6 +15,8 @@ export const HomeScreen: React.FC = () => {
     const navigation = useNavigation<HomeScreenNavigationProp>();
     const [loggingOut, setLoggingOut] = useState(false);
     const [resettingOnboarding, setResettingOnboarding] = useState(false);
+    const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+    const [loadingProfile, setLoadingProfile] = useState(true);
 
     const handleLogout = async () => {
         setLoggingOut(true);
@@ -32,6 +34,36 @@ export const HomeScreen: React.FC = () => {
             setLoggingOut(false);
         }
     };
+
+    // Load user profile and macros on mount and when screen comes into focus
+    const loadUserProfile = async () => {
+        if (!user) {
+            setLoadingProfile(false);
+            return;
+        }
+
+        try {
+            setLoadingProfile(true);
+            const profile = await getUserProfile(user);
+            setUserProfile(profile);
+        } catch (error) {
+            console.error('Error loading user profile:', error);
+        } finally {
+            setLoadingProfile(false);
+        }
+    };
+
+    // Load on mount
+    useEffect(() => {
+        loadUserProfile();
+    }, [user]);
+
+    // Reload when screen comes into focus (e.g., after completing onboarding)
+    useFocusEffect(
+        React.useCallback(() => {
+            loadUserProfile();
+        }, [user])
+    );
 
     const handleResetOnboarding = async () => {
         if (!user) {
@@ -76,6 +108,43 @@ export const HomeScreen: React.FC = () => {
         <View style={styles.container}>
             <Text style={styles.title}>Home</Text>
             <Text style={styles.subtitle}>Welcome, {user?.email}</Text>
+
+            {/* Macros Display */}
+            {!loadingProfile && (userProfile?.userSettings?.macros || userProfile?.targetMacros) && (
+                <View style={styles.macrosContainer}>
+                    <Text style={styles.macrosTitle}>Daily Macros</Text>
+                    {(() => {
+                        const macros = userProfile?.userSettings?.macros || userProfile?.targetMacros;
+                        return (
+                            <>
+                                {/* Base TDEE (Maintenance) */}
+                                {macros?.baseTDEE && (
+                                    <View style={styles.baseTDEEContainer}>
+                                        <Text style={styles.baseTDEELabel}>Maintenance Calories:</Text>
+                                        <Text style={styles.baseTDEEValue}>{macros.baseTDEE}</Text>
+                                    </View>
+                                )}
+                                <View style={styles.macroRow}>
+                                    <Text style={styles.macroLabel}>Calories:</Text>
+                                    <Text style={styles.macroValue}>{macros?.calories}</Text>
+                                </View>
+                                <View style={styles.macroRow}>
+                                    <Text style={styles.macroLabel}>Protein:</Text>
+                                    <Text style={styles.macroValue}>{macros?.protein} g</Text>
+                                </View>
+                                <View style={styles.macroRow}>
+                                    <Text style={styles.macroLabel}>Carbs:</Text>
+                                    <Text style={styles.macroValue}>{macros?.carbs} g</Text>
+                                </View>
+                                <View style={styles.macroRow}>
+                                    <Text style={styles.macroLabel}>Fats:</Text>
+                                    <Text style={styles.macroValue}>{macros?.fats} g</Text>
+                                </View>
+                            </>
+                        );
+                    })()}
+                </View>
+            )}
 
             {/* Testing Button - Reset Onboarding */}
             <Button

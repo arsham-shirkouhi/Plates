@@ -1,6 +1,7 @@
 import { doc, getDoc, setDoc, serverTimestamp, collection, getDocs, query, where, deleteField } from 'firebase/firestore';
 import { db } from './firebase';
 import { User } from 'firebase/auth';
+import { generateDailyMacrosFromAge, generateManualMacros } from '../utils/macroCalculator';
 
 // ============================================================================
 // DATABASE SCHEMA
@@ -8,10 +9,12 @@ import { User } from 'firebase/auth';
 
 /**
  * Onboarding Data Schema
+ * Note: This interface is kept for backward compatibility but we use the one from onboarding/types
+ * The onboarding screen converts birthMonth/birthDay/birthYear to age before calling saveOnboardingData
  */
 export interface OnboardingData {
     name: string;
-    age: number;
+    age: number; // Calculated from birthMonth/birthDay/birthYear in onboarding screen
     sex: 'male' | 'female' | 'other' | '';
     height: number;
     heightUnit: 'cm' | 'ft';
@@ -66,6 +69,18 @@ export interface UserProfile {
         protein: number; // in grams
         carbs: number; // in grams
         fats: number; // in grams
+        baseTDEE?: number; // Maintenance calories before goal adjustment
+    };
+
+    // User settings including macros
+    userSettings?: {
+        macros?: {
+            calories: number;
+            protein: number; // in grams
+            carbs: number; // in grams
+            fats: number; // in grams
+            baseTDEE?: number; // Maintenance calories before goal adjustment
+        };
     };
 }
 
@@ -159,19 +174,26 @@ export const saveOnboardingData = async (user: User, onboardingData: OnboardingD
         // Normalize the new username
         const newUsername = onboardingData.name.trim().toLowerCase();
 
-        // Calculate target macros if auto-setup was selected
-        let targetMacros = undefined;
+        // Calculate macros based on setup mode
+        // Store in userSettings.macros (new location) and also keep targetMacros for backward compatibility
+        let calculatedMacros = undefined;
         if (onboardingData.macrosSetup === 'auto') {
-            targetMacros = calculateTargetMacros(onboardingData);
+            // Use automatic calculation with Mifflin-St Jeor formula
+            // Only uses: age, sex, height, weight, activityLevel, goal, goalIntensity
+            calculatedMacros = generateDailyMacrosFromAge(
+                onboardingData.age,
+                onboardingData.sex,
+                onboardingData.height,
+                onboardingData.heightUnit,
+                onboardingData.weight,
+                onboardingData.weightUnit,
+                onboardingData.activityLevel,
+                onboardingData.goal,
+                onboardingData.goalIntensity
+            );
         } else if (onboardingData.macrosSetup === 'manual' && onboardingData.customMacros) {
-            // Use custom macros provided by user
-            // Note: We'll need to calculate calories from macros or ask user for calorie target
-            targetMacros = {
-                calories: 2000, // Placeholder - should be calculated or provided
-                protein: onboardingData.customMacros.protein,
-                carbs: onboardingData.customMacros.carbs,
-                fats: onboardingData.customMacros.fats,
-            };
+            // Use custom macros and calculate calories from them
+            calculatedMacros = generateManualMacros(onboardingData.customMacros);
         }
 
         // Prepare onboarding data - remove undefined customMacros
@@ -187,9 +209,13 @@ export const saveOnboardingData = async (user: User, onboardingData: OnboardingD
             updatedAt: serverTimestamp(),
         };
 
-        // Only include targetMacros if it's defined
-        if (targetMacros) {
-            updateData.targetMacros = targetMacros;
+        // Store macros in userSettings.macros (primary location)
+        if (calculatedMacros) {
+            updateData.userSettings = {
+                macros: calculatedMacros,
+            };
+            // Also keep targetMacros for backward compatibility
+            updateData.targetMacros = calculatedMacros;
         }
 
         // Preserve createdAt if it exists, otherwise set it
@@ -226,7 +252,7 @@ export const saveOnboardingData = async (user: User, onboardingData: OnboardingD
         console.log('✅ Onboarding data saved successfully');
         console.log('✅ Username registered in usernames collection');
         console.log('✅ onboardingCompleted flag set to: true');
-        console.log('📊 Target macros calculated:', targetMacros);
+        console.log('📊 Macros calculated and saved to userSettings.macros:', calculatedMacros);
     } catch (error) {
         console.error('Error saving onboarding data:', error);
         throw error;
@@ -531,52 +557,3 @@ export const getTodayDateString = (): string => {
     return `${year}-${month}-${day}`;
 };
 
-/**
- * Calculate target macros based on onboarding data
- * This is a placeholder - should implement proper BMR/TDEE calculation
- */
-const calculateTargetMacros = (onboardingData: OnboardingData): {
-    calories: number;
-    protein: number;
-    carbs: number;
-    fats: number;
-} => {
-    // TODO: Implement proper macro calculation based on:
-    // - BMR (Basal Metabolic Rate) using Mifflin-St Jeor Equation
-    // - TDEE (Total Daily Energy Expenditure) based on activity level
-    // - Goal (lose/maintain/build) with appropriate deficit/surplus
-    // - Goal intensity (mild/moderate/aggressive)
-
-    // Placeholder calculation
-    let baseCalories = 2000; // Default
-
-    // Adjust based on goal
-    if (onboardingData.goal === 'lose') {
-        baseCalories = onboardingData.goalIntensity === 'aggressive' ? 1500 :
-            onboardingData.goalIntensity === 'moderate' ? 1700 : 1800;
-    } else if (onboardingData.goal === 'build') {
-        baseCalories = onboardingData.goalIntensity === 'aggressive' ? 2500 :
-            onboardingData.goalIntensity === 'moderate' ? 2300 : 2200;
-    }
-
-    // Calculate macros (simplified)
-    // Protein: 1.6-2.2g per kg body weight (use 2g for high protein)
-    const weightInKg = onboardingData.weightUnit === 'kg' ? onboardingData.weight : onboardingData.weight * 0.453592;
-    const proteinGrams = Math.round(weightInKg * 2);
-
-    // Fats: 25-30% of calories (use 30%)
-    const fatCalories = Math.round(baseCalories * 0.30);
-    const fatGrams = Math.round(fatCalories / 9); // 9 calories per gram of fat
-
-    // Carbs: Remaining calories
-    const proteinCalories = proteinGrams * 4; // 4 calories per gram of protein
-    const carbCalories = baseCalories - proteinCalories - fatCalories;
-    const carbGrams = Math.round(carbCalories / 4); // 4 calories per gram of carbs
-
-    return {
-        calories: baseCalories,
-        protein: proteinGrams,
-        carbs: carbGrams,
-        fats: fatGrams,
-    };
-};

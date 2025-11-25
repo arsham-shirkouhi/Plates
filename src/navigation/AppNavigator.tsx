@@ -8,6 +8,7 @@ import { HomeScreen } from '../screens/HomeScreen';
 import { VerificationScreen } from '../screens/VerificationScreen';
 import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
+import { MacroResultsScreen } from '../screens/MacroResultsScreen';
 
 export type RootStackParamList = {
     Login: undefined;
@@ -16,6 +17,17 @@ export type RootStackParamList = {
     Verification: { email?: string };
     ForgotPassword: undefined;
     Onboarding: undefined;
+    MacroResults: {
+        macros: {
+            calories: number;
+            protein: number;
+            carbs: number;
+            fats: number;
+            baseTDEE?: number;
+        };
+        goal: 'lose' | 'maintain' | 'build';
+        goalIntensity: 'mild' | 'moderate' | 'aggressive';
+    };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -57,6 +69,14 @@ export const AppNavigator: React.FC<AppNavigatorProps> = ({ user }) => {
                 <Stack.Screen name="Verification" component={VerificationScreen} />
                 <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
                 <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+                <Stack.Screen
+                    name="MacroResults"
+                    component={MacroResultsScreen}
+                    options={{
+                        animation: 'slide_from_right',
+                        animationDuration: 300,
+                    }}
+                />
                 <Stack.Screen name="Home" component={HomeScreen} />
             </Stack.Navigator>
         </NavigationContainer>

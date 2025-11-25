@@ -14,6 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import { saveOnboardingData, OnboardingData as OnboardingDataType, hasCompletedOnboarding, checkUsernameExists } from '../services/userService';
 import { OnboardingData } from './onboarding/types';
 import { TOTAL_STEPS } from './onboarding/constants';
+import { generateDailyMacrosFromAge, generateManualMacros } from '../utils/macroCalculator';
 
 type OnboardingScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Onboarding'>;
 
@@ -770,13 +771,42 @@ export const OnboardingScreen: React.FC = () => {
                 customMacros: data.customMacros,
             };
 
+            // Calculate macros before saving to show in results modal
+            let macros = null;
+            if (onboardingData.macrosSetup === 'auto') {
+                macros = generateDailyMacrosFromAge(
+                    onboardingData.age,
+                    onboardingData.sex,
+                    onboardingData.height,
+                    onboardingData.heightUnit,
+                    onboardingData.weight,
+                    onboardingData.weightUnit,
+                    onboardingData.activityLevel,
+                    onboardingData.goal,
+                    onboardingData.goalIntensity
+                );
+            } else if (onboardingData.macrosSetup === 'manual' && onboardingData.customMacros) {
+                macros = generateManualMacros(onboardingData.customMacros);
+            }
+
             await saveOnboardingData(user, onboardingData);
             console.log('✅ Onboarding data saved successfully');
             console.log('✅ User flagged as onboardingCompleted: true');
-            console.log('🏠 Navigating to Home screen...');
-            console.log('═══════════════════════════════════════════════════════');
 
-            navigation.replace('Home');
+            // Navigate to results screen if macros were calculated
+            if (macros && onboardingData.goal && onboardingData.goalIntensity) {
+                console.log('📊 Navigating to Macro Results screen...');
+                navigation.replace('MacroResults', {
+                    macros,
+                    goal: onboardingData.goal as 'lose' | 'maintain' | 'build',
+                    goalIntensity: onboardingData.goalIntensity as 'mild' | 'moderate' | 'aggressive',
+                });
+            } else {
+                // If no macros, navigate directly to Home
+                console.log('🏠 Navigating to Home screen...');
+                navigation.replace('Home');
+            }
+            console.log('═══════════════════════════════════════════════════════');
         } catch (error: any) {
             console.error('❌ Error saving onboarding data:', error);
             Alert.alert('Error', 'Failed to save onboarding data. Please try again.');
@@ -3541,6 +3571,7 @@ export const OnboardingScreen: React.FC = () => {
                     />
                 </View>
             </View>
+
         </View>
     );
 };
