@@ -407,7 +407,7 @@ const macroBarStyles = StyleSheet.create({
     },
     barFill: {
         height: '100%',
-        borderRadius: 16,
+        borderRadius: 14,
         borderRightWidth: 3,
         borderRightColor: '#000',
     },
