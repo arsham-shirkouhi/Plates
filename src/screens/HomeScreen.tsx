@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Alert, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
@@ -12,6 +12,8 @@ import { FoodLog } from '../components/FoodLog';
 import { AIWidget } from '../components/AIWidget';
 import { TestControls } from '../components/TestControls';
 import { GradientBackground } from '../components/GradientBackground';
+import { BottomNavBar } from '../components/BottomNavBar';
+import { AddButton, NavButtons } from '../components/NavButton';
 import { resetOnboarding, getUserProfile, UserProfile, getDailyMacroLog, getTodayDateString, DailyMacroLog } from '../services/userService';
 import { styles } from './HomeScreen.styles';
 
@@ -27,6 +29,7 @@ export const HomeScreen: React.FC = () => {
     const [loadingProfile, setLoadingProfile] = useState(true);
     const [dailyLog, setDailyLog] = useState<DailyMacroLog | null>(null);
     const [loadingLog, setLoadingLog] = useState(true);
+    const closeMenuRef = useRef<(() => void) | null>(null);
 
     // Test values for manual adjustment
     const [testValues, setTestValues] = useState({
@@ -225,6 +228,30 @@ export const HomeScreen: React.FC = () => {
                     containerStyle={styles.logoutButton}
                 />
             </ScrollView>
+            
+            {/* Bottom Navigation Bar */}
+            <BottomNavBar>
+                <NavButtons
+                    onHomePress={() => {
+                        // Already on home screen
+                    }}
+                    onFoodPress={() => {
+                        Alert.alert('Food', 'Food screen coming soon');
+                    }}
+                    onFitnessPress={() => {
+                        Alert.alert('Fitness', 'Fitness screen coming soon');
+                    }}
+                />
+                <AddButton
+                    onPress={() => {
+                        Alert.alert('Add', 'Add functionality coming soon');
+                    }}
+                    onMenuStateChange={() => {
+                        // Menu state change handler (if needed in future)
+                    }}
+                    onCloseMenu={closeMenuRef}
+                />
+            </BottomNavBar>
         </View>
     );
 };

@@ -13,7 +13,7 @@ export const styles = StyleSheet.create({
         paddingLeft: 25,
         paddingRight: 25,
         paddingTop: 0,
-        paddingBottom: 16,
+        paddingBottom: 120, // Increased to accommodate bottom nav button stack (90px + padding)
     },
     contentCard: {
         backgroundColor: 'rgba(255, 255, 255, 0.8)',

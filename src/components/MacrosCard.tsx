@@ -387,7 +387,7 @@ const macroBarStyles = StyleSheet.create({
         height: 15,
         backgroundColor: '#fff',
         borderRadius: 16,
-        borderWidth: 3,
+        borderWidth: 2,
         borderColor: '#252525',
         overflow: 'hidden',
     },
