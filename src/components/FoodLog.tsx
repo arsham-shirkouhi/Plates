@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         borderWidth: 2.5,
         borderColor: '#252525',
-        paddingTop: 10,
+        paddingTop: 5,
         paddingBottom: 10,
         paddingHorizontal: 15,
         marginTop: 16,
@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingTop: 0,
-        paddingBottom: 9,
+        paddingBottom: 5,
     },
     headerText: {
         fontSize: 18,

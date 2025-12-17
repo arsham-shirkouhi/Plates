@@ -11,6 +11,8 @@ import { HeaderSection } from '../components/HeaderSection';
 import { MacrosCard } from '../components/MacrosCard';
 import { FoodLog } from '../components/FoodLog';
 import { AIWidget } from '../components/AIWidget';
+import { TodaysGoalsWidget } from '../components/TodaysGoalsWidget';
+import { SquareWidget } from '../components/SquareWidget';
 import { TestControls } from '../components/TestControls';
 import { GradientBackground } from '../components/GradientBackground';
 import { BottomNavBar } from '../components/BottomNavBar';
@@ -255,6 +257,16 @@ export const HomeScreen: React.FC = () => {
 
                 {/* AI Widget */}
                 <AIWidget />
+
+                {/* Square Widgets Row */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
+                    <TodaysGoalsWidget
+                        onPress={() => {
+                            Alert.alert('Today\'s Goals', 'Goals screen coming soon');
+                        }}
+                    />
+                    <SquareWidget title="widget 2" content="content 2" />
+                </View>
 
                 {/* Test Controls */}
                 {!loadingProfile && macros && (
