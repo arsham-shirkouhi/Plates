@@ -64,7 +64,7 @@ const CalorieCircularProgress: React.FC<CalorieCircularProgressProps> = ({
     // SVG circle parameters
     const size = 135;
     const strokeWidth = 15;
-    const borderWidth = 3; // Match progress bar border
+    const borderWidth = 2.5; // Match progress bar border
     const radius = (size - strokeWidth) / 2;
     const center = size / 2;
     const circumference = 2 * Math.PI * radius;

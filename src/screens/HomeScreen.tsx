@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Alert, ScrollView } from 'react-native';
+import { View, Alert, ScrollView, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -29,6 +30,7 @@ export const HomeScreen: React.FC = () => {
     const [loadingProfile, setLoadingProfile] = useState(true);
     const [dailyLog, setDailyLog] = useState<DailyMacroLog | null>(null);
     const [loadingLog, setLoadingLog] = useState(true);
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
     const closeMenuRef = useRef<(() => void) | null>(null);
 
     // Test values for manual adjustment
@@ -229,16 +231,68 @@ export const HomeScreen: React.FC = () => {
                 />
             </ScrollView>
             
+            {/* White to transparent gradient behind buttons */}
+            <LinearGradient
+                colors={['rgba(255, 255, 255, 0)', 'rgba(255, 255, 255, 1)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
+                style={[
+                    {
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        height: 150,
+                        zIndex: 99, // Behind buttons but above content
+                    },
+                    { paddingBottom: insets.bottom }
+                ]}
+                pointerEvents="none"
+            />
+            
+            {/* Transparent overlay to close menu when clicking outside */}
+            {isMenuOpen && (
+                <TouchableOpacity
+                    style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        width: Dimensions.get('window').width,
+                        height: Dimensions.get('window').height,
+                        zIndex: 98, // Above content but below nav buttons (zIndex 100)
+                    }}
+                    activeOpacity={1}
+                    onPress={() => {
+                        // Close menu by calling AddButton's close function
+                        closeMenuRef.current?.();
+                    }}
+                />
+            )}
+            
             {/* Bottom Navigation Bar */}
             <BottomNavBar>
                 <NavButtons
                     onHomePress={() => {
+                        // Close menu if open
+                        if (isMenuOpen) {
+                            closeMenuRef.current?.();
+                        }
                         // Already on home screen
                     }}
                     onFoodPress={() => {
+                        // Close menu if open
+                        if (isMenuOpen) {
+                            closeMenuRef.current?.();
+                        }
                         Alert.alert('Food', 'Food screen coming soon');
                     }}
                     onFitnessPress={() => {
+                        // Close menu if open
+                        if (isMenuOpen) {
+                            closeMenuRef.current?.();
+                        }
                         Alert.alert('Fitness', 'Fitness screen coming soon');
                     }}
                 />
@@ -246,8 +300,8 @@ export const HomeScreen: React.FC = () => {
                     onPress={() => {
                         Alert.alert('Add', 'Add functionality coming soon');
                     }}
-                    onMenuStateChange={() => {
-                        // Menu state change handler (if needed in future)
+                    onMenuStateChange={(isOpen) => {
+                        setIsMenuOpen(isOpen);
                     }}
                     onCloseMenu={closeMenuRef}
                 />
