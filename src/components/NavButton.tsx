@@ -18,19 +18,42 @@ interface NavIconButtonProps {
 // AddButton: Single green plate that expands to show menu
 export const AddButton: React.FC<NavButtonProps> = ({ onPress, onMenuStateChange, onCloseMenu }) => {
     const [isMenuOpen, setIsMenuOpen] = React.useState(false);
-    
+
     // Animation values for menu buttons - starting from green button position (0, 0)
     const menuButton1TranslateX = useRef(new Animated.Value(0)).current;
     const menuButton1TranslateY = useRef(new Animated.Value(0)).current;
-    
+
     const menuButton2TranslateX = useRef(new Animated.Value(0)).current;
     const menuButton2TranslateY = useRef(new Animated.Value(0)).current;
-    
+
     const menuButton3TranslateX = useRef(new Animated.Value(0)).current;
     const menuButton3TranslateY = useRef(new Animated.Value(0)).current;
-    
+
     // Rotation animation for plus icon (starts at 0deg, rotates to 135deg when opened)
     const plusIconRotation = useRef(new Animated.Value(0)).current;
+
+    // Press-down animation for green button
+    const greenButtonTranslateY = useRef(new Animated.Value(0)).current;
+
+    const handlePressIn = () => {
+        // Move green circle down to overlap shadow circle
+        Animated.spring(greenButtonTranslateY, {
+            toValue: 8, // Move down by 8px to overlap the shadow circle
+            useNativeDriver: true,
+            tension: 100,
+            friction: 7,
+        }).start();
+    };
+
+    const handlePressOut = () => {
+        // Move green circle back up
+        Animated.spring(greenButtonTranslateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 100,
+            friction: 7,
+        }).start();
+    };
 
     const handlePress = () => {
         if (isMenuOpen) {
@@ -181,12 +204,22 @@ export const AddButton: React.FC<NavButtonProps> = ({ onPress, onMenuStateChange
             {/* Main Green Button - aligned with left buttons */}
             <TouchableOpacity
                 onPress={handlePress}
-                activeOpacity={0.8}
+                onPressIn={handlePressIn}
+                onPressOut={handlePressOut}
+                activeOpacity={1}
                 style={styles.buttonContainer}
             >
                 <View style={styles.singleCircleContainer}>
-                    {/* Green circle with plus */}
-                    <View style={[styles.circle, styles.circleGreenSingle]}>
+                    {/* Green circle with plus - animated */}
+                    <Animated.View
+                        style={[
+                            styles.circle,
+                            styles.circleGreenSingle,
+                            {
+                                transform: [{ translateY: greenButtonTranslateY }],
+                            }
+                        ]}
+                    >
                         <Animated.Image
                             source={require('../../assets/images/icons/plus_icon.png')}
                             style={[
@@ -204,7 +237,7 @@ export const AddButton: React.FC<NavButtonProps> = ({ onPress, onMenuStateChange
                             ]}
                             resizeMode="contain"
                         />
-                    </View>
+                    </Animated.View>
                     {/* Green shadow below */}
                     <View style={[styles.circle, styles.circleGreenShadowSingle]} />
                 </View>
@@ -354,58 +387,85 @@ const styles = StyleSheet.create({
 
 // Navigation icon buttons (Home, Food, Fitness) - 2 stacked circles
 export const NavIconButton: React.FC<NavIconButtonProps> = ({ onPress, icon, isActive = false }) => {
+    const topCircleTranslateY = useRef(new Animated.Value(0)).current;
+
+    const handlePressIn = () => {
+        // Move top circle down to overlap bottom circle
+        Animated.spring(topCircleTranslateY, {
+            toValue: 8, // Move down by 8px to overlap the bottom circle
+            useNativeDriver: true,
+            tension: 100,
+            friction: 7,
+        }).start();
+    };
+
+    const handlePressOut = () => {
+        // Move top circle back up
+        Animated.spring(topCircleTranslateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 100,
+            friction: 7,
+        }).start();
+    };
+
     return (
         <TouchableOpacity
             onPress={onPress}
-            activeOpacity={0.7}
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            activeOpacity={1}
             style={iconButtonStyles.buttonContainer}
         >
             <View style={iconButtonStyles.circlesContainer}>
                 {/* Bottom circle */}
                 <View style={[
-                    iconButtonStyles.circle, 
+                    iconButtonStyles.circle,
                     iconButtonStyles.circleBottom,
                     isActive && iconButtonStyles.circleBottomActive
                 ]} />
-                
-                {/* Top circle with icon */}
-                <View style={[
-                    iconButtonStyles.circle, 
+
+                {/* Top circle with icon - animated */}
+                <Animated.View style={[
+                    iconButtonStyles.circle,
                     iconButtonStyles.circleTop,
-                    isActive && iconButtonStyles.circleTopActive
+                    isActive && iconButtonStyles.circleTopActive,
+                    {
+                        transform: [{ translateY: topCircleTranslateY }],
+                    }
                 ]}>
-                    <Ionicons 
-                        name={icon as any} 
-                        size={24} 
-                        color={isActive ? '#fff' : '#252525'} 
+                    <Ionicons
+                        name={icon as any}
+                        size={24}
+                        color={isActive ? '#fff' : '#252525'}
                     />
-                </View>
+                </Animated.View>
             </View>
         </TouchableOpacity>
     );
 };
 
 // Container for the three nav buttons
-export const NavButtons: React.FC<{ onHomePress?: () => void; onFoodPress?: () => void; onFitnessPress?: () => void }> = ({ 
-    onHomePress, 
-    onFoodPress, 
-    onFitnessPress 
+export const NavButtons: React.FC<{ onHomePress?: () => void; onFoodPress?: () => void; onFitnessPress?: () => void }> = ({
+    onHomePress,
+    onFoodPress,
+    onFitnessPress
 }) => {
     return (
         <View style={navButtonStyles.container}>
-            <NavIconButton 
-                icon="home-outline" 
+            <NavIconButton
+                icon="home-outline"
                 isActive={true}
                 onPress={onHomePress}
             />
             <View style={navButtonStyles.spacer} />
-            <NavIconButton 
-                icon="restaurant-outline" 
+            <NavIconButton
+                icon="restaurant-outline"
                 onPress={onFoodPress}
             />
             <View style={navButtonStyles.spacer} />
-            <NavIconButton 
-                icon="fitness-outline" 
+            <NavIconButton
+                icon="fitness-outline"
                 onPress={onFitnessPress}
             />
         </View>
@@ -454,12 +514,12 @@ const iconButtonStyles = StyleSheet.create({
         backgroundColor: '#526EFF',
     },
     circleBottom: {
-        backgroundColor: '#F5F5F5',
+        backgroundColor: '#C4C4C4',
         top: 8, // 8px offset
         zIndex: 1,
     },
     circleBottomActive: {
-        backgroundColor: '#4463F7', // Slightly darker blue for bottom circle
+        backgroundColor: '#374DC2', // Darker blue for bottom circle
     },
 });
 

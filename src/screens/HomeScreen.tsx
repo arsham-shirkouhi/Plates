@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Alert, ScrollView, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Alert, ScrollView, StyleSheet, TouchableOpacity, Dimensions, Animated, PanResponder } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
@@ -15,6 +15,7 @@ import { TestControls } from '../components/TestControls';
 import { GradientBackground } from '../components/GradientBackground';
 import { BottomNavBar } from '../components/BottomNavBar';
 import { AddButton, NavButtons } from '../components/NavButton';
+import { BlobAnimation } from '../components/BlobAnimation';
 import { resetOnboarding, getUserProfile, UserProfile, getDailyMacroLog, getTodayDateString, DailyMacroLog } from '../services/userService';
 import { styles } from './HomeScreen.styles';
 
@@ -32,6 +33,11 @@ export const HomeScreen: React.FC = () => {
     const [loadingLog, setLoadingLog] = useState(true);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const closeMenuRef = useRef<(() => void) | null>(null);
+
+    // Blob animation state - single blob that follows finger
+    const [isTouching, setIsTouching] = useState(false);
+    const pan = useRef(new Animated.ValueXY()).current;
+    const containerRef = useRef<View>(null);
 
     // Test values for manual adjustment
     const [testValues, setTestValues] = useState({
@@ -169,8 +175,56 @@ export const HomeScreen: React.FC = () => {
         setTestValues({ calories: 0, protein: 0, carbs: 0, fats: 0 });
     };
 
+    // Store container position for coordinate calculation
+    const containerPositionRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+    // PanResponder to track finger movement
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true, // Capture touches
+            onMoveShouldSetPanResponder: () => true, // Track movement
+            onPanResponderGrant: (evt) => {
+                // Touch started - show circle and set initial position
+                const { pageX, pageY } = evt.nativeEvent;
+                // Use stored container position
+                pan.setValue({
+                    x: pageX - containerPositionRef.current.x - 35, // Center the circle (70px / 2 = 35)
+                    y: pageY - containerPositionRef.current.y - 35,
+                });
+                setIsTouching(true);
+            },
+            onPanResponderMove: (evt, gestureState) => {
+                // Update circle position to follow finger
+                const { pageX, pageY } = evt.nativeEvent;
+                pan.setValue({
+                    x: pageX - containerPositionRef.current.x - 35, // Center the circle
+                    y: pageY - containerPositionRef.current.y - 35,
+                });
+            },
+            onPanResponderRelease: () => {
+                // Hide circle when finger is released
+                setIsTouching(false);
+            },
+            onPanResponderTerminate: () => {
+                // Hide circle if touch is cancelled
+                setIsTouching(false);
+            },
+        })
+    ).current;
+
+
     return (
-        <View style={styles.container}>
+        <View
+            ref={containerRef}
+            style={styles.container}
+            onLayout={() => {
+                // Store container position when layout is ready
+                containerRef.current?.measureInWindow((x, y, width, height) => {
+                    containerPositionRef.current = { x, y };
+                });
+            }}
+            {...panResponder.panHandlers}
+        >
             <ScrollView
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
@@ -230,7 +284,31 @@ export const HomeScreen: React.FC = () => {
                     containerStyle={styles.logoutButton}
                 />
             </ScrollView>
-            
+
+            {/* Blob that follows finger */}
+            {isTouching && (
+                <Animated.View
+                    style={[
+                        {
+                            position: 'absolute',
+                            width: 70,
+                            height: 70,
+                            transform: [
+                                { translateX: pan.x },
+                                { translateY: pan.y },
+                            ],
+                        },
+                    ]}
+                    pointerEvents="none"
+                >
+                    <BlobAnimation
+                        x={35}
+                        y={35}
+                        onComplete={() => { }}
+                    />
+                </Animated.View>
+            )}
+
             {/* White to transparent gradient behind buttons */}
             <LinearGradient
                 colors={['rgba(255, 255, 255, 0)', 'rgba(255, 255, 255, 1)']}
@@ -249,7 +327,7 @@ export const HomeScreen: React.FC = () => {
                 ]}
                 pointerEvents="none"
             />
-            
+
             {/* Transparent overlay to close menu when clicking outside */}
             {isMenuOpen && (
                 <TouchableOpacity
@@ -270,7 +348,7 @@ export const HomeScreen: React.FC = () => {
                     }}
                 />
             )}
-            
+
             {/* Bottom Navigation Bar */}
             <BottomNavBar>
                 <NavButtons
