@@ -64,7 +64,7 @@ const CalorieCircularProgress: React.FC<CalorieCircularProgressProps> = ({
     // SVG circle parameters
     const size = 135;
     const strokeWidth = 15;
-    const borderWidth = 2; // Match progress bar border
+    const borderWidth = 3; // Match progress bar border
     const radius = (size - strokeWidth) / 2;
     const center = size / 2;
     const circumference = 2 * Math.PI * radius;
@@ -131,7 +131,7 @@ const CalorieCircularProgress: React.FC<CalorieCircularProgressProps> = ({
                         cx={center}
                         cy={center}
                         r={outerBorderRadius}
-                        stroke="#000"
+                        stroke="#252525"
                         strokeWidth={borderWidth * 2 + 0.5}
                         fill="transparent"
                         strokeLinecap="round"
@@ -147,20 +147,6 @@ const CalorieCircularProgress: React.FC<CalorieCircularProgressProps> = ({
                         fill="transparent"
                         strokeDasharray={`${circumference} ${circumference}`}
                         strokeDashoffset={0}
-                        strokeLinecap="round"
-                        transform={`rotate(-90 ${center} ${center})`}
-                    />
-
-                    {/* Progress circle outline (black, for ends) - full circle */}
-                    <Circle
-                        cx={center}
-                        cy={center}
-                        r={radius}
-                        stroke="#000"
-                        strokeWidth={strokeWidth + 2}
-                        fill="transparent"
-                        strokeDasharray={`${circumference} ${circumference}`}
-                        strokeDashoffset={dashOffset}
                         strokeLinecap="round"
                         transform={`rotate(-90 ${center} ${center})`}
                     />
@@ -184,7 +170,7 @@ const CalorieCircularProgress: React.FC<CalorieCircularProgressProps> = ({
                         cx={center}
                         cy={center}
                         r={innerBorderRadius}
-                        stroke="#000"
+                        stroke="#252525"
                         strokeWidth={borderWidth + 0.5}
                         fill="transparent"
                         strokeLinecap="round"
@@ -354,14 +340,14 @@ const calorieStyles = StyleSheet.create({
     number: {
         fontSize: 24,
         fontFamily: fonts.bold,
-        color: '#000',
+        color: '#252525',
         marginBottom: 0,
         fontWeight: 'bold',
     },
     label: {
         fontSize: 16,
         fontFamily: fonts.regular,
-        color: '#000',
+        color: '#252525',
         textTransform: 'lowercase',
     },
 });
@@ -383,7 +369,7 @@ const macroBarStyles = StyleSheet.create({
     label: {
         fontSize: 18,
         fontFamily: fonts.bold,
-        color: '#000',
+        color: '#252525',
         textTransform: 'lowercase',
     },
     valueContainer: {
@@ -393,7 +379,7 @@ const macroBarStyles = StyleSheet.create({
     value: {
         fontSize: 18,
         fontFamily: fonts.regular,
-        color: '#000',
+        color: '#252525',
     },
     barContainer: {
         width: '100%',
@@ -401,14 +387,11 @@ const macroBarStyles = StyleSheet.create({
         height: 15,
         backgroundColor: '#fff',
         borderRadius: 16,
-        borderWidth: 2,
-        borderColor: '#000',
+        borderWidth: 3,
+        borderColor: '#252525',
         overflow: 'hidden',
     },
     barFill: {
         height: '100%',
-        borderRadius: 14,
-        borderRightWidth: 3,
-        borderRightColor: '#000',
     },
 });

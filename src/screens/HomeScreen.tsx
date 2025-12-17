@@ -8,6 +8,8 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { Button } from '../components/Button';
 import { HeaderSection } from '../components/HeaderSection';
 import { MacrosCard } from '../components/MacrosCard';
+import { FoodLog } from '../components/FoodLog';
+import { AIWidget } from '../components/AIWidget';
 import { TestControls } from '../components/TestControls';
 import { GradientBackground } from '../components/GradientBackground';
 import { resetOnboarding, getUserProfile, UserProfile, getDailyMacroLog, getTodayDateString, DailyMacroLog } from '../services/userService';
@@ -188,6 +190,12 @@ export const HomeScreen: React.FC = () => {
                 {!loadingProfile && macros && (
                     <MacrosCard macros={macros} consumed={consumed} />
                 )}
+
+                {/* Food Log */}
+                <FoodLog />
+
+                {/* AI Widget */}
+                <AIWidget />
 
                 {/* Test Controls */}
                 {!loadingProfile && macros && (

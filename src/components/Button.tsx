@@ -107,7 +107,7 @@ export const Button: React.FC<ButtonProps> = ({
                     ...baseStyle,
                     backgroundColor: isDisabled ? '#fff' : '#526EFF',
                     borderWidth: 2,
-                    borderColor: isDisabled ? '#000' : '#000',
+                    borderColor: isDisabled ? '#252525' : '#252525',
                     width: 360,
                     height: 50,
                     marginTop: 5,
@@ -119,7 +119,7 @@ export const Button: React.FC<ButtonProps> = ({
                     ...baseStyle,
                     backgroundColor: '#fff',
                     borderWidth: 2,
-                    borderColor: '#000',
+                    borderColor: '#252525',
                     flexDirection: 'row',
                     width: 360,
                     height: 50,
@@ -130,7 +130,7 @@ export const Button: React.FC<ButtonProps> = ({
                     ...baseStyle,
                     backgroundColor: '#fff',
                     borderWidth: 2,
-                    borderColor: '#000',
+                    borderColor: '#252525',
                     width: 360,
                     height: 50,
                     marginBottom: 12,
@@ -161,14 +161,14 @@ export const Button: React.FC<ButtonProps> = ({
             case 'primary':
                 return {
                     ...baseStyle,
-                    color: isDisabled ? '#000' : '#fff',
+                    color: isDisabled ? '#252525' : '#fff',
                     fontSize: 20,
                     fontFamily: fonts.bold,
                 };
             case 'google':
                 return {
                     ...baseStyle,
-                    color: '#000',
+                    color: '#252525',
                     fontSize: 20,
                     fontFamily: fonts.regular,
                 };
@@ -297,7 +297,7 @@ export const Button: React.FC<ButtonProps> = ({
                         isDisabled && styles.disabledButton,
                         {
                             transform: [{ translateY }],
-                            shadowColor: '#000',
+                            shadowColor: '#252525',
                             shadowOffset: {
                                 width: 0,
                                 height: shadowHeightState,
@@ -329,7 +329,7 @@ export const Button: React.FC<ButtonProps> = ({
                                 getTextStyle(),
                                 textStyle,
                                 {
-                                    color: isDisabled ? '#000' : '#fff',
+                                    color: isDisabled ? '#252525' : '#fff',
                                     opacity: colorOverlayOpacity.interpolate({
                                         inputRange: [0, 1],
                                         outputRange: [1, 1],

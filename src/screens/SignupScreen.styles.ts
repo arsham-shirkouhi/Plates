@@ -34,7 +34,7 @@ export const styles = StyleSheet.create({
     title: {
         fontSize: 42,
         fontFamily: fonts.bold,
-        color: '#000',
+        color: '#252525',
         textAlign: 'center',
         marginBottom: 8,
         textTransform: 'lowercase',

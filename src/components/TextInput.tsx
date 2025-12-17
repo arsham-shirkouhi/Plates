@@ -27,13 +27,13 @@ export const TextInput: React.FC<TextInputProps> = ({
         return {
             backgroundColor: '#F5F5F5',
             borderWidth: 2,
-            borderColor: '#000',
+            borderColor: '#252525',
             borderRadius: 10,
             paddingHorizontal: 15,
             paddingVertical: 15,
             fontSize: 18,
             fontFamily: fonts.regular,
-            color: '#000',
+            color: '#252525',
             width: 360,
             height: 50,
         };
@@ -56,7 +56,7 @@ export const TextInput: React.FC<TextInputProps> = ({
                         <Ionicons
                             name={isPasswordVisible ? 'eye-off-outline' : 'eye-outline'}
                             size={20}
-                            color="#000"
+                            color="#252525"
                         />
                     </TouchableOpacity>
                 )}
@@ -79,7 +79,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         backgroundColor: '#F5F5F5',
         borderWidth: 2,
-        borderColor: '#000',
+        borderColor: '#252525',
         borderRadius: 10,
         width: 360,
         height: 50,

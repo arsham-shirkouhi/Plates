@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { fonts } from '../constants/fonts';
 
@@ -10,6 +10,42 @@ interface HeaderSectionProps {
 }
 
 export const HeaderSection: React.FC<HeaderSectionProps> = ({ streak, topInset = 0, onProfilePress }) => {
+    // Animation values for circle positions
+    const profileCircleLeft = useRef(new Animated.Value(0)).current;
+    const greenCircleLeft = useRef(new Animated.Value(10)).current;
+
+    const handlePressIn = () => {
+        // Animate circles to stack on blue circle (at left: 20)
+        Animated.parallel([
+            Animated.timing(profileCircleLeft, {
+                toValue: 20,
+                duration: 150,
+                useNativeDriver: false,
+            }),
+            Animated.timing(greenCircleLeft, {
+                toValue: 20,
+                duration: 150,
+                useNativeDriver: false,
+            }),
+        ]).start();
+    };
+
+    const handlePressOut = () => {
+        // Animate circles back to original inline positions
+        Animated.parallel([
+            Animated.timing(profileCircleLeft, {
+                toValue: 0,
+                duration: 150,
+                useNativeDriver: false,
+            }),
+            Animated.timing(greenCircleLeft, {
+                toValue: 10,
+                duration: 150,
+                useNativeDriver: false,
+            }),
+        ]).start();
+    };
+
     return (
         <View style={[styles.container, { paddingTop: topInset + 20 }]}>
             {/* Streak and date row */}
@@ -25,11 +61,22 @@ export const HeaderSection: React.FC<HeaderSectionProps> = ({ streak, topInset =
                 </View>
 
                 {/* User icon */}
-                <TouchableOpacity onPress={onProfilePress} style={styles.profileButton}>
-                    <View style={styles.profileCircle}>
-                        <View style={styles.profileInnerCircle}>
-                            <Ionicons name="person" size={20} color="#526EFF" />
-                        </View>
+                <TouchableOpacity
+                    onPress={onProfilePress}
+                    onPressIn={handlePressIn}
+                    onPressOut={handlePressOut}
+                    style={styles.profileButton}
+                >
+                    <View style={styles.profileContainer}>
+                        <Animated.View style={[styles.profileCircle, { left: profileCircleLeft }]}>
+                            <Image
+                                source={require('../../assets/images/temp_pfp.png')}
+                                style={styles.profileImage}
+                                resizeMode="cover"
+                            />
+                        </Animated.View>
+                        <Animated.View style={[styles.profileCircleGreen, { left: greenCircleLeft }]} />
+                        <View style={styles.profileCircleBlue} />
                     </View>
                 </TouchableOpacity>
             </View>
@@ -49,7 +96,7 @@ const styles = StyleSheet.create({
     topRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'flex-start',
+        alignItems: 'center',
     },
     streakSection: {
         flex: 1,
@@ -59,7 +106,7 @@ const styles = StyleSheet.create({
         fontFamily: fonts.regular,
         color: '#fff',
         textTransform: 'lowercase',
-        marginBottom: 5,
+        marginBottom: 2,
     },
     streakNumber: {
         fontFamily: fonts.bold,
@@ -81,31 +128,50 @@ const styles = StyleSheet.create({
     profileButton: {
         marginLeft: 16,
     },
+    profileContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        position: 'relative',
+        width: 81, // Main circle (61px) + blue circle extends to 81px
+    },
     profileCircle: {
         width: 61,
         height: 61,
         borderRadius: 30.5,
         backgroundColor: '#fff',
         borderWidth: 3,
-        borderColor: '#26F170',
+        borderColor: '#252525',
         justifyContent: 'center',
         alignItems: 'center',
-        // Outer blue ring
-        shadowColor: '#526EFF',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 1,
-        shadowRadius: 8,
-        elevation: 4,
+        position: 'absolute',
+        zIndex: 3,
+        overflow: 'hidden',
     },
-    profileInnerCircle: {
-        width: 51,
-        height: 51,
-        borderRadius: 25.5,
-        backgroundColor: '#fff',
-        borderWidth: 2,
-        borderColor: '#000',
-        justifyContent: 'center',
-        alignItems: 'center',
+    profileImage: {
+        width: 61,
+        height: 61,
+        borderRadius: 30.5,
+    },
+    profileCircleGreen: {
+        width: 61,
+        height: 61,
+        borderRadius: 30.5,
+        backgroundColor: '#26F170',
+        borderWidth: 3,
+        borderColor: '#252525',
+        position: 'absolute',
+        zIndex: 2,
+    },
+    profileCircleBlue: {
+        width: 61,
+        height: 61,
+        borderRadius: 30.5,
+        backgroundColor: '#4463F7',
+        borderWidth: 3,
+        borderColor: '#252525',
+        position: 'absolute',
+        left: 20,
+        zIndex: 1,
     },
 });
 

@@ -1027,7 +1027,7 @@ export const OnboardingScreen: React.FC = () => {
                     <Ionicons
                         name="chevron-down"
                         size={20}
-                        color={isPlaceholder ? "#999" : "#000"}
+                        color={isPlaceholder ? "#999" : "#252525"}
                         style={styles.dateDropdownIcon}
                     />
                 </TouchableOpacity>
@@ -2218,7 +2218,7 @@ export const OnboardingScreen: React.FC = () => {
                                         styles.sexCard,
                                         {
                                             transform: [{ translateY: cardTranslateY }],
-                                            shadowColor: '#000',
+                                            shadowColor: '#252525',
                                             shadowOffset: {
                                                 width: 0,
                                                 height: cardShadowHeight,
@@ -2596,7 +2596,7 @@ export const OnboardingScreen: React.FC = () => {
                                             styles.goalCard,
                                             {
                                                 transform: [{ translateY: animations.translateY }],
-                                                shadowColor: '#000',
+                                                shadowColor: '#252525',
                                                 shadowOffset: {
                                                     width: 0,
                                                     height: animations.shadowHeight,
@@ -2647,7 +2647,7 @@ export const OnboardingScreen: React.FC = () => {
                                             styles.goalCard,
                                             {
                                                 transform: [{ translateY: animations.translateY }],
-                                                shadowColor: '#000',
+                                                shadowColor: '#252525',
                                                 shadowOffset: {
                                                     width: 0,
                                                     height: animations.shadowHeight,
@@ -2749,7 +2749,7 @@ export const OnboardingScreen: React.FC = () => {
                                         styles.activityCard,
                                         {
                                             transform: [{ translateY: animations.translateY }],
-                                            shadowColor: '#000',
+                                            shadowColor: '#252525',
                                             shadowOffset: {
                                                 width: 0,
                                                 height: animations.shadowHeight,
@@ -2869,7 +2869,7 @@ export const OnboardingScreen: React.FC = () => {
                                         styles.dietCard,
                                         {
                                             transform: [{ translateY: animations.translateY }],
-                                            shadowColor: '#000',
+                                            shadowColor: '#252525',
                                             shadowOffset: {
                                                 width: 0,
                                                 height: animations.shadowHeight,
@@ -2987,7 +2987,7 @@ export const OnboardingScreen: React.FC = () => {
                             styles.chip,
                             {
                                 transform: [{ translateY: animations.translateY }],
-                                shadowColor: '#000',
+                                shadowColor: '#252525',
                                 shadowOffset: {
                                     width: 0,
                                     height: animations.shadowHeight,
@@ -3091,7 +3091,7 @@ export const OnboardingScreen: React.FC = () => {
                                         styles.activityCard,
                                         {
                                             transform: [{ translateY: animations.translateY }],
-                                            shadowColor: '#000',
+                                            shadowColor: '#252525',
                                             shadowOffset: {
                                                 width: 0,
                                                 height: animations.shadowHeight,
@@ -3286,7 +3286,7 @@ export const OnboardingScreen: React.FC = () => {
                             styles.goalCard,
                             {
                                 transform: [{ translateY: animations.translateY }],
-                                shadowColor: '#000',
+                                shadowColor: '#252525',
                                 shadowOffset: {
                                     width: 0,
                                     height: animations.shadowHeight,
@@ -3391,7 +3391,7 @@ export const OnboardingScreen: React.FC = () => {
                                         styles.activityCard,
                                         {
                                             transform: [{ translateY: animations.translateY }],
-                                            shadowColor: isSelected ? 'transparent' : '#000',
+                                            shadowColor: isSelected ? 'transparent' : '#252525',
                                             shadowOffset: {
                                                 width: 0,
                                                 height: animations.shadowHeight,

@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginBottom: 4,
         textTransform: 'lowercase',
-        color: '#000',
+        color: '#252525',
     },
     subtitle: {
         fontSize: 16,
@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
         marginBottom: 12,
         textAlign: 'center',
         textTransform: 'lowercase',
-        color: '#000',
+        color: '#252525',
     },
     macroItem: {
         flexDirection: 'row',

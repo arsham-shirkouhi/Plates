@@ -276,8 +276,8 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         padding: 24,
         borderWidth: 2,
-        borderColor: '#000',
-        shadowColor: '#000',
+        borderColor: '#252525',
+        shadowColor: '#252525',
         shadowOffset: {
             width: 0,
             height: 8,
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginBottom: 8,
         textTransform: 'lowercase',
-        color: '#000',
+        color: '#252525',
     },
     subtitle: {
         fontSize: 16,
@@ -366,7 +366,7 @@ const styles = StyleSheet.create({
         marginBottom: 16,
         textAlign: 'center',
         textTransform: 'lowercase',
-        color: '#000',
+        color: '#252525',
     },
     macroItem: {
         flexDirection: 'row',
