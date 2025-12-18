@@ -44,6 +44,7 @@ export const FoodLog: React.FC<FoodLogProps> = ({
                         key={index}
                         style={[
                             styles.itemRow,
+                            index === 0 && styles.firstItemSpacing,
                             index < items.length - 1 && styles.itemSpacing
                         ]}
                     >
@@ -103,6 +104,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+    },
+    firstItemSpacing: {
+        paddingTop: 5,
     },
     itemSpacing: {
         marginBottom: 12,

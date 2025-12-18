@@ -108,25 +108,24 @@ export const initializeUser = async (user: User): Promise<void> => {
         }
 
         // Initialize new user document with default values
-        await setDoc(userDocRef, {
+        // Note: Don't include undefined fields - Firestore doesn't allow undefined values
+        const initialData: any = {
             // Onboarding status - new users haven't completed onboarding
             onboardingCompleted: false,
 
-            // No onboarding data yet
-            onboardingData: undefined,
-
-            // No target macros yet (will be set after onboarding)
-            targetMacros: undefined,
-
             // Streak tracking - default to 0
             streak: 0,
-            lastMealLogDate: undefined,
 
             // Metadata
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
             lastLoginAt: serverTimestamp(),
-        });
+        };
+
+        // Remove any undefined values before saving
+        const cleanData = removeUndefinedValues(initialData);
+
+        await setDoc(userDocRef, cleanData);
 
         console.log('User document initialized successfully');
     } catch (error) {

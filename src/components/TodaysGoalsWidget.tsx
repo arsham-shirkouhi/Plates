@@ -36,10 +36,24 @@ export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
     const [goals, setGoals] = useState(initialGoals);
     const [confettiParticles, setConfettiParticles] = useState<Array<{ id: number; originX: number; originY: number; angle: number }>>([]);
     const [removingIndex, setRemovingIndex] = useState<number | null>(null);
+    const previousVisibleTextsRef = useRef<Set<string>>(new Set());
     const maxVisible = 4;
     const visibleGoals = goals.slice(0, maxVisible);
     const remainingCount = goals.length - maxVisible;
     const showMore = remainingCount > 0;
+
+    // Calculate which items are newly appearing
+    const currentVisibleTexts = new Set(visibleGoals.map(g => g.text));
+    const newlyAppearingTexts = new Set(
+        visibleGoals
+            .filter(g => !previousVisibleTextsRef.current.has(g.text))
+            .map(g => g.text)
+    );
+
+    // Update the ref after render
+    React.useEffect(() => {
+        previousVisibleTextsRef.current = currentVisibleTexts;
+    });
 
     const containerRef = useRef<View>(null);
     const [containerPosition, setContainerPosition] = useState({ x: 0, y: 0 });
@@ -144,15 +158,19 @@ export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
                 </TouchableOpacity>
             ) : (
                 <View style={styles.goalsContainer}>
-                    {visibleGoals.map((goal, index) => (
-                        <GoalItem
-                            key={`${goal.text}-${index}`}
-                            goal={goal}
-                            index={index}
-                            isRemoving={removingIndex === index}
-                            onLongPress={(originX, originY) => handleGoalPress(index, originX, originY)}
-                        />
-                    ))}
+                    {visibleGoals.map((goal, index) => {
+                        const isNewlyAppearing = newlyAppearingTexts.has(goal.text);
+                        return (
+                            <GoalItem
+                                key={goal.text}
+                                goal={goal}
+                                index={index}
+                                isRemoving={removingIndex === index}
+                                isNewlyAppearing={isNewlyAppearing}
+                                onLongPress={(originX, originY) => handleGoalPress(index, originX, originY)}
+                            />
+                        );
+                    })}
                 </View>
             )}
 
@@ -180,41 +198,41 @@ interface GoalItemProps {
     goal: Goal;
     index: number;
     isRemoving: boolean;
+    isNewlyAppearing?: boolean;
     onLongPress: (originX: number, originY: number) => void;
 }
 
-const GoalItem: React.FC<GoalItemProps> = ({ goal, index, isRemoving, onLongPress }) => {
+const GoalItem: React.FC<GoalItemProps> = ({ goal, index, isRemoving, isNewlyAppearing = false, onLongPress }) => {
     const strikethroughWidth = useRef(new Animated.Value(0)).current;
     const opacity = useRef(new Animated.Value(0)).current;
     const itemOpacity = useRef(new Animated.Value(1)).current;
     const itemTranslateY = useRef(new Animated.Value(0)).current;
     const itemHeight = useRef(new Animated.Value(1)).current;
     const goalItemRef = useRef<TouchableOpacity>(null);
-    const isMounted = useRef(true);
+    const hasAnimatedIn = useRef(false);
 
     React.useEffect(() => {
-        isMounted.current = true;
-        // Animate in when item appears (for items that slide up after another is removed)
-        itemOpacity.setValue(0);
-        itemTranslateY.setValue(-20);
-        Animated.parallel([
+        // Only set initial values once, don't animate in
+        if (!hasAnimatedIn.current) {
+            hasAnimatedIn.current = true;
+            // Items start visible and in position (no entrance animation)
+            itemOpacity.setValue(1);
+            itemTranslateY.setValue(0);
+        }
+    }, []);
+
+    // Animate in when item is newly appearing (coming from "more" section)
+    React.useEffect(() => {
+        if (isNewlyAppearing) {
+            itemOpacity.setValue(0);
             Animated.timing(itemOpacity, {
                 toValue: 1,
                 duration: 300,
                 easing: Easing.out(Easing.ease),
-                useNativeDriver: true,
-            }),
-            Animated.timing(itemTranslateY, {
-                toValue: 0,
-                duration: 300,
-                easing: Easing.out(Easing.ease),
-                useNativeDriver: true,
-            }),
-        ]).start();
-        return () => {
-            isMounted.current = false;
-        };
-    }, []);
+                useNativeDriver: false, // Use false to avoid conflicts with maxHeight
+            }).start();
+        }
+    }, [isNewlyAppearing]);
 
     React.useEffect(() => {
         if (goal.completed) {
@@ -242,24 +260,25 @@ const GoalItem: React.FC<GoalItemProps> = ({ goal, index, isRemoving, onLongPres
 
     React.useEffect(() => {
         if (isRemoving) {
-            // Animate item disappearing
+            // Animate item disappearing - ramp up from slow to fast
+            // Use useNativeDriver: false for all since we need maxHeight (layout property)
             Animated.parallel([
                 Animated.timing(itemOpacity, {
                     toValue: 0,
                     duration: 400,
-                    easing: Easing.in(Easing.ease),
-                    useNativeDriver: true,
+                    easing: Easing.out(Easing.quad),
+                    useNativeDriver: false,
                 }),
                 Animated.timing(itemTranslateY, {
                     toValue: -20,
                     duration: 400,
-                    easing: Easing.in(Easing.ease),
-                    useNativeDriver: true,
+                    easing: Easing.out(Easing.quad),
+                    useNativeDriver: false,
                 }),
                 Animated.timing(itemHeight, {
                     toValue: 0,
                     duration: 400,
-                    easing: Easing.in(Easing.ease),
+                    easing: Easing.out(Easing.quad),
                     useNativeDriver: false,
                 }),
             ]).start();

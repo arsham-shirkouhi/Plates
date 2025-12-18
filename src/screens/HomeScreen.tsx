@@ -18,6 +18,7 @@ import { GradientBackground } from '../components/GradientBackground';
 import { BottomNavBar } from '../components/BottomNavBar';
 import { AddButton, NavButtons } from '../components/NavButton';
 import { BlobAnimation } from '../components/BlobAnimation';
+import { BorderRingAnimation } from '../components/BorderRingAnimation';
 import { resetOnboarding, getUserProfile, UserProfile, getDailyMacroLog, getTodayDateString, DailyMacroLog } from '../services/userService';
 import { styles } from './HomeScreen.styles';
 
@@ -38,8 +39,10 @@ export const HomeScreen: React.FC = () => {
 
     // Blob animation state - single blob that follows finger
     const [isTouching, setIsTouching] = useState(false);
+    const [showBorderRing, setShowBorderRing] = useState(false);
     const pan = useRef(new Animated.ValueXY()).current;
     const containerRef = useRef<View>(null);
+    const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     // Test values for manual adjustment
     const [testValues, setTestValues] = useState({
@@ -186,17 +189,21 @@ export const HomeScreen: React.FC = () => {
             onStartShouldSetPanResponder: () => true, // Capture touches
             onMoveShouldSetPanResponder: () => true, // Track movement
             onPanResponderGrant: (evt) => {
-                // Touch started - show circle and set initial position
+                // Touch started - set initial position for blob
                 const { pageX, pageY } = evt.nativeEvent;
-                // Use stored container position
                 pan.setValue({
-                    x: pageX - containerPositionRef.current.x - 35, // Center the circle (70px / 2 = 35)
+                    x: pageX - containerPositionRef.current.x - 35,
                     y: pageY - containerPositionRef.current.y - 35,
                 });
                 setIsTouching(true);
+
+                // Start timer for border ring (1 second hold)
+                longPressTimerRef.current = setTimeout(() => {
+                    setShowBorderRing(true);
+                }, 1000);
             },
             onPanResponderMove: (evt, gestureState) => {
-                // Update circle position to follow finger
+                // Update circle position to follow finger (for blob)
                 const { pageX, pageY } = evt.nativeEvent;
                 pan.setValue({
                     x: pageX - containerPositionRef.current.x - 35, // Center the circle
@@ -204,12 +211,22 @@ export const HomeScreen: React.FC = () => {
                 });
             },
             onPanResponderRelease: () => {
-                // Hide circle when finger is released
+                // Hide animations when finger is released
+                if (longPressTimerRef.current) {
+                    clearTimeout(longPressTimerRef.current);
+                    longPressTimerRef.current = null;
+                }
                 setIsTouching(false);
+                setShowBorderRing(false);
             },
             onPanResponderTerminate: () => {
-                // Hide circle if touch is cancelled
+                // Hide animations if touch is cancelled
+                if (longPressTimerRef.current) {
+                    clearTimeout(longPressTimerRef.current);
+                    longPressTimerRef.current = null;
+                }
                 setIsTouching(false);
+                setShowBorderRing(false);
             },
         })
     ).current;
@@ -320,6 +337,9 @@ export const HomeScreen: React.FC = () => {
                     />
                 </Animated.View>
             )}
+
+            {/* Border ring animation (Apple AI style) */}
+            <BorderRingAnimation isActive={showBorderRing} />
 
             {/* White to transparent gradient behind buttons */}
             <LinearGradient
