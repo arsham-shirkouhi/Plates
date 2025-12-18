@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { TouchableOpacity, TouchableOpacityProps, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle, Image, ImageSourcePropType, Animated, Easing } from 'react-native';
+import { View, TouchableOpacity, TouchableOpacityProps, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle, Image, ImageSourcePropType, Animated, Easing } from 'react-native';
 import { fonts } from '../constants/fonts';
 
 export type ButtonVariant = 'primary' | 'google' | 'secondary' | 'link';
@@ -26,7 +26,7 @@ export const Button: React.FC<ButtonProps> = ({
     const isDisabled = disabled || loading;
     const prevDisabledRef = useRef(isDisabled);
 
-    // Animation refs for press effect (only for primary button)
+    // Animation refs for press effect (for all button variants except link)
     const translateY = useRef(new Animated.Value(0)).current;
     const shadowHeight = useRef(new Animated.Value(isDisabled ? 0 : 4)).current;
     const [shadowHeightState, setShadowHeightState] = useState(isDisabled ? 0 : 4);
@@ -42,28 +42,21 @@ export const Button: React.FC<ButtonProps> = ({
         };
     }, []);
 
-    // Animate when button transitions from disabled to enabled
+    // Animate when button transitions from disabled to enabled (for all variants except link)
     useEffect(() => {
-        if (variant === 'primary') {
+        if (variant !== 'link') {
             const wasDisabled = prevDisabledRef.current;
             const nowEnabled = !isDisabled;
 
             if (wasDisabled && nowEnabled) {
-                // Animate enable transition: colors, shadow appears, and bounce
-                Animated.parallel([
+                // Animate enable transition: shadow appears, and bounce
+                const animations = [
                     // Shadow appears
                     Animated.timing(shadowHeight, {
                         toValue: 4,
                         duration: 300,
                         easing: Easing.out(Easing.ease),
                         useNativeDriver: false,
-                    }),
-                    // Color overlay fades in
-                    Animated.timing(colorOverlayOpacity, {
-                        toValue: 1,
-                        duration: 300,
-                        easing: Easing.out(Easing.ease),
-                        useNativeDriver: true,
                     }),
                     // Bounce animation - move up then spring back
                     Animated.sequence([
@@ -80,11 +73,27 @@ export const Button: React.FC<ButtonProps> = ({
                             useNativeDriver: true,
                         }),
                     ]),
-                ]).start();
+                ];
+
+                // Color overlay fades in (only for primary)
+                if (variant === 'primary') {
+                    animations.push(
+                        Animated.timing(colorOverlayOpacity, {
+                            toValue: 1,
+                            duration: 300,
+                            easing: Easing.out(Easing.ease),
+                            useNativeDriver: true,
+                        })
+                    );
+                }
+
+                Animated.parallel(animations).start();
             } else if (!wasDisabled && isDisabled) {
                 // Reset to disabled state immediately
                 shadowHeight.setValue(0);
-                colorOverlayOpacity.setValue(0);
+                if (variant === 'primary') {
+                    colorOverlayOpacity.setValue(0);
+                }
                 translateY.setValue(0);
             }
 
@@ -224,9 +233,9 @@ export const Button: React.FC<ButtonProps> = ({
         );
     }
 
-    // Press animation handlers for primary button
+    // Press animation handlers for all button variants (except link)
     const handlePressIn = () => {
-        if (variant === 'primary' && !isDisabled) {
+        if (!isDisabled) {
             // Animate button down and shadow disappearing simultaneously
             // Button moves down 4px to reduce shadow
             Animated.parallel([
@@ -247,7 +256,7 @@ export const Button: React.FC<ButtonProps> = ({
     };
 
     const handlePressOut = () => {
-        if (variant === 'primary' && !isDisabled) {
+        if (!isDisabled) {
             // Animate button back up and shadow reappearing simultaneously
             Animated.parallel([
                 Animated.timing(translateY, {
@@ -266,109 +275,118 @@ export const Button: React.FC<ButtonProps> = ({
         }
     };
 
-    // For primary button, use Animated.View with shadow
-    if (variant === 'primary') {
-        const handlePress = (event: any) => {
-            if (!isDisabled) {
-                // Play press animation
-                handlePressIn();
-                // After animation completes, call the original onPress and release
-                setTimeout(() => {
-                    if (props.onPress) {
-                        props.onPress(event);
-                    }
-                    handlePressOut();
-                }, 120);
-            }
+    // For all button variants (except link), use Animated.View with shadow
+    // Link variant returns early above, so we know variant is not 'link' here
+    if (variant === 'primary' || variant === 'google' || variant === 'secondary') {
+        const buttonStyle = getButtonStyle();
+
+        // Extract dimensions for shadow (without margins)
+        const shadowStyle: ViewStyle = {
+            width: buttonStyle.width,
+            height: buttonStyle.height,
+            borderRadius: buttonStyle.borderRadius || 12,
+            backgroundColor: '#252525',
         };
 
         return (
-            <TouchableOpacity
-                onPress={handlePress}
-                onPressIn={handlePressIn}
-                onPressOut={handlePressOut}
-                disabled={isDisabled}
-                activeOpacity={1}
-                style={containerStyle}
-            >
+            <View style={[containerStyle, { position: 'relative', alignItems: 'center' }]}>
+                {/* Shadow layer - positioned behind button for harsh drop shadow */}
                 <Animated.View
                     style={[
-                        getButtonStyle(),
-                        isDisabled && styles.disabledButton,
+                        shadowStyle,
                         {
-                            transform: [{ translateY }],
-                            shadowColor: '#252525',
-                            shadowOffset: {
-                                width: 0,
-                                height: shadowHeightState,
-                            },
-                            shadowOpacity: 1,
-                            shadowRadius: 0,
-                            elevation: shadowHeightState,
-                            overflow: 'hidden',
-                        },
-                    ]}
-                >
-                    {/* Color overlay for smooth background color transition */}
-                    <Animated.View
-                        style={[
-                            StyleSheet.absoluteFill,
-                            {
-                                backgroundColor: '#526EFF',
-                                borderRadius: 10,
-                                opacity: colorOverlayOpacity,
-                            },
-                        ]}
-                        pointerEvents="none"
-                    />
-                    {loading ? (
-                        <ActivityIndicator color={getLoadingColor()} />
-                    ) : (
-                        <Animated.Text
-                            style={[
-                                getTextStyle(),
-                                textStyle,
+                            position: 'absolute',
+                            top: ((typeof buttonStyle.marginTop === 'number' ? buttonStyle.marginTop : 0) + 4), // Account for button margin + 4px offset
+                            alignSelf: 'center',
+                            transform: [
                                 {
-                                    color: isDisabled ? '#252525' : '#fff',
-                                    opacity: colorOverlayOpacity.interpolate({
-                                        inputRange: [0, 1],
-                                        outputRange: [1, 1],
+                                    translateY: shadowHeight.interpolate({
+                                        inputRange: [0, 4],
+                                        outputRange: [0, 0], // Shadow position stays constant
                                     }),
                                 },
-                            ]}
-                        >
-                            {title}
-                        </Animated.Text>
-                    )}
-                </Animated.View>
-            </TouchableOpacity>
+                            ],
+                            opacity: shadowHeight.interpolate({
+                                inputRange: [0, 4],
+                                outputRange: [0, 1],
+                            }),
+                            zIndex: 0,
+                        },
+                    ]}
+                    pointerEvents="none"
+                />
+                <TouchableOpacity
+                    onPress={props.onPress}
+                    onPressIn={handlePressIn}
+                    onPressOut={handlePressOut}
+                    disabled={isDisabled}
+                    activeOpacity={1}
+                    style={{ zIndex: 1, width: '100%', alignItems: 'center' }}
+                >
+                    <Animated.View
+                        style={[
+                            buttonStyle,
+                            isDisabled && styles.disabledButton,
+                            {
+                                transform: [{ translateY }],
+                                overflow: 'hidden',
+                            },
+                        ]}
+                    >
+                        {/* Color overlay for smooth background color transition (only for primary) */}
+                        {variant === 'primary' && (
+                            <Animated.View
+                                style={[
+                                    StyleSheet.absoluteFill,
+                                    {
+                                        backgroundColor: '#526EFF',
+                                        borderRadius: 10,
+                                        opacity: colorOverlayOpacity,
+                                    },
+                                ]}
+                                pointerEvents="none"
+                            />
+                        )}
+                        {loading ? (
+                            <ActivityIndicator color={getLoadingColor()} />
+                        ) : (
+                            <>
+                                {icon && variant === 'google' && (
+                                    <Image
+                                        source={icon}
+                                        style={styles.icon}
+                                        resizeMode="contain"
+                                    />
+                                )}
+                                {variant === 'primary' ? (
+                                    <Animated.Text
+                                        style={[
+                                            getTextStyle(),
+                                            textStyle,
+                                            {
+                                                color: isDisabled ? '#252525' : '#fff',
+                                                opacity: colorOverlayOpacity.interpolate({
+                                                    inputRange: [0, 1],
+                                                    outputRange: [1, 1],
+                                                }),
+                                            },
+                                        ]}
+                                    >
+                                        {title}
+                                    </Animated.Text>
+                                ) : (
+                                    <Text style={[getTextStyle(), textStyle]}>{title}</Text>
+                                )}
+                            </>
+                        )}
+                    </Animated.View>
+                </TouchableOpacity>
+            </View>
         );
     }
 
-    return (
-        <TouchableOpacity
-            style={[getButtonStyle(), containerStyle, isDisabled && styles.disabledButton]}
-            onPress={props.onPress}
-            disabled={isDisabled}
-            activeOpacity={isDisabled ? 1 : 0.8}
-            {...props}
-        >
-            {loading ? (
-                <ActivityIndicator color={getLoadingColor()} />
-            ) : (
-                <>
-                    {icon && variant === 'google' && (
-                        <Image
-                            source={icon}
-                            style={styles.icon}
-                            resizeMode="contain"
-                        />
-                    )}
-                    <Text style={[getTextStyle(), textStyle]}>{title}</Text>
-                </>
-            )}
-        </TouchableOpacity>
-    );
+    // This should never be reached, but TypeScript requires it for type safety
+    return null;
 };
 
 const styles = StyleSheet.create({

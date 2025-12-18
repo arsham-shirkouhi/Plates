@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Alert, ScrollView, StyleSheet, TouchableOpacity, Dimensions, Animated, PanResponder } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Alert, ScrollView, StyleSheet, TouchableOpacity, Dimensions, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
@@ -40,6 +40,7 @@ export const HomeScreen: React.FC = () => {
     // Blob animation state - single blob that follows finger
     const [isTouching, setIsTouching] = useState(false);
     const [showBorderRing, setShowBorderRing] = useState(false);
+    const isTouchingRef = useRef(false);
     const pan = useRef(new Animated.ValueXY()).current;
     const containerRef = useRef<View>(null);
     const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -70,7 +71,7 @@ export const HomeScreen: React.FC = () => {
     };
 
     // Load user profile and macros on mount and when screen comes into focus
-    const loadUserProfile = async () => {
+    const loadUserProfile = useCallback(async () => {
         if (!user) {
             setLoadingProfile(false);
             return;
@@ -85,10 +86,10 @@ export const HomeScreen: React.FC = () => {
         } finally {
             setLoadingProfile(false);
         }
-    };
+    }, [user]);
 
     // Load today's daily log
-    const loadDailyLog = async () => {
+    const loadDailyLog = useCallback(async () => {
         if (!user) {
             setLoadingLog(false);
             return;
@@ -104,20 +105,20 @@ export const HomeScreen: React.FC = () => {
         } finally {
             setLoadingLog(false);
         }
-    };
+    }, [user]);
 
     // Load on mount
     useEffect(() => {
         loadUserProfile();
         loadDailyLog();
-    }, [user]);
+    }, [loadUserProfile, loadDailyLog]);
 
     // Reload when screen comes into focus (e.g., after completing onboarding)
     useFocusEffect(
-        React.useCallback(() => {
+        useCallback(() => {
             loadUserProfile();
             loadDailyLog();
-        }, [user])
+        }, [loadUserProfile, loadDailyLog])
     );
 
     const handleResetOnboarding = async () => {
@@ -183,53 +184,65 @@ export const HomeScreen: React.FC = () => {
     // Store container position for coordinate calculation
     const containerPositionRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
-    // PanResponder to track finger movement
-    const panResponder = useRef(
-        PanResponder.create({
-            onStartShouldSetPanResponder: () => true, // Capture touches
-            onMoveShouldSetPanResponder: () => true, // Track movement
-            onPanResponderGrant: (evt) => {
-                // Touch started - set initial position for blob
-                const { pageX, pageY } = evt.nativeEvent;
-                pan.setValue({
-                    x: pageX - containerPositionRef.current.x - 35,
-                    y: pageY - containerPositionRef.current.y - 35,
-                });
-                setIsTouching(true);
+    // Track touch for blob animation without interfering with ScrollView
+    const touchStartPosition = useRef<{ x: number; y: number } | null>(null);
+    const isScrolling = useRef(false);
 
-                // Start timer for border ring (1 second hold)
-                longPressTimerRef.current = setTimeout(() => {
-                    setShowBorderRing(true);
-                }, 1000);
-            },
-            onPanResponderMove: (evt, gestureState) => {
-                // Update circle position to follow finger (for blob)
-                const { pageX, pageY } = evt.nativeEvent;
+    const handleTouchStart = useCallback((evt: any) => {
+        const { pageX, pageY } = evt.nativeEvent;
+        touchStartPosition.current = { x: pageX, y: pageY };
+        isScrolling.current = false;
+
+        // Start timer for blob and border ring (only if not scrolling)
+        longPressTimerRef.current = setTimeout(() => {
+            if (!isScrolling.current && touchStartPosition.current) {
                 pan.setValue({
-                    x: pageX - containerPositionRef.current.x - 35, // Center the circle
-                    y: pageY - containerPositionRef.current.y - 35,
+                    x: touchStartPosition.current.x - containerPositionRef.current.x - 35,
+                    y: touchStartPosition.current.y - containerPositionRef.current.y - 35,
                 });
-            },
-            onPanResponderRelease: () => {
-                // Hide animations when finger is released
+                isTouchingRef.current = true;
+                setIsTouching(true);
+                setShowBorderRing(true);
+            }
+        }, 1000);
+    }, []);
+
+    const handleTouchMove = useCallback((evt: any) => {
+        // If user moves finger significantly, they're scrolling
+        if (touchStartPosition.current) {
+            const { pageX, pageY } = evt.nativeEvent;
+            const dx = Math.abs(pageX - touchStartPosition.current.x);
+            const dy = Math.abs(pageY - touchStartPosition.current.y);
+            if (dx > 5 || dy > 5) {
+                isScrolling.current = true;
                 if (longPressTimerRef.current) {
                     clearTimeout(longPressTimerRef.current);
                     longPressTimerRef.current = null;
                 }
-                setIsTouching(false);
-                setShowBorderRing(false);
-            },
-            onPanResponderTerminate: () => {
-                // Hide animations if touch is cancelled
-                if (longPressTimerRef.current) {
-                    clearTimeout(longPressTimerRef.current);
-                    longPressTimerRef.current = null;
-                }
-                setIsTouching(false);
-                setShowBorderRing(false);
-            },
-        })
-    ).current;
+            }
+        }
+
+        // Update blob position if it's active - use ref to avoid dependency
+        if (isTouchingRef.current) {
+            const { pageX, pageY } = evt.nativeEvent;
+            pan.setValue({
+                x: pageX - containerPositionRef.current.x - 35,
+                y: pageY - containerPositionRef.current.y - 35,
+            });
+        }
+    }, []);
+
+    const handleTouchEnd = useCallback(() => {
+        if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+        }
+        touchStartPosition.current = null;
+        isScrolling.current = false;
+        isTouchingRef.current = false;
+        setIsTouching(false);
+        setShowBorderRing(false);
+    }, []);
 
 
     return (
@@ -242,77 +255,92 @@ export const HomeScreen: React.FC = () => {
                     containerPositionRef.current = { x, y };
                 });
             }}
-            {...panResponder.panHandlers}
         >
-            <ScrollView
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={false}
-                style={styles.scrollView}
+            <View
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                onTouchCancel={handleTouchEnd}
+                style={{ flex: 1 }}
             >
-                {/* Gradient background */}
-                <GradientBackground />
+                <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                    style={styles.scrollView}
+                    scrollEventThrottle={16}
+                    removeClippedSubviews={false}
+                    nestedScrollEnabled={true}
+                    keyboardShouldPersistTaps="handled"
+                    decelerationRate="normal"
+                    bounces={true}
+                    overScrollMode="auto"
+                    scrollEnabled={true}
+                >
+                    {/* Gradient background */}
+                    <GradientBackground />
 
-                {/* Header with streak, date, and profile */}
-                {!loadingProfile && (
-                    <HeaderSection
-                        streak={streak}
-                        topInset={insets.top}
-                        onProfilePress={() => {
-                            // TODO: Navigate to profile screen
-                            Alert.alert('Profile', 'Profile screen coming soon');
-                        }}
+                    {/* Header with streak, date, and profile */}
+                    {!loadingProfile && (
+                        <HeaderSection
+                            streak={streak}
+                            topInset={insets.top}
+                            onProfilePress={() => {
+                                // TODO: Navigate to profile screen
+                                Alert.alert('Profile', 'Profile screen coming soon');
+                            }}
+                        />
+                    )}
+
+                    {/* Main Content Card */}
+                    {!loadingProfile && macros && (
+                        <MacrosCard macros={macros} consumed={consumed} />
+                    )}
+
+                    {/* Food Log */}
+                    <FoodLog />
+
+                    {/* AI Widget */}
+                    <AIWidget />
+
+                    {/* Square Widgets Row */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
+                        <TodaysGoalsWidget
+                            onPress={() => {
+                                Alert.alert('Today\'s Goals', 'Goals screen coming soon');
+                            }}
+                        />
+                        <SquareWidget title="widget 2" content="content 2" />
+                    </View>
+
+                    {/* Test Controls */}
+                    {!loadingProfile && macros && (
+                        <TestControls
+                            consumed={consumed}
+                            onUpdate={handleTestUpdate}
+                            onReset={handleTestReset}
+                        />
+                    )}
+
+                    {/* Testing Button - Reset Onboarding */}
+                    <Button
+                        variant="secondary"
+                        title="Reset Onboarding (Testing)"
+                        onPress={handleResetOnboarding}
+                        loading={resettingOnboarding}
+                        disabled={resettingOnboarding}
+                        containerStyle={styles.testButton}
                     />
-                )}
 
-                {/* Main Content Card */}
-                {!loadingProfile && macros && (
-                    <MacrosCard macros={macros} consumed={consumed} />
-                )}
-
-                {/* Food Log */}
-                <FoodLog />
-
-                {/* AI Widget */}
-                <AIWidget />
-
-                {/* Square Widgets Row */}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
-                    <TodaysGoalsWidget
-                        onPress={() => {
-                            Alert.alert('Today\'s Goals', 'Goals screen coming soon');
-                        }}
+                    <Button
+                        variant="primary"
+                        title="Logout"
+                        onPress={handleLogout}
+                        loading={loggingOut}
+                        disabled={loggingOut}
+                        containerStyle={styles.logoutButton}
                     />
-                    <SquareWidget title="widget 2" content="content 2" />
-                </View>
-
-                {/* Test Controls */}
-                {!loadingProfile && macros && (
-                    <TestControls
-                        consumed={consumed}
-                        onUpdate={handleTestUpdate}
-                        onReset={handleTestReset}
-                    />
-                )}
-
-                {/* Testing Button - Reset Onboarding */}
-                <Button
-                    variant="secondary"
-                    title="Reset Onboarding (Testing)"
-                    onPress={handleResetOnboarding}
-                    loading={resettingOnboarding}
-                    disabled={resettingOnboarding}
-                    containerStyle={styles.testButton}
-                />
-
-                <Button
-                    variant="primary"
-                    title="Logout"
-                    onPress={handleLogout}
-                    loading={loggingOut}
-                    disabled={loggingOut}
-                    containerStyle={styles.logoutButton}
-                />
-            </ScrollView>
+                </ScrollView>
+            </View>
 
             {/* Blob that follows finger */}
             {isTouching && (

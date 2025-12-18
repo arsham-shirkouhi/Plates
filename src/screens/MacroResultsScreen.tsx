@@ -189,6 +189,14 @@ export const MacroResultsScreen: React.FC = () => {
             <ScrollView
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
+                scrollEventThrottle={16}
+                removeClippedSubviews={false}
+                nestedScrollEnabled={true}
+                keyboardShouldPersistTaps="handled"
+                decelerationRate="normal"
+                bounces={true}
+                overScrollMode="auto"
+                scrollEnabled={true}
             >
                 <Animated.View
                     style={[

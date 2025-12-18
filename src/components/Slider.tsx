@@ -32,25 +32,36 @@ export const Slider: React.FC<SliderProps> = ({
     const [isEditing, setIsEditing] = useState(false);
     const [textValue, setTextValue] = useState(value.toString());
     const currentDragValue = useRef(value); // Track the value during drag
+    const currentPanPosition = useRef(0); // Track the current pan position
+    const trackRef = useRef<View>(null);
+    const [trackWidth, setTrackWidth] = useState(SLIDER_WIDTH - THUMB_SIZE);
 
     const getValueFromPosition = (x: number): number => {
-        const percentage = Math.max(0, Math.min(1, x / sliderWidth));
+        const effectiveWidth = trackWidth;
+        const percentage = Math.max(0, Math.min(1, x / effectiveWidth));
         const rawValue = minimumValue + (maximumValue - minimumValue) * percentage;
         const steppedValue = Math.round(rawValue / step) * step;
         return Math.max(minimumValue, Math.min(maximumValue, steppedValue));
     };
 
     const getPositionFromValue = (val: number): number => {
+        const effectiveWidth = trackWidth;
         const percentage = (val - minimumValue) / (maximumValue - minimumValue);
-        return percentage * sliderWidth;
+        return percentage * effectiveWidth;
     };
+
+    // Store formatValue in a ref to avoid dependency issues
+    const formatValueRef = useRef(formatValue);
+    useEffect(() => {
+        formatValueRef.current = formatValue;
+    }, [formatValue]);
 
     // Update text value when slider value changes (but not when user is editing)
     useEffect(() => {
         if (!isEditing) {
-            if (formatValue) {
+            if (formatValueRef.current) {
                 // Extract just the number part (remove unit)
-                const formatted = formatValue(value);
+                const formatted = formatValueRef.current(value);
                 // Remove unit and any special characters like ' and "
                 const cleaned = formatted.replace(unit ? ' ' + unit : '', '').replace(/'/g, '').replace(/"/g, '').trim();
                 setTextValue(cleaned);
@@ -59,7 +70,7 @@ export const Slider: React.FC<SliderProps> = ({
                 setTextValue(value.toString());
             }
         }
-    }, [value, isEditing, formatValue, unit]);
+    }, [value, isEditing, unit]);
 
     // Animate thumb position smoothly - only when value changes externally, not during drag
     const isDragging = useRef(false);
@@ -70,8 +81,9 @@ export const Slider: React.FC<SliderProps> = ({
     }, [value]);
 
     useEffect(() => {
-        if (!isDragging.current) {
+        if (!isDragging.current && trackWidth > 0) {
             const position = getPositionFromValue(value);
+            currentPanPosition.current = position;
             Animated.spring(pan, {
                 toValue: position,
                 useNativeDriver: true,
@@ -79,17 +91,24 @@ export const Slider: React.FC<SliderProps> = ({
                 friction: 7,
             }).start();
         }
-    }, [value, minimumValue, maximumValue]);
+    }, [value, minimumValue, maximumValue, trackWidth]);
 
     const panResponder = useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => true,
+            onStartShouldSetPanResponderCapture: () => true,
             onMoveShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponderCapture: () => true,
+            onPanResponderTerminationRequest: () => false, // Don't allow parent to take over
             onPanResponderGrant: (evt) => {
                 isDragging.current = true;
-                // Get the touch position relative to the track
-                const trackX = evt.nativeEvent.locationX - THUMB_SIZE / 2;
-                const clampedX = Math.max(0, Math.min(sliderWidth, trackX));
+                // Get the touch position relative to the track (locationX is relative to the track view)
+                // locationX gives us the position from the left edge of the track
+                // We want the thumb center to be at the touch point, so subtract half thumb size
+                const touchX = evt.nativeEvent.locationX;
+                const thumbCenterX = touchX - THUMB_SIZE / 2;
+                const clampedX = Math.max(0, Math.min(trackWidth, thumbCenterX));
+                currentPanPosition.current = clampedX;
                 const newValue = getValueFromPosition(clampedX);
                 currentDragValue.current = newValue;
                 onValueChange(newValue);
@@ -97,12 +116,16 @@ export const Slider: React.FC<SliderProps> = ({
                 pan.setValue(clampedX);
             },
             onPanResponderMove: (evt) => {
-                const trackX = evt.nativeEvent.locationX - THUMB_SIZE / 2;
-                const clampedX = Math.max(0, Math.min(sliderWidth, trackX));
+                // Use absolute position from locationX to track finger exactly
+                // locationX gives us the position from the left edge of the track
+                const touchX = evt.nativeEvent.locationX;
+                const thumbCenterX = touchX - THUMB_SIZE / 2;
+                const clampedX = Math.max(0, Math.min(trackWidth, thumbCenterX));
+                currentPanPosition.current = clampedX;
                 const newValue = getValueFromPosition(clampedX);
                 currentDragValue.current = newValue;
                 onValueChange(newValue);
-                // Smooth real-time updates during drag - direct setValue for responsiveness
+                // Update position immediately to follow finger exactly
                 pan.setValue(clampedX);
             },
             onPanResponderRelease: () => {
@@ -110,9 +133,24 @@ export const Slider: React.FC<SliderProps> = ({
                 // Use the current drag value (the last value set during drag)
                 const finalValue = currentDragValue.current;
                 const finalPosition = getPositionFromValue(finalValue);
+                currentPanPosition.current = finalPosition;
                 // Ensure the value is properly set
                 onValueChange(finalValue);
                 // Snap to final position with spring animation
+                Animated.spring(pan, {
+                    toValue: finalPosition,
+                    useNativeDriver: true,
+                    tension: 100,
+                    friction: 8,
+                }).start();
+            },
+            onPanResponderTerminate: () => {
+                // Handle case where gesture is terminated
+                isDragging.current = false;
+                const finalValue = currentDragValue.current;
+                const finalPosition = getPositionFromValue(finalValue);
+                currentPanPosition.current = finalPosition;
+                onValueChange(finalValue);
                 Animated.spring(pan, {
                     toValue: finalPosition,
                     useNativeDriver: true,
@@ -220,7 +258,16 @@ export const Slider: React.FC<SliderProps> = ({
             ) : (
                 <Text style={styles.valueText}>{displayValue}</Text>
             )}
-            <View style={styles.sliderTrack} {...panResponder.panHandlers}>
+            <View
+                ref={trackRef}
+                style={styles.sliderTrack}
+                onLayout={(event) => {
+                    const { width } = event.nativeEvent.layout;
+                    // Account for thumb size - thumb can move from 0 to (width - THUMB_SIZE)
+                    setTrackWidth(width - THUMB_SIZE);
+                }}
+                {...panResponder.panHandlers}
+            >
                 <Animated.View
                     style={[
                         styles.sliderThumb,

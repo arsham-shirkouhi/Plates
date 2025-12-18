@@ -52,8 +52,27 @@ export const OnboardingScreen: React.FC = () => {
     const contentScale = useRef(new Animated.Value(1)).current;
     const unitToggleSlide = useRef(new Animated.Value(data.heightUnit === 'cm' ? 0 : 1)).current;
     const weightUnitToggleSlide = useRef(new Animated.Value(data.weightUnit === 'kg' ? 0 : 1)).current;
-    const unitPreferenceWeightToggleSlide = useRef(new Animated.Value(data.unitPreference.weight === 'kg' ? 0 : 1)).current;
-    const unitPreferenceHeightToggleSlide = useRef(new Animated.Value(data.unitPreference.height === 'cm' ? 0 : 1)).current;
+    const unitPreferenceToggleSlide = useRef(new Animated.Value(
+        (data.unitPreference.weight === 'kg' && data.unitPreference.height === 'cm') ? 0 : 1
+    )).current;
+
+    // Measurement step animation refs
+    const heightValueDisplayAnim = useRef(new Animated.Value(1)).current;
+    const heightIncrementButtonScale = useRef(new Animated.Value(1)).current;
+    const heightDecrementButtonScale = useRef(new Animated.Value(1)).current;
+    const weightValueDisplayAnim = useRef(new Animated.Value(1)).current;
+    const weightIncrementButtonScale = useRef(new Animated.Value(1)).current;
+    const weightDecrementButtonScale = useRef(new Animated.Value(1)).current;
+
+    // Refs for scrolling to selected items in dropdowns
+    const heightScrollViewRef = useRef<ScrollView>(null);
+    const weightScrollViewRef = useRef<ScrollView>(null);
+    const heightScrollViewHeight = useRef<number>(400); // Default to maxHeight
+    const weightScrollViewHeight = useRef<number>(400); // Default to maxHeight
+
+    // Long press interval refs for measurement steps
+    const heightLongPressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const weightLongPressIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
     // Welcome step animation refs
     const welcomeTextOpacity = useRef(new Animated.Value(0)).current;
@@ -226,6 +245,10 @@ export const OnboardingScreen: React.FC = () => {
     const [dayModalVisible, setDayModalVisible] = useState(false);
     const [yearModalVisible, setYearModalVisible] = useState(false);
 
+    // Height and weight picker state
+    const [heightModalVisible, setHeightModalVisible] = useState(false);
+    const [weightModalVisible, setWeightModalVisible] = useState(false);
+
     // Animation refs for modals
     const monthSlideAnim = useRef(new Animated.Value(0)).current;
     const monthFadeAnim = useRef(new Animated.Value(0)).current;
@@ -233,6 +256,10 @@ export const OnboardingScreen: React.FC = () => {
     const dayFadeAnim = useRef(new Animated.Value(0)).current;
     const yearSlideAnim = useRef(new Animated.Value(0)).current;
     const yearFadeAnim = useRef(new Animated.Value(0)).current;
+    const heightSlideAnim = useRef(new Animated.Value(0)).current;
+    const heightFadeAnim = useRef(new Animated.Value(0)).current;
+    const weightSlideAnim = useRef(new Animated.Value(0)).current;
+    const weightFadeAnim = useRef(new Animated.Value(0)).current;
 
     const months = [
         'january', 'february', 'march', 'april', 'may', 'june',
@@ -644,42 +671,42 @@ export const OnboardingScreen: React.FC = () => {
                     return { valid: false, message: 'please select your sex' };
                 }
                 break;
-            case 5: // Height - REQUIRED
+            case 5: // Unit Preferences - REQUIRED (has defaults, but validate)
+                if (!data.unitPreference || !data.unitPreference.weight || !data.unitPreference.height) {
+                    return { valid: false, message: 'please select unit preferences' };
+                }
+                break;
+            case 6: // Height - REQUIRED
                 if (!data.height || data.height <= 0) {
                     return { valid: false, message: 'please enter your height' };
                 }
                 break;
-            case 6: // Weight - REQUIRED
+            case 7: // Weight - REQUIRED
                 if (!data.weight || data.weight <= 0) {
                     return { valid: false, message: 'please enter your weight' };
                 }
                 break;
-            case 7: // Goal - REQUIRED
+            case 8: // Goal - REQUIRED
                 if (data.goal === '') {
                     return { valid: false, message: 'please select your goal' };
                 }
                 break;
-            case 8: // Activity Level - REQUIRED
+            case 9: // Activity Level - REQUIRED
                 if (data.activityLevel === '') {
                     return { valid: false, message: 'please select your activity level' };
                 }
                 break;
-            case 9: // Diet Preference - REQUIRED
+            case 10: // Diet Preference - REQUIRED
                 if (data.dietPreference === '') {
                     return { valid: false, message: 'please select your diet preference' };
                 }
                 break;
-            case 10: // Allergies - OPTIONAL, can skip
+            case 11: // Allergies - OPTIONAL, can skip
                 // No validation needed - optional field
                 break;
-            case 11: // Goal Intensity - REQUIRED
+            case 12: // Goal Intensity - REQUIRED
                 if (data.goalIntensity === '') {
                     return { valid: false, message: 'please select goal intensity' };
-                }
-                break;
-            case 12: // Unit Preferences - REQUIRED (has defaults, but validate)
-                if (!data.unitPreference || !data.unitPreference.weight || !data.unitPreference.height) {
-                    return { valid: false, message: 'please select unit preferences' };
                 }
                 break;
             case 13: // Purpose - REQUIRED
@@ -938,21 +965,21 @@ export const OnboardingScreen: React.FC = () => {
             case 4:
                 return renderSexStep();
             case 5:
-                return renderHeightStep();
-            case 6:
-                return renderWeightStep();
-            case 7:
-                return renderGoalStep();
-            case 8:
-                return renderActivityLevelStep();
-            case 9:
-                return renderDietPreferenceStep();
-            case 10:
-                return renderAllergiesStep();
-            case 11:
-                return renderGoalIntensityStep();
-            case 12:
                 return renderUnitPreferencesStep();
+            case 6:
+                return renderHeightStep();
+            case 7:
+                return renderWeightStep();
+            case 8:
+                return renderGoalStep();
+            case 9:
+                return renderActivityLevelStep();
+            case 10:
+                return renderDietPreferenceStep();
+            case 11:
+                return renderAllergiesStep();
+            case 12:
+                return renderGoalIntensityStep();
             case 13:
                 return renderPurposeStep();
             case 14:
@@ -1018,10 +1045,14 @@ export const OnboardingScreen: React.FC = () => {
                     style={[baseStyle || styles.dateDropdown, style]}
                     onPress={onPress}
                 >
-                    <Text style={[
-                        styles.dateDropdownText,
-                        isPlaceholder && styles.dateDropdownTextPlaceholder
-                    ]}>
+                    <Text
+                        style={[
+                            styles.dateDropdownText,
+                            isPlaceholder && styles.dateDropdownTextPlaceholder
+                        ]}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                    >
                         {isPlaceholder ? placeholder : value}
                     </Text>
                     <Ionicons
@@ -1098,7 +1129,16 @@ export const OnboardingScreen: React.FC = () => {
                                 ]}
                             >
                                 <Text style={styles.modalTitle}>{title}</Text>
-                                <ScrollView style={styles.modalScrollView}>
+                                <ScrollView
+                                    style={styles.modalScrollView}
+                                    scrollEventThrottle={16}
+                                    removeClippedSubviews={true}
+                                    nestedScrollEnabled={true}
+                                    keyboardShouldPersistTaps="handled"
+                                    decelerationRate="normal"
+                                    bounces={true}
+                                    overScrollMode="auto"
+                                >
                                     {items.map((item, index) => {
                                         const value = typeof item === 'number' ? item : index + 1;
                                         const isSelected = selectedValue === value;
@@ -1170,7 +1210,9 @@ export const OnboardingScreen: React.FC = () => {
                         'Year',
                         'year',
                         data.birthYear ? data.birthYear.toString() : 'year',
-                        () => setYearModalVisible(true)
+                        () => setYearModalVisible(true),
+                        undefined,
+                        styles.dateDropdownYear
                     )}
                 </View>
                 {isUnderAge && (
@@ -1466,7 +1508,7 @@ export const OnboardingScreen: React.FC = () => {
 
     // Animate goal cards when selection changes - pressed button state when selected
     useEffect(() => {
-        if (currentStep === 7) { // Goal step is step 7
+        if (currentStep === 8) { // Goal step is step 8
             const isLoseSelected = data.goal === 'lose';
             const isMaintainSelected = data.goal === 'maintain';
             const isBuildSelected = data.goal === 'build';
@@ -1544,7 +1586,7 @@ export const OnboardingScreen: React.FC = () => {
 
     // Animate activity level cards when selection changes - pressed button state when selected
     useEffect(() => {
-        if (currentStep === 8) { // Activity level step is step 8
+        if (currentStep === 9) { // Activity level step is step 9
             const isSedentarySelected = data.activityLevel === 'sedentary';
             const isLightlySelected = data.activityLevel === 'lightly';
             const isModerateSelected = data.activityLevel === 'moderate';
@@ -1639,7 +1681,7 @@ export const OnboardingScreen: React.FC = () => {
 
     // Animate diet preference cards when selection changes - pressed button state when selected
     useEffect(() => {
-        if (currentStep === 9) { // Diet preference step is step 9
+        if (currentStep === 10) { // Diet preference step is step 10
             const isRegularSelected = data.dietPreference === 'regular';
             const isHighProteinSelected = data.dietPreference === 'high-protein';
             const isVegetarianSelected = data.dietPreference === 'vegetarian';
@@ -1777,7 +1819,7 @@ export const OnboardingScreen: React.FC = () => {
     // Animate allergy chips when selection changes - pressed button state when selected
     useEffect(() => {
         // Always run animations when on step 10, or when allergies change
-        if (currentStep === 10) { // Allergies step is step 10
+        if (currentStep === 11) { // Allergies step is step 11
             const isNutsSelected = data.allergies.includes('nuts');
             const isLactoseSelected = data.allergies.includes('lactose');
             const isGlutenSelected = data.allergies.includes('gluten');
@@ -1935,7 +1977,7 @@ export const OnboardingScreen: React.FC = () => {
 
     // Animate goal intensity cards when selection changes - pressed button state when selected
     useEffect(() => {
-        if (currentStep === 11) { // Goal intensity step is step 11
+        if (currentStep === 12) { // Goal intensity step is step 12
             const isMildSelected = data.goalIntensity === 'mild';
             const isModerateSelected = data.goalIntensity === 'moderate';
             const isAggressiveSelected = data.goalIntensity === 'aggressive';
@@ -2207,69 +2249,114 @@ export const OnboardingScreen: React.FC = () => {
                         const iconScale = option.key === 'male' ? maleIconScale : femaleIconScale;
                         const isSelected = data.sex === option.key;
 
+                        const handlePressIn = () => {
+                            const cardShadowHeight = option.key === 'male' ? maleCardShadowHeight : femaleCardShadowHeight;
+                            const cardTranslateY = option.key === 'male' ? maleCardTranslateY : femaleCardTranslateY;
+
+                            Animated.parallel([
+                                Animated.timing(cardTranslateY, {
+                                    toValue: 4,
+                                    duration: 120,
+                                    easing: Easing.out(Easing.ease),
+                                    useNativeDriver: true,
+                                }),
+                                Animated.timing(cardShadowHeight, {
+                                    toValue: 0,
+                                    duration: 120,
+                                    easing: Easing.out(Easing.ease),
+                                    useNativeDriver: false,
+                                }),
+                            ]).start();
+                        };
+
+                        const handlePressOut = () => {
+                            // The selection animation will handle the final state
+                            // This just provides immediate feedback
+                        };
+
+                        const cardShadowHeightAnim = option.key === 'male' ? maleCardShadowHeight : femaleCardShadowHeight;
+
                         return (
-                            <TouchableOpacity
-                                key={option.key}
-                                onPress={() => updateData('sex', option.key)}
-                                activeOpacity={1}
-                            >
+                            <View key={option.key} style={{ position: 'relative' }}>
+                                {/* Shadow layer - harsh drop shadow */}
                                 <Animated.View
                                     style={[
                                         styles.sexCard,
                                         {
-                                            transform: [{ translateY: cardTranslateY }],
-                                            shadowColor: '#252525',
-                                            shadowOffset: {
-                                                width: 0,
-                                                height: cardShadowHeight,
-                                            },
-                                            shadowOpacity: 1,
-                                            shadowRadius: 0,
-                                            elevation: cardShadowHeight,
+                                            position: 'absolute',
+                                            backgroundColor: '#252525',
+                                            top: 4,
+                                            left: 0,
+                                            right: 0,
+                                            transform: [{ translateY: 0 }],
+                                            opacity: cardShadowHeightAnim.interpolate({
+                                                inputRange: [0, 4],
+                                                outputRange: [0, 1],
+                                            }),
+                                            zIndex: 0,
+                                            borderWidth: 0,
                                         },
                                     ]}
+                                    pointerEvents="none"
+                                />
+                                <TouchableOpacity
+                                    key={option.key}
+                                    onPress={() => updateData('sex', option.key)}
+                                    onPressIn={handlePressIn}
+                                    onPressOut={handlePressOut}
+                                    activeOpacity={1}
+                                    style={{ zIndex: 1 }}
                                 >
-                                    {/* Blue color overlay that fades in when selected */}
                                     <Animated.View
                                         style={[
-                                            StyleSheet.absoluteFill,
+                                            styles.sexCard,
                                             {
-                                                backgroundColor: '#526EFF',
-                                                borderRadius: 10,
-                                                opacity: cardColorOpacity,
-                                            },
-                                        ]}
-                                        pointerEvents="none"
-                                    />
-                                    <Animated.Text
-                                        style={[
-                                            styles.sexCardIcon,
-                                            {
-                                                transform: [{ scale: iconScale }],
-                                                color: cardColorOpacity.interpolate({
-                                                    inputRange: [0, 1],
-                                                    outputRange: ['#666', '#fff'],
-                                                }),
+                                                transform: [{ translateY: cardTranslateY }],
                                             },
                                         ]}
                                     >
-                                        {option.symbol}
-                                    </Animated.Text>
-                                    <Animated.Text
-                                        style={[
-                                            styles.sexCardText,
-                                            {
-                                                color: cardColorOpacity.interpolate({
-                                                    inputRange: [0, 1],
-                                                    outputRange: ['#333', '#fff'],
-                                                }),
-                                            },
-                                        ]}
-                                    >
-                                        {option.label}
-                                    </Animated.Text>
-                                </Animated.View>
-                            </TouchableOpacity>
+                                        {/* Blue color overlay that fades in when selected */}
+                                        <Animated.View
+                                            style={[
+                                                StyleSheet.absoluteFill,
+                                                {
+                                                    backgroundColor: '#526EFF',
+                                                    borderRadius: 10,
+                                                    opacity: cardColorOpacity,
+                                                },
+                                            ]}
+                                            pointerEvents="none"
+                                        />
+                                        <Animated.Text
+                                            style={[
+                                                styles.sexCardIcon,
+                                                {
+                                                    transform: [{ scale: iconScale }],
+                                                    color: cardColorOpacity.interpolate({
+                                                        inputRange: [0, 1],
+                                                        outputRange: ['#666', '#fff'],
+                                                    }),
+                                                },
+                                            ]}
+                                        >
+                                            {option.symbol}
+                                        </Animated.Text>
+                                        <Animated.Text
+                                            style={[
+                                                styles.sexCardText,
+                                                {
+                                                    color: cardColorOpacity.interpolate({
+                                                        inputRange: [0, 1],
+                                                        outputRange: ['#333', '#fff'],
+                                                    }),
+                                                },
+                                            ]}
+                                        >
+                                            {option.label}
+                                        </Animated.Text>
+                                    </Animated.View>
+                                </TouchableOpacity>
+                            </View>
                         );
                     })}
                 </View>
@@ -2277,262 +2364,753 @@ export const OnboardingScreen: React.FC = () => {
         );
     };
 
-    // Animate unit toggle sliding background when unit changes (only on height step)
+    // Animate unit preference toggle sliding background when unit changes (only on unit preferences step)
     useEffect(() => {
-        if (currentStep === 5) {
-            Animated.timing(unitToggleSlide, {
-                toValue: data.heightUnit === 'cm' ? 0 : 1,
+        if (currentStep === 5) { // Unit preferences step is now step 5
+            const isMetric = data.unitPreference.weight === 'kg' && data.unitPreference.height === 'cm';
+            Animated.timing(unitPreferenceToggleSlide, {
+                toValue: isMetric ? 0 : 1,
                 duration: 300,
                 easing: Easing.out(Easing.ease),
                 useNativeDriver: true,
             }).start();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [data.heightUnit, currentStep]);
-
-    // Animate weight unit toggle sliding background when unit changes (only on weight step)
-    useEffect(() => {
-        if (currentStep === 6) {
-            Animated.timing(weightUnitToggleSlide, {
-                toValue: data.weightUnit === 'kg' ? 0 : 1,
-                duration: 300,
-                easing: Easing.out(Easing.ease),
-                useNativeDriver: true,
-            }).start();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [data.weightUnit, currentStep]);
-
-    // Animate unit preference toggles sliding background when unit changes (only on unit preferences step)
-    useEffect(() => {
-        if (currentStep === 12) { // Unit preferences step is step 12
-            Animated.parallel([
-                Animated.timing(unitPreferenceWeightToggleSlide, {
-                    toValue: data.unitPreference.weight === 'kg' ? 0 : 1,
-                    duration: 300,
-                    easing: Easing.out(Easing.ease),
-                    useNativeDriver: true,
-                }),
-                Animated.timing(unitPreferenceHeightToggleSlide, {
-                    toValue: data.unitPreference.height === 'cm' ? 0 : 1,
-                    duration: 300,
-                    easing: Easing.out(Easing.ease),
-                    useNativeDriver: true,
-                }),
-            ]).start();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [data.unitPreference, currentStep]);
 
-    const renderHeightStep = () => {
-        // For ft, we store height in inches (e.g., 71 inches = 5'11")
-        // Range: 4'0" (48 inches) to 7'11" (95 inches)
-        const minHeight = data.heightUnit === 'cm' ? 100 : 48; // 48 inches = 4'0"
-        const maxHeight = data.heightUnit === 'cm' ? 250 : 95; // 95 inches = 7'11"
-        const step = data.heightUnit === 'cm' ? 1 : 1; // 1 inch steps for ft
+    // Sync height and weight units with unit preference when unit preference changes
+    useEffect(() => {
+        if (currentStep >= 6) { // After unit preference step
+            // Sync height unit
+            if (data.heightUnit !== data.unitPreference.height) {
+                const currentHeight = data.height;
+                let convertedHeight = currentHeight;
 
-        // Ensure height value is within valid range for current unit
-        // Round to nearest step first, then clamp
-        const steppedHeight = Math.round(data.height / step) * step;
-        const clampedHeight = Math.max(minHeight, Math.min(maxHeight, steppedHeight));
+                // Convert if needed
+                if (data.heightUnit === 'cm' && data.unitPreference.height === 'ft') {
+                    convertedHeight = currentHeight * 0.393701; // cm to inches
+                } else if (data.heightUnit === 'ft' && data.unitPreference.height === 'cm') {
+                    convertedHeight = currentHeight * 2.54; // inches to cm
+                }
 
-        // Helper function to convert inches to feet and inches string (e.g., 71 -> "5'11\"")
-        const inchesToFeetInches = (inches: number): string => {
-            const clampedInches = Math.max(48, Math.min(95, Math.round(inches)));
-            const feet = Math.floor(clampedInches / 12);
-            const remainingInches = clampedInches % 12;
-            return `${feet}'${remainingInches}"`;
+                updateData('heightUnit', data.unitPreference.height);
+                updateData('height', Math.round(convertedHeight));
+            }
+
+            // Sync weight unit
+            if (data.weightUnit !== data.unitPreference.weight) {
+                const currentWeight = data.weight;
+                let convertedWeight = currentWeight;
+
+                // Convert if needed
+                if (data.weightUnit === 'kg' && data.unitPreference.weight === 'lbs') {
+                    convertedWeight = currentWeight * 2.20462; // kg to lbs
+                } else if (data.weightUnit === 'lbs' && data.unitPreference.weight === 'kg') {
+                    convertedWeight = currentWeight * 0.453592; // lbs to kg
+                }
+
+                updateData('weightUnit', data.unitPreference.weight);
+                updateData('weight', data.unitPreference.weight === 'kg' ? parseFloat(convertedWeight.toFixed(1)) : Math.round(convertedWeight));
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [data.unitPreference, currentStep]);
+
+    // Close modals when entering height or weight steps
+    useEffect(() => {
+        if (currentStep === 6) { // Height step
+            setHeightModalVisible(false);
+            heightSlideAnim.setValue(0);
+            heightFadeAnim.setValue(0);
+        }
+        if (currentStep === 7) { // Weight step
+            setWeightModalVisible(false);
+            weightSlideAnim.setValue(0);
+            weightFadeAnim.setValue(0);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentStep]);
+
+    // Helper function to convert inches to feet and inches string (e.g., 71 -> "5'11\"")
+    const inchesToFeetInches = (inches: number): string => {
+        const clampedInches = Math.max(48, Math.min(95, Math.round(inches)));
+        const feet = Math.floor(clampedInches / 12);
+        const remainingInches = clampedInches % 12;
+        return `${feet}'${remainingInches}"`;
+    };
+
+    // Shared helper for rendering measurement step (height or weight) - Simple dropdown version
+    const renderMeasurementStep = (
+        title: string,
+        currentValue: number,
+        currentUnit: string,
+        unitKey: 'heightUnit' | 'weightUnit',
+        valueKey: 'height' | 'weight',
+        unitToggleSlideAnim: Animated.Value,
+        modalVisible: boolean,
+        setModalVisible: (visible: boolean) => void,
+        slideAnim: Animated.Value,
+        fadeAnim: Animated.Value,
+        config: {
+            unit1: string;
+            unit2: string;
+            min1: number;
+            max1: number;
+            step1: number;
+            min2: number;
+            max2: number;
+            step2: number;
+            convert1To2: (val: number) => number;
+            convert2To1: (val: number) => number;
+            format1: (val: number) => string;
+            format2: (val: number) => string;
+        }
+    ) => {
+        const isUnit1 = currentUnit === config.unit1;
+        const minValue = isUnit1 ? config.min1 : config.min2;
+        const maxValue = isUnit1 ? config.max1 : config.max2;
+        const step = isUnit1 ? config.step1 : config.step2;
+
+        // Clamp and round value
+        const steppedValue = Math.round(currentValue / step) * step;
+        const clampedValue = Math.max(minValue, Math.min(maxValue, steppedValue));
+
+        const handleUnitChange = (newUnit: string) => {
+            if (newUnit === config.unit1 && currentUnit === config.unit2) {
+                const converted = config.convert2To1(currentValue);
+                const rounded = config.step1 >= 1
+                    ? Math.round(converted / config.step1) * config.step1
+                    : Math.round(converted * 2) / 2;
+                const clamped = Math.max(config.min1, Math.min(config.max1, rounded));
+                updateData(unitKey, config.unit1);
+                updateData(valueKey, clamped);
+            } else if (newUnit === config.unit2 && currentUnit === config.unit1) {
+                const converted = config.convert1To2(currentValue);
+                const rounded = config.step2 >= 1
+                    ? Math.round(converted / config.step2) * config.step2
+                    : Math.round(converted);
+                const clamped = Math.max(config.min2, Math.min(config.max2, rounded));
+                updateData(unitKey, config.unit2);
+                updateData(valueKey, clamped);
+            }
         };
 
-        // Convert height when switching units
-        const handleUnitChange = (newUnit: 'cm' | 'ft') => {
-            if (newUnit === 'ft' && data.heightUnit === 'cm') {
-                // Convert cm to inches (1 cm = 0.393701 inches)
-                const heightInInches = data.height * 0.393701;
-                const roundedInches = Math.round(heightInInches);
-                const clampedInches = Math.max(48, Math.min(95, roundedInches));
-                // Update both values - unit first, then height
-                updateData('heightUnit', 'ft');
-                updateData('height', clampedInches);
-            } else if (newUnit === 'cm' && data.heightUnit === 'ft') {
-                // Convert inches to cm (1 inch = 2.54 cm)
-                const heightInCm = data.height * 2.54;
-                const roundedCm = Math.round(heightInCm);
-                const clampedCm = Math.max(100, Math.min(250, roundedCm));
-                // Update both values - unit first, then height
-                updateData('heightUnit', 'cm');
-                updateData('height', clampedCm);
+        // Generate items for dropdown
+        const items: string[] = [];
+        for (let val = minValue; val <= maxValue; val += step) {
+            if (isUnit1) {
+                items.push(config.format1(val));
+            } else {
+                items.push(config.format2(val));
             }
+        }
+
+        const formattedValue = isUnit1 ? config.format1(clampedValue) : config.format2(clampedValue);
+        const selectedIndex = items.findIndex(item => item === formattedValue);
+
+        const handleOpenModal = () => {
+            setModalVisible(true);
+            Animated.parallel([
+                Animated.timing(slideAnim, {
+                    toValue: 1,
+                    duration: 250,
+                    easing: Easing.out(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(fadeAnim, {
+                    toValue: 1,
+                    duration: 250,
+                    easing: Easing.out(Easing.ease),
+                    useNativeDriver: true,
+                }),
+            ]).start();
+        };
+
+        const handleSelect = (index: number) => {
+            const selectedValue = minValue + (index * step);
+            updateData(valueKey, selectedValue);
+        };
+
+        const handleCloseModal = () => {
+            Animated.parallel([
+                Animated.timing(slideAnim, {
+                    toValue: 0,
+                    duration: 250,
+                    easing: Easing.in(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(fadeAnim, {
+                    toValue: 0,
+                    duration: 250,
+                    easing: Easing.in(Easing.ease),
+                    useNativeDriver: true,
+                }),
+            ]).start(() => {
+                setModalVisible(false);
+            });
+        };
+
+        const renderPickerModal = () => {
+            const translateY = slideAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [300, 0],
+            });
+
+            return (
+                <Modal
+                    visible={modalVisible}
+                    transparent={true}
+                    animationType="none"
+                    onRequestClose={handleCloseModal}
+                >
+                    <TouchableOpacity
+                        style={styles.modalOverlay}
+                        activeOpacity={1}
+                        onPress={handleCloseModal}
+                    >
+                        <Animated.View
+                            style={[
+                                styles.modalOverlayAnimated,
+                                {
+                                    opacity: fadeAnim,
+                                },
+                            ]}
+                        >
+                            <Animated.View
+                                style={[
+                                    styles.modalContent,
+                                    {
+                                        transform: [{ translateY }],
+                                    },
+                                ]}
+                            >
+                                <Text style={styles.modalTitle}>{title}</Text>
+                                <ScrollView
+                                    style={styles.modalScrollView}
+                                    scrollEventThrottle={16}
+                                    removeClippedSubviews={true}
+                                    nestedScrollEnabled={true}
+                                    keyboardShouldPersistTaps="handled"
+                                    decelerationRate="normal"
+                                    bounces={true}
+                                    overScrollMode="auto"
+                                >
+                                    {items.map((item, index) => {
+                                        const isSelected = index === selectedIndex;
+                                        return (
+                                            <TouchableOpacity
+                                                key={index}
+                                                style={[
+                                                    styles.modalItem,
+                                                    isSelected && styles.modalItemSelected
+                                                ]}
+                                                onPress={() => {
+                                                    handleSelect(index);
+                                                    handleCloseModal();
+                                                }}
+                                            >
+                                                <Text style={[
+                                                    styles.modalItemText,
+                                                    isSelected && styles.modalItemTextSelected
+                                                ]}>
+                                                    {item}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </ScrollView>
+                            </Animated.View>
+                        </Animated.View>
+                    </TouchableOpacity>
+                </Modal>
+            );
+        };
+
+        return (
+            <View style={styles.stepContent}>
+                <Text style={styles.stepTitle}>{title}</Text>
+
+                {/* Unit Toggle */}
+                <View style={{ position: 'relative', marginBottom: 0, marginTop: 20, alignItems: 'center' }}>
+                    {/* Shadow layer - harsh drop shadow */}
+                    <Animated.View
+                        style={[
+                            styles.unitToggle,
+                            {
+                                position: 'absolute',
+                                backgroundColor: '#252525',
+                                top: 4,
+                                left: 0,
+                                opacity: 1,
+                                zIndex: 0,
+                                borderWidth: 0,
+                                marginBottom: 0,
+                            },
+                        ]}
+                        pointerEvents="none"
+                    />
+                    <View style={[styles.unitToggle, { zIndex: 1 }]}>
+                        <Animated.View
+                            style={[
+                                styles.unitToggleBackground,
+                                {
+                                    transform: [{
+                                        translateX: unitToggleSlideAnim.interpolate({
+                                            inputRange: [0, 1],
+                                            outputRange: [0, 176],
+                                        }),
+                                    }],
+                                },
+                            ]}
+                        />
+                        <TouchableOpacity
+                            style={styles.unitButton}
+                            onPress={() => handleUnitChange(config.unit1)}
+                        >
+                            <Text style={[
+                                styles.unitButtonText,
+                                currentUnit === config.unit1 && styles.unitButtonTextActive
+                            ]}>
+                                {config.unit1}
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.unitButton}
+                            onPress={() => handleUnitChange(config.unit2)}
+                        >
+                            <Text style={[
+                                styles.unitButtonText,
+                                currentUnit === config.unit2 && styles.unitButtonTextActive
+                            ]}>
+                                {config.unit2}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* Dropdown */}
+                <View style={styles.datePickerContainer}>
+                    <TouchableOpacity
+                        style={styles.dateDropdown}
+                        onPress={handleOpenModal}
+                    >
+                        <Text
+                            style={styles.dateDropdownText}
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                        >
+                            {formattedValue}
+                        </Text>
+                        <Ionicons
+                            name="chevron-down"
+                            size={20}
+                            color="#252525"
+                            style={styles.dateDropdownIcon}
+                        />
+                    </TouchableOpacity>
+                </View>
+
+                {renderPickerModal()}
+            </View>
+        );
+    };
+
+    const renderHeightStep = () => {
+        // Use unit preference for height
+        const currentUnit = data.unitPreference.height;
+        const isMetric = currentUnit === 'cm';
+        const minValue = isMetric ? 100 : 39; // 100cm = ~39 inches (3'3")
+        const maxValue = isMetric ? 300 : 118; // 300cm = ~118 inches (9'10")
+        const step = 1;
+
+        // Clamp and round value
+        const steppedValue = Math.round(data.height / step) * step;
+        const clampedValue = Math.max(minValue, Math.min(maxValue, steppedValue));
+
+        // Generate items for dropdown
+        const items: string[] = [];
+        for (let val = minValue; val <= maxValue; val += step) {
+            if (isMetric) {
+                items.push(`${Math.round(val)} cm`);
+            } else {
+                items.push(inchesToFeetInches(val));
+            }
+        }
+
+        const formattedValue = isMetric
+            ? `${Math.round(clampedValue)} cm`
+            : inchesToFeetInches(clampedValue);
+        const selectedIndex = items.findIndex(item => item === formattedValue);
+
+        const handleOpenModal = () => {
+            setHeightModalVisible(true);
+            Animated.parallel([
+                Animated.timing(heightSlideAnim, {
+                    toValue: 1,
+                    duration: 250,
+                    easing: Easing.out(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(heightFadeAnim, {
+                    toValue: 1,
+                    duration: 250,
+                    easing: Easing.out(Easing.ease),
+                    useNativeDriver: true,
+                }),
+            ]).start(() => {
+                // Scroll to selected item after modal animation completes
+                if (selectedIndex >= 0 && heightScrollViewRef.current) {
+                    // Calculate item height: padding 20px top + 20px bottom + text ~24px (fontSize 18 with line height) + border 1px = ~61px
+                    const itemHeight = 61;
+                    // Use measured scroll view height or default to 400
+                    const viewportHeight = heightScrollViewHeight.current;
+                    // Calculate position to center: item position - half viewport + half item height
+                    // Add positive offset to scroll more, moving the item up in the viewport to center it
+                    const itemPosition = selectedIndex * itemHeight;
+                    const scrollPosition = Math.max(0, itemPosition - (viewportHeight / 2) + (itemHeight / 2) + 100);
+                    setTimeout(() => {
+                        heightScrollViewRef.current?.scrollTo({
+                            y: scrollPosition,
+                            animated: true,
+                        });
+                    }, 150);
+                }
+            });
+        };
+
+        const handleSelect = (index: number) => {
+            const selectedValue = minValue + (index * step);
+            updateData('height', selectedValue);
+        };
+
+        const handleCloseModal = () => {
+            Animated.parallel([
+                Animated.timing(heightSlideAnim, {
+                    toValue: 0,
+                    duration: 250,
+                    easing: Easing.in(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(heightFadeAnim, {
+                    toValue: 0,
+                    duration: 250,
+                    easing: Easing.in(Easing.ease),
+                    useNativeDriver: true,
+                }),
+            ]).start(() => {
+                setHeightModalVisible(false);
+            });
+        };
+
+        const renderPickerModal = () => {
+            const translateY = heightSlideAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [300, 0],
+            });
+
+            return (
+                <Modal
+                    visible={heightModalVisible}
+                    transparent={true}
+                    animationType="none"
+                    onRequestClose={handleCloseModal}
+                >
+                    <TouchableOpacity
+                        style={styles.modalOverlay}
+                        activeOpacity={1}
+                        onPress={handleCloseModal}
+                    >
+                        <Animated.View
+                            style={[
+                                styles.modalOverlayAnimated,
+                                {
+                                    opacity: heightFadeAnim,
+                                },
+                            ]}
+                        >
+                            <Animated.View
+                                style={[
+                                    styles.modalContent,
+                                    {
+                                        transform: [{ translateY }],
+                                    },
+                                ]}
+                            >
+                                <Text style={styles.modalTitle}>what's your height?</Text>
+                                <ScrollView
+                                    ref={heightScrollViewRef}
+                                    style={styles.modalScrollView}
+                                    scrollEventThrottle={16}
+                                    removeClippedSubviews={true}
+                                    nestedScrollEnabled={true}
+                                    keyboardShouldPersistTaps="handled"
+                                    decelerationRate="normal"
+                                    bounces={true}
+                                    overScrollMode="auto"
+                                    onLayout={(event) => {
+                                        const { height } = event.nativeEvent.layout;
+                                        heightScrollViewHeight.current = height;
+                                    }}
+                                >
+                                    {items.map((item, index) => {
+                                        const isSelected = index === selectedIndex;
+                                        return (
+                                            <TouchableOpacity
+                                                key={index}
+                                                style={[
+                                                    styles.modalItem,
+                                                    isSelected && styles.modalItemSelected
+                                                ]}
+                                                onPress={() => {
+                                                    handleSelect(index);
+                                                    handleCloseModal();
+                                                }}
+                                            >
+                                                <Text style={[
+                                                    styles.modalItemText,
+                                                    isSelected && styles.modalItemTextSelected
+                                                ]}>
+                                                    {item}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </ScrollView>
+                            </Animated.View>
+                        </Animated.View>
+                    </TouchableOpacity>
+                </Modal>
+            );
         };
 
         return (
             <View style={styles.stepContent}>
                 <Text style={styles.stepTitle}>what's your height?</Text>
-                <View style={styles.unitToggle}>
-                    <Animated.View
-                        style={[
-                            styles.unitToggleBackground,
-                            {
-                                left: unitToggleSlide.interpolate({
-                                    inputRange: [0, 1],
-                                    outputRange: [4, 180], // 4px from left when cm, 180px when ft
-                                }),
-                                right: unitToggleSlide.interpolate({
-                                    inputRange: [0, 1],
-                                    outputRange: [180, 4], // 180px from right when cm, 4px from right when ft
-                                }),
-                            },
-                        ]}
-                    />
+
+                {/* Dropdown */}
+                <View style={styles.datePickerContainer}>
                     <TouchableOpacity
-                        style={styles.unitButton}
-                        onPress={() => handleUnitChange('cm')}
+                        style={styles.dateDropdown}
+                        onPress={handleOpenModal}
                     >
-                        <Text style={[
-                            styles.unitButtonText,
-                            data.heightUnit === 'cm' && styles.unitButtonTextActive
-                        ]}>
-                            cm
+                        <Text
+                            style={styles.dateDropdownText}
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                        >
+                            {formattedValue}
                         </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={styles.unitButton}
-                        onPress={() => handleUnitChange('ft')}
-                    >
-                        <Text style={[
-                            styles.unitButtonText,
-                            data.heightUnit === 'ft' && styles.unitButtonTextActive
-                        ]}>
-                            ft
-                        </Text>
+                        <Ionicons
+                            name="chevron-down"
+                            size={20}
+                            color="#252525"
+                            style={styles.dateDropdownIcon}
+                        />
                     </TouchableOpacity>
                 </View>
-                <Slider
-                    key={`height-slider-${data.heightUnit}`}
-                    value={clampedHeight}
-                    onValueChange={(value) => {
-                        // Round to nearest step
-                        const steppedValue = Math.round(value / step) * step;
-                        const clampedValue = Math.max(minHeight, Math.min(maxHeight, steppedValue));
-                        updateData('height', clampedValue);
-                    }}
-                    minimumValue={minHeight}
-                    maximumValue={maxHeight}
-                    step={step}
-                    unit={data.heightUnit}
-                    formatValue={(val) => {
-                        if (data.heightUnit === 'cm') {
-                            return `${Math.round(val)} cm`;
-                        } else {
-                            // val is in inches, convert to feet and inches format
-                            return inchesToFeetInches(val);
-                        }
-                    }}
-                    editableText={false}
-                />
+
+                {renderPickerModal()}
             </View>
         );
     };
 
     const renderWeightStep = () => {
-        const minWeight = data.weightUnit === 'kg' ? 20 : 45; // 20 kg, 45 lbs
-        const maxWeight = data.weightUnit === 'kg' ? 250 : 550; // 250 kg, 550 lbs
-        const step = data.weightUnit === 'kg' ? 0.5 : 1; // 0.5 kg, 1 lb
+        // Use unit preference for weight
+        const currentUnit = data.unitPreference.weight;
+        const isMetric = currentUnit === 'kg';
+        const minValue = isMetric ? 20 : 45;
+        const maxValue = isMetric ? 250 : 550;
+        const step = isMetric ? 0.5 : 1;
 
-        // Ensure weight is within valid range when unit changes
-        // Round to nearest step first, then clamp
-        const steppedWeight = data.weightUnit === 'kg'
+        // Clamp and round value
+        const steppedValue = isMetric
             ? Math.round(data.weight / step) * step
             : Math.round(data.weight / step) * step;
-        const clampedWeight = Math.max(minWeight, Math.min(maxWeight, steppedWeight));
+        const clampedValue = Math.max(minValue, Math.min(maxValue, steppedValue));
 
-        // Convert weight when switching units
-        const handleUnitChange = (newUnit: 'kg' | 'lbs') => {
-            if (newUnit === 'kg' && data.weightUnit === 'lbs') {
-                // Convert lbs to kg (1 lb = 0.453592 kg)
-                const weightInKg = data.weight * 0.453592;
-                const roundedKg = Math.round(weightInKg * 2) / 2; // Round to nearest 0.5
-                const clampedKg = Math.max(20, Math.min(250, roundedKg));
-                updateData('weightUnit', 'kg');
-                updateData('weight', clampedKg);
-            } else if (newUnit === 'lbs' && data.weightUnit === 'kg') {
-                // Convert kg to lbs (1 kg = 2.20462 lbs)
-                const weightInLbs = data.weight * 2.20462;
-                const roundedLbs = Math.round(weightInLbs);
-                const clampedLbs = Math.max(45, Math.min(550, roundedLbs));
-                updateData('weightUnit', 'lbs');
-                updateData('weight', clampedLbs);
+        // Generate items for dropdown
+        const items: string[] = [];
+        for (let val = minValue; val <= maxValue; val += step) {
+            if (isMetric) {
+                items.push(`${val.toFixed(1)} kg`);
+            } else {
+                items.push(`${Math.round(val)} lbs`);
             }
+        }
+
+        const formattedValue = isMetric
+            ? `${clampedValue.toFixed(1)} kg`
+            : `${Math.round(clampedValue)} lbs`;
+        const selectedIndex = items.findIndex(item => item === formattedValue);
+
+        const handleOpenModal = () => {
+            setWeightModalVisible(true);
+            Animated.parallel([
+                Animated.timing(weightSlideAnim, {
+                    toValue: 1,
+                    duration: 250,
+                    easing: Easing.out(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(weightFadeAnim, {
+                    toValue: 1,
+                    duration: 250,
+                    easing: Easing.out(Easing.ease),
+                    useNativeDriver: true,
+                }),
+            ]).start(() => {
+                // Scroll to selected item after modal animation completes
+                if (selectedIndex >= 0 && weightScrollViewRef.current) {
+                    // Calculate item height: padding 20px top + 20px bottom + text ~24px (fontSize 18 with line height) + border 1px = ~61px
+                    const itemHeight = 61;
+                    // Use measured scroll view height or default to 400
+                    const viewportHeight = weightScrollViewHeight.current;
+                    // Calculate position to center: item position - half viewport + half item height
+                    // Add positive offset to scroll more, moving the item up in the viewport to center it
+                    const itemPosition = selectedIndex * itemHeight;
+                    const scrollPosition = Math.max(0, itemPosition - (viewportHeight / 2) + (itemHeight / 2) + 100);
+                    setTimeout(() => {
+                        weightScrollViewRef.current?.scrollTo({
+                            y: scrollPosition,
+                            animated: true,
+                        });
+                    }, 150);
+                }
+            });
+        };
+
+        const handleSelect = (index: number) => {
+            const selectedValue = minValue + (index * step);
+            updateData('weight', isMetric ? parseFloat(selectedValue.toFixed(1)) : Math.round(selectedValue));
+        };
+
+        const handleCloseModal = () => {
+            Animated.parallel([
+                Animated.timing(weightSlideAnim, {
+                    toValue: 0,
+                    duration: 250,
+                    easing: Easing.in(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(weightFadeAnim, {
+                    toValue: 0,
+                    duration: 250,
+                    easing: Easing.in(Easing.ease),
+                    useNativeDriver: true,
+                }),
+            ]).start(() => {
+                setWeightModalVisible(false);
+            });
+        };
+
+        const renderPickerModal = () => {
+            const translateY = weightSlideAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [300, 0],
+            });
+
+            return (
+                <Modal
+                    visible={weightModalVisible}
+                    transparent={true}
+                    animationType="none"
+                    onRequestClose={handleCloseModal}
+                >
+                    <TouchableOpacity
+                        style={styles.modalOverlay}
+                        activeOpacity={1}
+                        onPress={handleCloseModal}
+                    >
+                        <Animated.View
+                            style={[
+                                styles.modalOverlayAnimated,
+                                {
+                                    opacity: weightFadeAnim,
+                                },
+                            ]}
+                        >
+                            <Animated.View
+                                style={[
+                                    styles.modalContent,
+                                    {
+                                        transform: [{ translateY }],
+                                    },
+                                ]}
+                            >
+                                <Text style={styles.modalTitle}>what's your weight?</Text>
+                                <ScrollView
+                                    ref={weightScrollViewRef}
+                                    style={styles.modalScrollView}
+                                    scrollEventThrottle={16}
+                                    removeClippedSubviews={true}
+                                    nestedScrollEnabled={true}
+                                    keyboardShouldPersistTaps="handled"
+                                    decelerationRate="normal"
+                                    bounces={true}
+                                    overScrollMode="auto"
+                                    onLayout={(event) => {
+                                        const { height } = event.nativeEvent.layout;
+                                        weightScrollViewHeight.current = height;
+                                    }}
+                                >
+                                    {items.map((item, index) => {
+                                        const isSelected = index === selectedIndex;
+                                        return (
+                                            <TouchableOpacity
+                                                key={index}
+                                                style={[
+                                                    styles.modalItem,
+                                                    isSelected && styles.modalItemSelected
+                                                ]}
+                                                onPress={() => {
+                                                    handleSelect(index);
+                                                    handleCloseModal();
+                                                }}
+                                            >
+                                                <Text style={[
+                                                    styles.modalItemText,
+                                                    isSelected && styles.modalItemTextSelected
+                                                ]}>
+                                                    {item}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </ScrollView>
+                            </Animated.View>
+                        </Animated.View>
+                    </TouchableOpacity>
+                </Modal>
+            );
         };
 
         return (
             <View style={styles.stepContent}>
                 <Text style={styles.stepTitle}>what's your weight?</Text>
-                <View style={styles.unitToggle}>
-                    <Animated.View
-                        style={[
-                            styles.unitToggleBackground,
-                            {
-                                left: weightUnitToggleSlide.interpolate({
-                                    inputRange: [0, 1],
-                                    outputRange: [4, 180], // 4px from left when kg, 180px when lbs
-                                }),
-                                right: weightUnitToggleSlide.interpolate({
-                                    inputRange: [0, 1],
-                                    outputRange: [180, 4], // 180px from right when kg, 4px from right when lbs
-                                }),
-                            },
-                        ]}
-                    />
+
+                {/* Dropdown */}
+                <View style={styles.datePickerContainer}>
                     <TouchableOpacity
-                        style={styles.unitButton}
-                        onPress={() => handleUnitChange('kg')}
+                        style={styles.dateDropdown}
+                        onPress={handleOpenModal}
                     >
-                        <Text style={[
-                            styles.unitButtonText,
-                            data.weightUnit === 'kg' && styles.unitButtonTextActive
-                        ]}>
-                            kg
+                        <Text
+                            style={styles.dateDropdownText}
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                        >
+                            {formattedValue}
                         </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={styles.unitButton}
-                        onPress={() => handleUnitChange('lbs')}
-                    >
-                        <Text style={[
-                            styles.unitButtonText,
-                            data.weightUnit === 'lbs' && styles.unitButtonTextActive
-                        ]}>
-                            lbs
-                        </Text>
+                        <Ionicons
+                            name="chevron-down"
+                            size={20}
+                            color="#252525"
+                            style={styles.dateDropdownIcon}
+                        />
                     </TouchableOpacity>
                 </View>
-                <Slider
-                    key={`weight-slider-${data.weightUnit}`}
-                    value={clampedWeight}
-                    onValueChange={(value) => {
-                        // Round to nearest step
-                        const steppedValue = data.weightUnit === 'kg'
-                            ? Math.round(value / step) * step
-                            : Math.round(value / step) * step;
-                        const clampedValue = Math.max(minWeight, Math.min(maxWeight, steppedValue));
-                        updateData('weight', clampedValue);
-                    }}
-                    minimumValue={minWeight}
-                    maximumValue={maxWeight}
-                    step={step}
-                    unit={data.weightUnit}
-                    formatValue={(val) => {
-                        if (data.weightUnit === 'kg') {
-                            const formatted = typeof val === 'number' ? val.toFixed(1) : String(val);
-                            return `${formatted} kg`;
-                        } else {
-                            const rounded = typeof val === 'number' ? Math.round(val) : val;
-                            return `${rounded} lbs`;
-                        }
-                    }}
-                    editableText={false}
-                />
+
+                {renderPickerModal()}
             </View>
         );
     };
@@ -2585,49 +3163,160 @@ export const OnboardingScreen: React.FC = () => {
                             const animations = getCardAnimations(option.key);
                             const isSelected = data.goal === option.key;
 
+                            const handlePressIn = () => {
+                                let cardShadowHeight: Animated.Value;
+                                let cardTranslateY: Animated.Value;
+
+                                switch (option.key) {
+                                    case 'lose':
+                                        cardShadowHeight = loseCardShadowHeight;
+                                        cardTranslateY = loseCardTranslateY;
+                                        break;
+                                    case 'maintain':
+                                        cardShadowHeight = maintainCardShadowHeight;
+                                        cardTranslateY = maintainCardTranslateY;
+                                        break;
+                                    case 'build':
+                                        cardShadowHeight = buildCardShadowHeight;
+                                        cardTranslateY = buildCardTranslateY;
+                                        break;
+                                    default:
+                                        return;
+                                }
+
+                                Animated.parallel([
+                                    Animated.timing(cardTranslateY, {
+                                        toValue: 4,
+                                        duration: 120,
+                                        easing: Easing.out(Easing.ease),
+                                        useNativeDriver: true,
+                                    }),
+                                    Animated.timing(cardShadowHeight, {
+                                        toValue: 0,
+                                        duration: 120,
+                                        easing: Easing.out(Easing.ease),
+                                        useNativeDriver: false,
+                                    }),
+                                ]).start();
+                            };
+
+                            const handlePressOut = () => {
+                                let cardShadowHeight: Animated.Value;
+                                let cardTranslateY: Animated.Value;
+
+                                switch (option.key) {
+                                    case 'lose':
+                                        cardShadowHeight = loseCardShadowHeight;
+                                        cardTranslateY = loseCardTranslateY;
+                                        break;
+                                    case 'maintain':
+                                        cardShadowHeight = maintainCardShadowHeight;
+                                        cardTranslateY = maintainCardTranslateY;
+                                        break;
+                                    case 'build':
+                                        cardShadowHeight = buildCardShadowHeight;
+                                        cardTranslateY = buildCardTranslateY;
+                                        break;
+                                    default:
+                                        return;
+                                }
+
+                                // If not selected, restore shadow and position
+                                if (!isSelected) {
+                                    Animated.parallel([
+                                        Animated.timing(cardTranslateY, {
+                                            toValue: 0,
+                                            duration: 120,
+                                            easing: Easing.out(Easing.ease),
+                                            useNativeDriver: true,
+                                        }),
+                                        Animated.timing(cardShadowHeight, {
+                                            toValue: 4,
+                                            duration: 120,
+                                            easing: Easing.out(Easing.ease),
+                                            useNativeDriver: false,
+                                        }),
+                                    ]).start();
+                                }
+                            };
+
+                            const getCardShadowAnim = () => {
+                                switch (option.key) {
+                                    case 'lose': return loseCardShadowHeight;
+                                    case 'maintain': return maintainCardShadowHeight;
+                                    case 'build': return buildCardShadowHeight;
+                                    default: return loseCardShadowHeight;
+                                }
+                            };
+                            const cardShadowHeightAnim = getCardShadowAnim();
+
                             return (
-                                <TouchableOpacity
-                                    key={option.key}
-                                    onPress={() => updateData('goal', option.key)}
-                                    activeOpacity={1}
-                                >
+                                <View key={option.key} style={{ position: 'relative', width: 150, height: 154, marginBottom: 12 }}>
+                                    {/* Shadow layer - harsh drop shadow */}
                                     <Animated.View
                                         style={[
-                                            styles.goalCard,
                                             {
-                                                transform: [{ translateY: animations.translateY }],
-                                                shadowColor: '#252525',
-                                                shadowOffset: {
-                                                    width: 0,
-                                                    height: animations.shadowHeight,
-                                                },
-                                                shadowOpacity: 1,
-                                                shadowRadius: 0,
-                                                elevation: animations.shadowHeight,
+                                                position: 'absolute',
+                                                width: 150,
+                                                height: 150,
+                                                backgroundColor: '#252525',
+                                                borderRadius: 12,
+                                                top: 4,
+                                                left: 0,
+                                                opacity: cardShadowHeightAnim.interpolate({
+                                                    inputRange: [0, 4],
+                                                    outputRange: [0, 1],
+                                                }),
+                                                zIndex: 0,
                                             },
                                         ]}
+                                        pointerEvents="none"
+                                    />
+                                    <TouchableOpacity
+                                        onPress={() => updateData('goal', option.key)}
+                                        onPressIn={handlePressIn}
+                                        onPressOut={handlePressOut}
+                                        activeOpacity={1}
+                                        style={{ zIndex: 1, position: 'absolute', top: 0, left: 0 }}
                                     >
-                                        {/* Color overlay that fades in when selected */}
                                         <Animated.View
                                             style={[
-                                                StyleSheet.absoluteFill,
+                                                styles.goalCard,
                                                 {
-                                                    backgroundColor: option.color,
-                                                    borderRadius: 12,
-                                                    opacity: animations.colorOpacity,
+                                                    transform: [{ translateY: animations.translateY }],
+                                                    shadowColor: '#252525',
+                                                    shadowOffset: {
+                                                        width: 0,
+                                                        height: animations.shadowHeight,
+                                                    },
+                                                    shadowOpacity: 1,
+                                                    shadowRadius: 0,
+                                                    elevation: animations.shadowHeight,
                                                 },
                                             ]}
-                                            pointerEvents="none"
-                                        />
-                                        <Text style={styles.goalIcon}>{option.icon}</Text>
-                                        <Text style={[
-                                            styles.goalCardText,
-                                            isSelected && styles.goalCardTextSelected
-                                        ]}>
-                                            {option.label}
-                                        </Text>
-                                    </Animated.View>
-                                </TouchableOpacity>
+                                        >
+                                            {/* Color overlay that fades in when selected */}
+                                            <Animated.View
+                                                style={[
+                                                    StyleSheet.absoluteFill,
+                                                    {
+                                                        backgroundColor: option.color,
+                                                        borderRadius: 12,
+                                                        opacity: animations.colorOpacity,
+                                                    },
+                                                ]}
+                                                pointerEvents="none"
+                                            />
+                                            <Text style={styles.goalIcon}>{option.icon}</Text>
+                                            <Text style={[
+                                                styles.goalCardText,
+                                                isSelected && styles.goalCardTextSelected
+                                            ]}>
+                                                {option.label}
+                                            </Text>
+                                        </Animated.View>
+                                    </TouchableOpacity>
+                                </View>
                             );
                         })}
                     </View>
@@ -2636,49 +3325,152 @@ export const OnboardingScreen: React.FC = () => {
                             const animations = getCardAnimations(option.key);
                             const isSelected = data.goal === option.key;
 
+                            const handlePressIn = () => {
+                                let cardShadowHeight: Animated.Value;
+                                let cardTranslateY: Animated.Value;
+
+                                switch (option.key) {
+                                    case 'lose':
+                                        cardShadowHeight = loseCardShadowHeight;
+                                        cardTranslateY = loseCardTranslateY;
+                                        break;
+                                    case 'maintain':
+                                        cardShadowHeight = maintainCardShadowHeight;
+                                        cardTranslateY = maintainCardTranslateY;
+                                        break;
+                                    case 'build':
+                                        cardShadowHeight = buildCardShadowHeight;
+                                        cardTranslateY = buildCardTranslateY;
+                                        break;
+                                    default:
+                                        return;
+                                }
+
+                                Animated.parallel([
+                                    Animated.timing(cardTranslateY, {
+                                        toValue: 4,
+                                        duration: 120,
+                                        easing: Easing.out(Easing.ease),
+                                        useNativeDriver: true,
+                                    }),
+                                    Animated.timing(cardShadowHeight, {
+                                        toValue: 0,
+                                        duration: 120,
+                                        easing: Easing.out(Easing.ease),
+                                        useNativeDriver: false,
+                                    }),
+                                ]).start();
+                            };
+
+                            const handlePressOut = () => {
+                                let cardShadowHeight: Animated.Value;
+                                let cardTranslateY: Animated.Value;
+
+                                switch (option.key) {
+                                    case 'lose':
+                                        cardShadowHeight = loseCardShadowHeight;
+                                        cardTranslateY = loseCardTranslateY;
+                                        break;
+                                    case 'maintain':
+                                        cardShadowHeight = maintainCardShadowHeight;
+                                        cardTranslateY = maintainCardTranslateY;
+                                        break;
+                                    case 'build':
+                                        cardShadowHeight = buildCardShadowHeight;
+                                        cardTranslateY = buildCardTranslateY;
+                                        break;
+                                    default:
+                                        return;
+                                }
+
+                                // If not selected, restore shadow and position
+                                if (!isSelected) {
+                                    Animated.parallel([
+                                        Animated.timing(cardTranslateY, {
+                                            toValue: 0,
+                                            duration: 120,
+                                            easing: Easing.out(Easing.ease),
+                                            useNativeDriver: true,
+                                        }),
+                                        Animated.timing(cardShadowHeight, {
+                                            toValue: 4,
+                                            duration: 120,
+                                            easing: Easing.out(Easing.ease),
+                                            useNativeDriver: false,
+                                        }),
+                                    ]).start();
+                                }
+                            };
+
+                            const getCardShadowAnim = () => {
+                                switch (option.key) {
+                                    case 'lose': return loseCardShadowHeight;
+                                    case 'maintain': return maintainCardShadowHeight;
+                                    case 'build': return buildCardShadowHeight;
+                                    default: return loseCardShadowHeight;
+                                }
+                            };
+                            const cardShadowHeightAnim = getCardShadowAnim();
+
                             return (
-                                <TouchableOpacity
-                                    key={option.key}
-                                    onPress={() => updateData('goal', option.key)}
-                                    activeOpacity={1}
-                                >
+                                <View key={option.key} style={{ position: 'relative', width: 150, height: 154, marginBottom: 12 }}>
+                                    {/* Shadow layer - harsh drop shadow */}
                                     <Animated.View
                                         style={[
-                                            styles.goalCard,
                                             {
-                                                transform: [{ translateY: animations.translateY }],
-                                                shadowColor: '#252525',
-                                                shadowOffset: {
-                                                    width: 0,
-                                                    height: animations.shadowHeight,
-                                                },
-                                                shadowOpacity: 1,
-                                                shadowRadius: 0,
-                                                elevation: animations.shadowHeight,
+                                                position: 'absolute',
+                                                width: 150,
+                                                height: 150,
+                                                backgroundColor: '#252525',
+                                                borderRadius: 12,
+                                                top: 4,
+                                                left: 0,
+                                                opacity: cardShadowHeightAnim.interpolate({
+                                                    inputRange: [0, 4],
+                                                    outputRange: [0, 1],
+                                                }),
+                                                zIndex: 0,
                                             },
                                         ]}
+                                        pointerEvents="none"
+                                    />
+                                    <TouchableOpacity
+                                        onPress={() => updateData('goal', option.key)}
+                                        onPressIn={handlePressIn}
+                                        onPressOut={handlePressOut}
+                                        activeOpacity={1}
+                                        style={{ zIndex: 1, position: 'absolute', top: 0, left: 0 }}
                                     >
-                                        {/* Color overlay that fades in when selected */}
                                         <Animated.View
                                             style={[
-                                                StyleSheet.absoluteFill,
+                                                styles.goalCard,
                                                 {
-                                                    backgroundColor: option.color,
-                                                    borderRadius: 12,
-                                                    opacity: animations.colorOpacity,
+                                                    transform: [{ translateY: animations.translateY }],
                                                 },
                                             ]}
-                                            pointerEvents="none"
-                                        />
-                                        <Text style={styles.goalIcon}>{option.icon}</Text>
-                                        <Text style={[
-                                            styles.goalCardText,
-                                            isSelected && styles.goalCardTextSelected
-                                        ]}>
-                                            {option.label}
-                                        </Text>
-                                    </Animated.View>
-                                </TouchableOpacity>
+                                        >
+                                            {/* Color overlay that fades in when selected */}
+                                            <Animated.View
+                                                style={[
+                                                    StyleSheet.absoluteFill,
+                                                    {
+                                                        backgroundColor: option.color,
+                                                        borderRadius: 12,
+                                                        opacity: animations.colorOpacity,
+                                                    },
+                                                ]}
+                                                pointerEvents="none"
+                                            />
+                                            <Text style={styles.goalIcon}>{option.icon}</Text>
+                                            <Text style={[
+                                                styles.goalCardText,
+                                                isSelected && styles.goalCardTextSelected
+                                            ]}>
+                                                {option.label}
+                                            </Text>
+                                        </Animated.View>
+                                    </TouchableOpacity>
+                                </View>
                             );
                         })}
                     </View>
@@ -2738,54 +3530,128 @@ export const OnboardingScreen: React.FC = () => {
                         const animations = getCardAnimations(option.key);
                         const isSelected = data.activityLevel === option.key;
 
+                        const handlePressIn = () => {
+                            let cardShadowHeight: Animated.Value;
+                            let cardTranslateY: Animated.Value;
+
+                            switch (option.key) {
+                                case 'sedentary':
+                                    cardShadowHeight = sedentaryCardShadowHeight;
+                                    cardTranslateY = sedentaryCardTranslateY;
+                                    break;
+                                case 'lightly':
+                                    cardShadowHeight = lightlyCardShadowHeight;
+                                    cardTranslateY = lightlyCardTranslateY;
+                                    break;
+                                case 'moderate':
+                                    cardShadowHeight = moderateCardShadowHeight;
+                                    cardTranslateY = moderateCardTranslateY;
+                                    break;
+                                case 'very':
+                                    cardShadowHeight = veryCardShadowHeight;
+                                    cardTranslateY = veryCardTranslateY;
+                                    break;
+                                default:
+                                    return;
+                            }
+
+                            Animated.parallel([
+                                Animated.timing(cardTranslateY, {
+                                    toValue: 4,
+                                    duration: 120,
+                                    easing: Easing.out(Easing.ease),
+                                    useNativeDriver: true,
+                                }),
+                                Animated.timing(cardShadowHeight, {
+                                    toValue: 0,
+                                    duration: 120,
+                                    easing: Easing.out(Easing.ease),
+                                    useNativeDriver: false,
+                                }),
+                            ]).start();
+                        };
+
+                        const handlePressOut = () => {
+                            // The selection animation will handle the final state
+                        };
+
+                        const getCardShadowAnim = () => {
+                            switch (option.key) {
+                                case 'sedentary': return sedentaryCardShadowHeight;
+                                case 'lightly': return lightlyCardShadowHeight;
+                                case 'moderate': return moderateCardShadowHeight;
+                                case 'very': return veryCardShadowHeight;
+                                default: return sedentaryCardShadowHeight;
+                            }
+                        };
+                        const cardShadowHeightAnim = getCardShadowAnim();
+
                         return (
-                            <TouchableOpacity
-                                key={option.key}
-                                onPress={() => updateData('activityLevel', option.key)}
-                                activeOpacity={1}
-                            >
+                            <View key={option.key} style={{ position: 'relative', marginBottom: 8, paddingBottom: 4 }}>
+                                {/* Shadow layer - harsh drop shadow */}
                                 <Animated.View
                                     style={[
                                         styles.activityCard,
                                         {
-                                            transform: [{ translateY: animations.translateY }],
-                                            shadowColor: '#252525',
-                                            shadowOffset: {
-                                                width: 0,
-                                                height: animations.shadowHeight,
-                                            },
-                                            shadowOpacity: 1,
-                                            shadowRadius: 0,
-                                            elevation: animations.shadowHeight,
+                                            position: 'absolute',
+                                            backgroundColor: '#252525',
+                                            top: 4,
+                                            left: 0,
+                                            right: 0,
+                                            opacity: cardShadowHeightAnim.interpolate({
+                                                inputRange: [0, 4],
+                                                outputRange: [0, 1],
+                                            }),
+                                            zIndex: 0,
+                                            borderWidth: 0,
+                                            marginBottom: 0,
+                                            padding: 20, // Match card padding
                                         },
                                     ]}
+                                    pointerEvents="none"
+                                />
+                                <TouchableOpacity
+                                    onPress={() => updateData('activityLevel', option.key)}
+                                    onPressIn={handlePressIn}
+                                    onPressOut={handlePressOut}
+                                    activeOpacity={1}
+                                    style={{ zIndex: 1 }}
                                 >
-                                    {/* Color overlay that fades in when selected */}
                                     <Animated.View
                                         style={[
-                                            StyleSheet.absoluteFill,
+                                            styles.activityCard,
                                             {
-                                                backgroundColor: option.color,
-                                                borderRadius: 12,
-                                                opacity: animations.colorOpacity,
+                                                transform: [{ translateY: animations.translateY }],
                                             },
                                         ]}
-                                        pointerEvents="none"
-                                    />
-                                    <Text style={[
-                                        styles.activityCardTitle,
-                                        isSelected && styles.activityCardTitleSelected
-                                    ]}>
-                                        {option.label}
-                                    </Text>
-                                    <Text style={[
-                                        styles.activityCardDesc,
-                                        isSelected && styles.activityCardDescSelected
-                                    ]}>
-                                        {option.desc}
-                                    </Text>
-                                </Animated.View>
-                            </TouchableOpacity>
+                                    >
+                                        {/* Color overlay that fades in when selected */}
+                                        <Animated.View
+                                            style={[
+                                                StyleSheet.absoluteFill,
+                                                {
+                                                    backgroundColor: option.color,
+                                                    borderRadius: 12,
+                                                    opacity: animations.colorOpacity,
+                                                },
+                                            ]}
+                                            pointerEvents="none"
+                                        />
+                                        <Text style={[
+                                            styles.activityCardTitle,
+                                            isSelected && styles.activityCardTitleSelected
+                                        ]}>
+                                            {option.label}
+                                        </Text>
+                                        <Text style={[
+                                            styles.activityCardDesc,
+                                            isSelected && styles.activityCardDescSelected
+                                        ]}>
+                                            {option.desc}
+                                        </Text>
+                                    </Animated.View>
+                                </TouchableOpacity>
+                            </View>
                         );
                     })}
                 </View>
@@ -2858,49 +3724,131 @@ export const OnboardingScreen: React.FC = () => {
                         const animations = getCardAnimations(option.key);
                         const isSelected = data.dietPreference === option.key;
 
+                        const handlePressIn = () => {
+                            let cardShadowHeight: Animated.Value;
+                            let cardTranslateY: Animated.Value;
+
+                            switch (option.key) {
+                                case 'regular':
+                                    cardShadowHeight = regularCardShadowHeight;
+                                    cardTranslateY = regularCardTranslateY;
+                                    break;
+                                case 'high-protein':
+                                    cardShadowHeight = highProteinCardShadowHeight;
+                                    cardTranslateY = highProteinCardTranslateY;
+                                    break;
+                                case 'vegetarian':
+                                    cardShadowHeight = vegetarianCardShadowHeight;
+                                    cardTranslateY = vegetarianCardTranslateY;
+                                    break;
+                                case 'vegan':
+                                    cardShadowHeight = veganCardShadowHeight;
+                                    cardTranslateY = veganCardTranslateY;
+                                    break;
+                                case 'keto':
+                                    cardShadowHeight = ketoCardShadowHeight;
+                                    cardTranslateY = ketoCardTranslateY;
+                                    break;
+                                case 'halal':
+                                    cardShadowHeight = halalCardShadowHeight;
+                                    cardTranslateY = halalCardTranslateY;
+                                    break;
+                                default:
+                                    return;
+                            }
+
+                            Animated.parallel([
+                                Animated.timing(cardTranslateY, {
+                                    toValue: 4,
+                                    duration: 120,
+                                    easing: Easing.out(Easing.ease),
+                                    useNativeDriver: true,
+                                }),
+                                Animated.timing(cardShadowHeight, {
+                                    toValue: 0,
+                                    duration: 120,
+                                    easing: Easing.out(Easing.ease),
+                                    useNativeDriver: false,
+                                }),
+                            ]).start();
+                        };
+
+                        const handlePressOut = () => {
+                            // The selection animation will handle the final state
+                        };
+
+                        const getCardShadowAnim = () => {
+                            switch (option.key) {
+                                case 'regular': return regularCardShadowHeight;
+                                case 'high-protein': return highProteinCardShadowHeight;
+                                case 'vegetarian': return vegetarianCardShadowHeight;
+                                case 'vegan': return veganCardShadowHeight;
+                                case 'keto': return ketoCardShadowHeight;
+                                case 'halal': return halalCardShadowHeight;
+                                default: return regularCardShadowHeight;
+                            }
+                        };
+                        const cardShadowHeightAnim = getCardShadowAnim();
+
                         return (
-                            <TouchableOpacity
-                                key={option.key}
-                                onPress={() => updateData('dietPreference', option.key)}
-                                activeOpacity={1}
-                            >
+                            <View key={option.key} style={{ position: 'relative', width: 150, height: 154, marginBottom: 12 }}>
+                                {/* Shadow layer - harsh drop shadow */}
                                 <Animated.View
                                     style={[
-                                        styles.dietCard,
                                         {
-                                            transform: [{ translateY: animations.translateY }],
-                                            shadowColor: '#252525',
-                                            shadowOffset: {
-                                                width: 0,
-                                                height: animations.shadowHeight,
-                                            },
-                                            shadowOpacity: 1,
-                                            shadowRadius: 0,
-                                            elevation: animations.shadowHeight,
+                                            position: 'absolute',
+                                            width: 150,
+                                            height: 150,
+                                            backgroundColor: '#252525',
+                                            borderRadius: 12,
+                                            top: 4,
+                                            left: 0,
+                                            opacity: cardShadowHeightAnim.interpolate({
+                                                inputRange: [0, 4],
+                                                outputRange: [0, 1],
+                                            }),
+                                            zIndex: 0,
                                         },
                                     ]}
+                                    pointerEvents="none"
+                                />
+                                <TouchableOpacity
+                                    onPress={() => updateData('dietPreference', option.key)}
+                                    onPressIn={handlePressIn}
+                                    onPressOut={handlePressOut}
+                                    activeOpacity={1}
+                                    style={{ zIndex: 1 }}
                                 >
-                                    {/* Color overlay that fades in when selected */}
                                     <Animated.View
                                         style={[
-                                            StyleSheet.absoluteFill,
+                                            styles.dietCard,
                                             {
-                                                backgroundColor: option.color,
-                                                borderRadius: 12,
-                                                opacity: animations.colorOpacity,
+                                                transform: [{ translateY: animations.translateY }],
                                             },
                                         ]}
-                                        pointerEvents="none"
-                                    />
-                                    <Text style={styles.dietIcon}>{option.icon}</Text>
-                                    <Text style={[
-                                        styles.dietCardText,
-                                        isSelected && styles.dietCardTextSelected
-                                    ]}>
-                                        {option.label}
-                                    </Text>
-                                </Animated.View>
-                            </TouchableOpacity>
+                                    >
+                                        {/* Color overlay that fades in when selected */}
+                                        <Animated.View
+                                            style={[
+                                                StyleSheet.absoluteFill,
+                                                {
+                                                    backgroundColor: option.color,
+                                                    borderRadius: 12,
+                                                    opacity: animations.colorOpacity,
+                                                },
+                                            ]}
+                                            pointerEvents="none"
+                                        />
+                                        <Text style={styles.dietIcon}>{option.icon}</Text>
+                                        <Text style={[
+                                            styles.dietCardText,
+                                            isSelected && styles.dietCardTextSelected
+                                        ]}>
+                                            {option.label}
+                                        </Text>
+                                    </Animated.View>
+                                </TouchableOpacity>
+                            </View>
                         );
                     })}
                 </View>
@@ -2970,54 +3918,141 @@ export const OnboardingScreen: React.FC = () => {
             const isSelected = data.allergies.includes(allergy);
             const animations = getChipAnimations(allergy);
 
+            const handlePressIn = () => {
+                let chipShadowHeight: Animated.Value;
+                let chipTranslateY: Animated.Value;
+
+                switch (allergy) {
+                    case 'nuts':
+                        chipShadowHeight = nutsChipShadowHeight;
+                        chipTranslateY = nutsChipTranslateY;
+                        break;
+                    case 'lactose':
+                        chipShadowHeight = lactoseChipShadowHeight;
+                        chipTranslateY = lactoseChipTranslateY;
+                        break;
+                    case 'gluten':
+                        chipShadowHeight = glutenChipShadowHeight;
+                        chipTranslateY = glutenChipTranslateY;
+                        break;
+                    case 'shellfish':
+                        chipShadowHeight = shellfishChipShadowHeight;
+                        chipTranslateY = shellfishChipTranslateY;
+                        break;
+                    case 'eggs':
+                        chipShadowHeight = eggsChipShadowHeight;
+                        chipTranslateY = eggsChipTranslateY;
+                        break;
+                    case 'soy':
+                        chipShadowHeight = soyChipShadowHeight;
+                        chipTranslateY = soyChipTranslateY;
+                        break;
+                    case 'fish':
+                        chipShadowHeight = fishChipShadowHeight;
+                        chipTranslateY = fishChipTranslateY;
+                        break;
+                    default:
+                        return;
+                }
+
+                Animated.parallel([
+                    Animated.timing(chipTranslateY, {
+                        toValue: 4,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(chipShadowHeight, {
+                        toValue: 0,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                ]).start();
+            };
+
+            const handlePressOut = () => {
+                // The selection animation will handle the final state
+            };
+
+            const getChipShadowAnim = () => {
+                switch (allergy) {
+                    case 'nuts': return nutsChipShadowHeight;
+                    case 'lactose': return lactoseChipShadowHeight;
+                    case 'gluten': return glutenChipShadowHeight;
+                    case 'shellfish': return shellfishChipShadowHeight;
+                    case 'eggs': return eggsChipShadowHeight;
+                    case 'soy': return soyChipShadowHeight;
+                    case 'fish': return fishChipShadowHeight;
+                    default: return nutsChipShadowHeight;
+                }
+            };
+            const chipShadowHeightAnim = getChipShadowAnim();
+
             return (
-                <TouchableOpacity
-                    key={allergy}
-                    onPress={() => {
-                        if (isSelected) {
-                            updateData('allergies', data.allergies.filter(a => a !== allergy));
-                        } else {
-                            updateData('allergies', [...data.allergies, allergy]);
-                        }
-                    }}
-                    activeOpacity={1}
-                >
+                <View key={allergy} style={{ position: 'relative', marginBottom: 4, paddingBottom: 4 }}>
+                    {/* Shadow layer - harsh drop shadow */}
                     <Animated.View
                         style={[
                             styles.chip,
                             {
-                                transform: [{ translateY: animations.translateY }],
-                                shadowColor: '#252525',
-                                shadowOffset: {
-                                    width: 0,
-                                    height: animations.shadowHeight,
-                                },
-                                shadowOpacity: 1,
-                                shadowRadius: 0,
-                                elevation: animations.shadowHeight,
+                                position: 'absolute',
+                                backgroundColor: '#252525',
+                                top: 4,
+                                left: 0,
+                                right: 0,
+                                opacity: chipShadowHeightAnim.interpolate({
+                                    inputRange: [0, 4],
+                                    outputRange: [0, 1],
+                                }),
+                                zIndex: 0,
+                                borderWidth: 0,
                             },
                         ]}
+                        pointerEvents="none"
+                    />
+                    <TouchableOpacity
+                        onPress={() => {
+                            if (isSelected) {
+                                updateData('allergies', data.allergies.filter(a => a !== allergy));
+                            } else {
+                                updateData('allergies', [...data.allergies, allergy]);
+                            }
+                        }}
+                        onPressIn={handlePressIn}
+                        onPressOut={handlePressOut}
+                        activeOpacity={1}
+                        style={{ zIndex: 1 }}
                     >
-                        {/* Color overlay that fades in when selected */}
                         <Animated.View
                             style={[
-                                StyleSheet.absoluteFill,
+                                styles.chip,
                                 {
-                                    backgroundColor: '#526EFF',
-                                    borderRadius: 12,
-                                    opacity: animations.colorOpacity,
+                                    transform: [{ translateY: animations.translateY }],
                                 },
                             ]}
-                            pointerEvents="none"
-                        />
-                        <Text style={[
-                            styles.chipText,
-                            isSelected && styles.chipTextSelected
-                        ]}>
-                            {allergy}
-                        </Text>
-                    </Animated.View>
-                </TouchableOpacity>
+                        >
+                            {/* Color overlay that fades in when selected */}
+                            <Animated.View
+                                style={[
+                                    StyleSheet.absoluteFill,
+                                    {
+                                        backgroundColor: '#526EFF',
+                                        borderRadius: 12,
+                                        opacity: animations.colorOpacity,
+                                    },
+                                ]}
+                                pointerEvents="none"
+                            />
+                            <Text style={[
+                                styles.chipText,
+                                isSelected && styles.chipTextSelected
+                            ]}>
+                                {allergy}
+                            </Text>
+                        </Animated.View>
+                    </TouchableOpacity>
+                </View>
             );
         };
 
@@ -3080,150 +4115,202 @@ export const OnboardingScreen: React.FC = () => {
                         const animations = getCardAnimations(option.key);
                         const isSelected = data.goalIntensity === option.key;
 
+                        const handlePressIn = () => {
+                            let cardShadowHeight: Animated.Value;
+                            let cardTranslateY: Animated.Value;
+
+                            switch (option.key) {
+                                case 'mild':
+                                    cardShadowHeight = mildIntensityCardShadowHeight;
+                                    cardTranslateY = mildIntensityCardTranslateY;
+                                    break;
+                                case 'moderate':
+                                    cardShadowHeight = moderateIntensityCardShadowHeight;
+                                    cardTranslateY = moderateIntensityCardTranslateY;
+                                    break;
+                                case 'aggressive':
+                                    cardShadowHeight = aggressiveIntensityCardShadowHeight;
+                                    cardTranslateY = aggressiveIntensityCardTranslateY;
+                                    break;
+                                default:
+                                    return;
+                            }
+
+                            Animated.parallel([
+                                Animated.timing(cardTranslateY, {
+                                    toValue: 4,
+                                    duration: 120,
+                                    easing: Easing.out(Easing.ease),
+                                    useNativeDriver: true,
+                                }),
+                                Animated.timing(cardShadowHeight, {
+                                    toValue: 0,
+                                    duration: 120,
+                                    easing: Easing.out(Easing.ease),
+                                    useNativeDriver: false,
+                                }),
+                            ]).start();
+                        };
+
+                        const handlePressOut = () => {
+                            // The selection animation will handle the final state
+                        };
+
+                        const getCardShadowAnim = () => {
+                            switch (option.key) {
+                                case 'mild': return mildIntensityCardShadowHeight;
+                                case 'moderate': return moderateIntensityCardShadowHeight;
+                                case 'aggressive': return aggressiveIntensityCardShadowHeight;
+                                default: return mildIntensityCardShadowHeight;
+                            }
+                        };
+                        const cardShadowHeightAnim = getCardShadowAnim();
+
                         return (
-                            <TouchableOpacity
-                                key={option.key}
-                                onPress={() => updateData('goalIntensity', option.key)}
-                                activeOpacity={1}
-                            >
+                            <View key={option.key} style={{ position: 'relative', marginBottom: 22 }}>
+                                {/* Shadow layer - harsh drop shadow */}
                                 <Animated.View
                                     style={[
                                         styles.activityCard,
                                         {
-                                            transform: [{ translateY: animations.translateY }],
-                                            shadowColor: '#252525',
-                                            shadowOffset: {
-                                                width: 0,
-                                                height: animations.shadowHeight,
-                                            },
-                                            shadowOpacity: 1,
-                                            shadowRadius: 0,
-                                            elevation: animations.shadowHeight,
+                                            position: 'absolute',
+                                            backgroundColor: '#252525',
+                                            top: 4,
+                                            left: 0,
+                                            right: 0,
+                                            opacity: cardShadowHeightAnim.interpolate({
+                                                inputRange: [0, 4],
+                                                outputRange: [0, 1],
+                                            }),
+                                            zIndex: 0,
+                                            borderWidth: 0,
+                                            marginBottom: 0,
                                         },
                                     ]}
+                                    pointerEvents="none"
+                                />
+                                <TouchableOpacity
+                                    onPress={() => updateData('goalIntensity', option.key)}
+                                    onPressIn={handlePressIn}
+                                    onPressOut={handlePressOut}
+                                    activeOpacity={1}
+                                    style={{ zIndex: 1 }}
                                 >
-                                    {/* Color overlay that fades in when selected */}
                                     <Animated.View
                                         style={[
-                                            StyleSheet.absoluteFill,
+                                            styles.activityCard,
                                             {
-                                                backgroundColor: option.color,
-                                                borderRadius: 12,
-                                                opacity: animations.colorOpacity,
+                                                transform: [{ translateY: animations.translateY }],
                                             },
                                         ]}
-                                        pointerEvents="none"
-                                    />
-                                    <Text style={[
-                                        styles.activityCardTitle,
-                                        isSelected && styles.activityCardTitleSelected
-                                    ]}>
-                                        {option.label}
-                                    </Text>
-                                    <Text style={[
-                                        styles.activityCardDesc,
-                                        isSelected && styles.activityCardDescSelected
-                                    ]}>
-                                        {option.desc}
-                                    </Text>
-                                </Animated.View>
-                            </TouchableOpacity>
+                                    >
+                                        {/* Color overlay that fades in when selected */}
+                                        <Animated.View
+                                            style={[
+                                                StyleSheet.absoluteFill,
+                                                {
+                                                    backgroundColor: option.color,
+                                                    borderRadius: 12,
+                                                    opacity: animations.colorOpacity,
+                                                },
+                                            ]}
+                                            pointerEvents="none"
+                                        />
+                                        <Text style={[
+                                            styles.activityCardTitle,
+                                            isSelected && styles.activityCardTitleSelected
+                                        ]}>
+                                            {option.label}
+                                        </Text>
+                                        <Text style={[
+                                            styles.activityCardDesc,
+                                            isSelected && styles.activityCardDescSelected
+                                        ]}>
+                                            {option.desc}
+                                        </Text>
+                                    </Animated.View>
+                                </TouchableOpacity>
+                            </View>
                         );
                     })}
+                </View>
+            </View >
+        );
+    };
+
+    const renderUnitPreferencesStep = () => {
+        const isMetric = data.unitPreference.weight === 'kg' && data.unitPreference.height === 'cm';
+
+        const handleMetricPress = () => {
+            updateData('unitPreference', { weight: 'kg', height: 'cm' });
+        };
+
+        const handleImperialPress = () => {
+            updateData('unitPreference', { weight: 'lbs', height: 'ft' });
+        };
+
+        return (
+            <View style={styles.stepContent}>
+                <Text style={styles.stepTitle}>unit preferences?</Text>
+                <View style={{ position: 'relative', marginBottom: 24, marginTop: 20, alignItems: 'center' }}>
+                    {/* Shadow layer - harsh drop shadow */}
+                    <Animated.View
+                        style={[
+                            styles.unitToggle,
+                            {
+                                position: 'absolute',
+                                backgroundColor: '#252525',
+                                top: 4,
+                                left: 0,
+                                opacity: 1,
+                                zIndex: 0,
+                                borderWidth: 0,
+                                marginBottom: 0,
+                            },
+                        ]}
+                        pointerEvents="none"
+                    />
+                    <View style={[styles.unitToggle, { zIndex: 1 }]}>
+                        <Animated.View
+                            style={[
+                                styles.unitToggleBackground,
+                                {
+                                    transform: [{
+                                        translateX: unitPreferenceToggleSlide.interpolate({
+                                            inputRange: [0, 1],
+                                            outputRange: [0, 176], // Button width for translation
+                                        }),
+                                    }],
+                                },
+                            ]}
+                        />
+                        <TouchableOpacity
+                            style={styles.unitButton}
+                            onPress={handleMetricPress}
+                        >
+                            <Text style={[
+                                styles.unitButtonText,
+                                isMetric && styles.unitButtonTextActive
+                            ]}>
+                                cm/kg
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.unitButton}
+                            onPress={handleImperialPress}
+                        >
+                            <Text style={[
+                                styles.unitButtonText,
+                                !isMetric && styles.unitButtonTextActive
+                            ]}>
+                                ft/lbs
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </View>
         );
     };
-
-    const renderUnitPreferencesStep = () => (
-        <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>unit preferences?</Text>
-            <View style={styles.unitSection}>
-                <Text style={styles.unitSectionTitle}>weight</Text>
-                <View style={styles.unitToggle}>
-                    <Animated.View
-                        style={[
-                            styles.unitToggleBackground,
-                            {
-                                left: unitPreferenceWeightToggleSlide.interpolate({
-                                    inputRange: [0, 1],
-                                    outputRange: [4, 180], // 4px from left when kg, 180px when lbs
-                                }),
-                                right: unitPreferenceWeightToggleSlide.interpolate({
-                                    inputRange: [0, 1],
-                                    outputRange: [180, 4], // 180px from right when kg, 4px from right when lbs
-                                }),
-                            },
-                        ]}
-                    />
-                    <TouchableOpacity
-                        style={styles.unitButton}
-                        onPress={() => updateData('unitPreference', { ...data.unitPreference, weight: 'kg' })}
-                    >
-                        <Text style={[
-                            styles.unitButtonText,
-                            data.unitPreference.weight === 'kg' && styles.unitButtonTextActive
-                        ]}>
-                            kg
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={styles.unitButton}
-                        onPress={() => updateData('unitPreference', { ...data.unitPreference, weight: 'lbs' })}
-                    >
-                        <Text style={[
-                            styles.unitButtonText,
-                            data.unitPreference.weight === 'lbs' && styles.unitButtonTextActive
-                        ]}>
-                            lbs
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
-            <View style={styles.unitSection}>
-                <Text style={styles.unitSectionTitle}>height</Text>
-                <View style={styles.unitToggle}>
-                    <Animated.View
-                        style={[
-                            styles.unitToggleBackground,
-                            {
-                                left: unitPreferenceHeightToggleSlide.interpolate({
-                                    inputRange: [0, 1],
-                                    outputRange: [4, 180], // 4px from left when cm, 180px when ft
-                                }),
-                                right: unitPreferenceHeightToggleSlide.interpolate({
-                                    inputRange: [0, 1],
-                                    outputRange: [180, 4], // 180px from right when cm, 4px from right when ft
-                                }),
-                            },
-                        ]}
-                    />
-                    <TouchableOpacity
-                        style={styles.unitButton}
-                        onPress={() => updateData('unitPreference', { ...data.unitPreference, height: 'cm' })}
-                    >
-                        <Text style={[
-                            styles.unitButtonText,
-                            data.unitPreference.height === 'cm' && styles.unitButtonTextActive
-                        ]}>
-                            cm
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={styles.unitButton}
-                        onPress={() => updateData('unitPreference', { ...data.unitPreference, height: 'ft' })}
-                    >
-                        <Text style={[
-                            styles.unitButtonText,
-                            data.unitPreference.height === 'ft' && styles.unitButtonTextActive
-                        ]}>
-                            ft
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
-        </View>
-    );
 
     const renderPurposeStep = () => {
         const purposeOptions = [
@@ -3275,49 +4362,122 @@ export const OnboardingScreen: React.FC = () => {
             const animations = getCardAnimations(option.key);
             const isSelected = data.purpose === option.key;
 
+            const handlePressIn = () => {
+                let cardShadowHeight: Animated.Value;
+                let cardTranslateY: Animated.Value;
+
+                switch (option.key) {
+                    case 'meals':
+                        cardShadowHeight = mealsPurposeCardShadowHeight;
+                        cardTranslateY = mealsPurposeCardTranslateY;
+                        break;
+                    case 'workouts':
+                        cardShadowHeight = workoutsPurposeCardShadowHeight;
+                        cardTranslateY = workoutsPurposeCardTranslateY;
+                        break;
+                    case 'both':
+                        cardShadowHeight = bothPurposeCardShadowHeight;
+                        cardTranslateY = bothPurposeCardTranslateY;
+                        break;
+                    case 'discipline':
+                        cardShadowHeight = disciplinePurposeCardShadowHeight;
+                        cardTranslateY = disciplinePurposeCardTranslateY;
+                        break;
+                    default:
+                        return;
+                }
+
+                Animated.parallel([
+                    Animated.timing(cardTranslateY, {
+                        toValue: 4,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(cardShadowHeight, {
+                        toValue: 0,
+                        duration: 120,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                ]).start();
+            };
+
+            const handlePressOut = () => {
+                // The selection animation will handle the final state
+            };
+
+            const getCardShadowAnim = () => {
+                switch (option.key) {
+                    case 'meals': return mealsPurposeCardShadowHeight;
+                    case 'workouts': return workoutsPurposeCardShadowHeight;
+                    case 'both': return bothPurposeCardShadowHeight;
+                    case 'discipline': return disciplinePurposeCardShadowHeight;
+                    default: return mealsPurposeCardShadowHeight;
+                }
+            };
+            const cardShadowHeightAnim = getCardShadowAnim();
+
             return (
-                <TouchableOpacity
-                    key={option.key}
-                    onPress={() => updateData('purpose', option.key)}
-                    activeOpacity={1}
-                >
+                <View key={option.key} style={{ position: 'relative' }}>
+                    {/* Shadow layer - harsh drop shadow */}
                     <Animated.View
                         style={[
                             styles.goalCard,
                             {
-                                transform: [{ translateY: animations.translateY }],
-                                shadowColor: '#252525',
-                                shadowOffset: {
-                                    width: 0,
-                                    height: animations.shadowHeight,
-                                },
-                                shadowOpacity: 1,
-                                shadowRadius: 0,
-                                elevation: animations.shadowHeight,
+                                position: 'absolute',
+                                backgroundColor: '#252525',
+                                top: 4,
+                                left: 0,
+                                right: 0,
+                                transform: [{ translateY: 0 }],
+                                opacity: cardShadowHeightAnim.interpolate({
+                                    inputRange: [0, 4],
+                                    outputRange: [0, 1],
+                                }),
+                                zIndex: 0,
+                                borderWidth: 0,
                             },
                         ]}
+                        pointerEvents="none"
+                    />
+                    <TouchableOpacity
+                        onPress={() => updateData('purpose', option.key)}
+                        onPressIn={handlePressIn}
+                        onPressOut={handlePressOut}
+                        activeOpacity={1}
+                        style={{ zIndex: 1 }}
                     >
-                        {/* Color overlay that fades in when selected */}
                         <Animated.View
                             style={[
-                                StyleSheet.absoluteFill,
+                                styles.goalCard,
                                 {
-                                    backgroundColor: option.color,
-                                    borderRadius: 12,
-                                    opacity: animations.colorOpacity,
+                                    transform: [{ translateY: animations.translateY }],
                                 },
                             ]}
-                            pointerEvents="none"
-                        />
-                        <Text style={styles.goalIcon}>{option.icon}</Text>
-                        <Text style={[
-                            styles.goalCardText,
-                            isSelected && styles.goalCardTextSelected
-                        ]}>
-                            {option.label}
-                        </Text>
-                    </Animated.View>
-                </TouchableOpacity>
+                        >
+                            {/* Color overlay that fades in when selected */}
+                            <Animated.View
+                                style={[
+                                    StyleSheet.absoluteFill,
+                                    {
+                                        backgroundColor: option.color,
+                                        borderRadius: 12,
+                                        opacity: animations.colorOpacity,
+                                    },
+                                ]}
+                                pointerEvents="none"
+                            />
+                            <Text style={styles.goalIcon}>{option.icon}</Text>
+                            <Text style={[
+                                styles.goalCardText,
+                                isSelected && styles.goalCardTextSelected
+                            ]}>
+                                {option.label}
+                            </Text>
+                        </Animated.View>
+                    </TouchableOpacity>
+                </View>
             );
         };
 
@@ -3326,10 +4486,10 @@ export const OnboardingScreen: React.FC = () => {
                 <Text style={styles.stepTitle}>what's your purpose?</Text>
                 <View style={styles.goalContainer}>
                     <View style={styles.goalRow}>
-                        {firstRow.map(renderCard)}
+                        {firstRow.map((option) => renderCard(option))}
                     </View>
                     <View style={styles.goalRow}>
-                        {secondRow.map(renderCard)}
+                        {secondRow.map((option) => renderCard(option))}
                     </View>
                 </View>
             </View>
@@ -3380,54 +4540,110 @@ export const OnboardingScreen: React.FC = () => {
                         const animations = getCardAnimations(option.key);
                         const isSelected = data.macrosSetup === option.key;
 
+                        const handlePressIn = () => {
+                            let cardShadowHeight: Animated.Value;
+                            let cardTranslateY: Animated.Value;
+
+                            switch (option.key) {
+                                case 'auto':
+                                    cardShadowHeight = autoMacroCardShadowHeight;
+                                    cardTranslateY = autoMacroCardTranslateY;
+                                    break;
+                                case 'manual':
+                                    cardShadowHeight = manualMacroCardShadowHeight;
+                                    cardTranslateY = manualMacroCardTranslateY;
+                                    break;
+                                default:
+                                    return;
+                            }
+
+                            Animated.parallel([
+                                Animated.timing(cardTranslateY, {
+                                    toValue: 4,
+                                    duration: 120,
+                                    easing: Easing.out(Easing.ease),
+                                    useNativeDriver: true,
+                                }),
+                                Animated.timing(cardShadowHeight, {
+                                    toValue: 0,
+                                    duration: 120,
+                                    easing: Easing.out(Easing.ease),
+                                    useNativeDriver: false,
+                                }),
+                            ]).start();
+                        };
+
+                        const handlePressOut = () => {
+                            // The selection animation will handle the final state
+                        };
+
+                        const cardShadowHeightAnim = option.key === 'auto' ? autoMacroCardShadowHeight : manualMacroCardShadowHeight;
+
                         return (
-                            <TouchableOpacity
-                                key={option.key}
-                                onPress={() => updateData('macrosSetup', option.key)}
-                                activeOpacity={1}
-                            >
+                            <View key={option.key} style={{ position: 'relative', marginBottom: 22 }}>
+                                {/* Shadow layer - harsh drop shadow */}
                                 <Animated.View
                                     style={[
                                         styles.activityCard,
                                         {
-                                            transform: [{ translateY: animations.translateY }],
-                                            shadowColor: isSelected ? 'transparent' : '#252525',
-                                            shadowOffset: {
-                                                width: 0,
-                                                height: animations.shadowHeight,
-                                            },
-                                            shadowOpacity: isSelected ? 0 : 1,
-                                            shadowRadius: 0,
-                                            elevation: isSelected ? 0 : animations.shadowHeight,
+                                            position: 'absolute',
+                                            backgroundColor: '#252525',
+                                            top: 4,
+                                            left: 0,
+                                            right: 0,
+                                            opacity: cardShadowHeightAnim.interpolate({
+                                                inputRange: [0, 4],
+                                                outputRange: [0, 1],
+                                            }),
+                                            zIndex: 0,
+                                            borderWidth: 0,
+                                            marginBottom: 0,
                                         },
                                     ]}
+                                    pointerEvents="none"
+                                />
+                                <TouchableOpacity
+                                    onPress={() => updateData('macrosSetup', option.key)}
+                                    onPressIn={handlePressIn}
+                                    onPressOut={handlePressOut}
+                                    activeOpacity={1}
+                                    style={{ zIndex: 1 }}
                                 >
-                                    {/* Color overlay that fades in when selected */}
                                     <Animated.View
                                         style={[
-                                            StyleSheet.absoluteFill,
+                                            styles.activityCard,
                                             {
-                                                backgroundColor: option.color,
-                                                borderRadius: 12,
-                                                opacity: animations.colorOpacity,
+                                                transform: [{ translateY: animations.translateY }],
                                             },
                                         ]}
-                                        pointerEvents="none"
-                                    />
-                                    <Text style={[
-                                        styles.activityCardTitle,
-                                        isSelected && styles.activityCardTitleSelected
-                                    ]}>
-                                        {option.label}
-                                    </Text>
-                                    <Text style={[
-                                        styles.activityCardDesc,
-                                        isSelected && styles.activityCardDescSelected
-                                    ]}>
-                                        {option.desc}
-                                    </Text>
-                                </Animated.View>
-                            </TouchableOpacity>
+                                    >
+                                        {/* Color overlay that fades in when selected */}
+                                        <Animated.View
+                                            style={[
+                                                StyleSheet.absoluteFill,
+                                                {
+                                                    backgroundColor: option.color,
+                                                    borderRadius: 12,
+                                                    opacity: animations.colorOpacity,
+                                                },
+                                            ]}
+                                            pointerEvents="none"
+                                        />
+                                        <Text style={[
+                                            styles.activityCardTitle,
+                                            isSelected && styles.activityCardTitleSelected
+                                        ]}>
+                                            {option.label}
+                                        </Text>
+                                        <Text style={[
+                                            styles.activityCardDesc,
+                                            isSelected && styles.activityCardDescSelected
+                                        ]}>
+                                            {option.desc}
+                                        </Text>
+                                    </Animated.View>
+                                </TouchableOpacity>
+                            </View>
                         );
                     })}
                 </View>
@@ -3535,23 +4751,24 @@ export const OnboardingScreen: React.FC = () => {
                         <Text style={styles.backButtonText}>back</Text>
                     </TouchableOpacity>
                 )}
-                <ScrollView
+                <View
                     style={styles.scrollView}
-                    contentContainerStyle={styles.scrollContent}
-                    showsVerticalScrollIndicator={false}
                 >
                     <Animated.View
-                        style={{
-                            opacity: contentFade,
-                            transform: [
-                                { translateY: contentSlide },
-                                { scale: contentScale },
-                            ],
-                        }}
+                        style={[
+                            styles.scrollContent,
+                            {
+                                opacity: contentFade,
+                                transform: [
+                                    { translateY: contentSlide },
+                                    { scale: contentScale },
+                                ],
+                            },
+                        ]}
                     >
                         {renderStepContent()}
                     </Animated.View>
-                </ScrollView>
+                </View>
                 <View style={styles.buttonContainer}>
                     {currentStep > 1 && renderWeightPlates()}
                     <Button

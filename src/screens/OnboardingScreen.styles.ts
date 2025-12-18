@@ -95,14 +95,14 @@ export const styles = StyleSheet.create({
     scrollView: {
         flex: 1,
         width: '100%',
+        overflow: 'hidden',
     },
     scrollContent: {
-        flexGrow: 1,
+        flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
         paddingBottom: 20,
         paddingTop: 60, // Space for back button
-        minHeight: '100%',
     },
     stepContent: {
         width: '100%',
@@ -258,30 +258,42 @@ export const styles = StyleSheet.create({
         justifyContent: 'space-between',
         width: 360,
         alignSelf: 'center',
-        marginTop: 20,
+        marginTop: 12, // Reduced to bring closer to unit toggle
     },
     dateDropdown: {
-        flex: 1,
+        flex: 1.3,
         backgroundColor: '#fff',
         borderWidth: 2,
         borderColor: '#252525',
         borderRadius: 10,
-        padding: 15,
+        padding: 12,
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: 50,
+        minHeight: 44,
         flexDirection: 'row',
     },
     dateDropdownDay: {
-        flex: 0.5,
+        flex: 0.8,
         backgroundColor: '#fff',
         borderWidth: 2,
         borderColor: '#252525',
         borderRadius: 10,
-        padding: 15,
+        padding: 12,
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: 50,
+        minHeight: 44,
+        flexDirection: 'row',
+    },
+    dateDropdownYear: {
+        flex: 0.9,
+        backgroundColor: '#fff',
+        borderWidth: 2,
+        borderColor: '#252525',
+        borderRadius: 10,
+        padding: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 44,
         flexDirection: 'row',
     },
     dateDropdownText: {
@@ -291,6 +303,7 @@ export const styles = StyleSheet.create({
         textTransform: 'lowercase',
         flex: 1,
         textAlign: 'center',
+        flexShrink: 1,
     },
     dateDropdownTextPlaceholder: {
         color: '#999',
@@ -477,9 +490,10 @@ export const styles = StyleSheet.create({
     },
     goalRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        justifyContent: 'center',
         marginBottom: 12,
-        gap: 12,
+        gap: 20,
+        overflow: 'visible',
     },
     goalRowSingle: {
         flexDirection: 'row',
@@ -487,8 +501,8 @@ export const styles = StyleSheet.create({
         marginBottom: 12,
     },
     goalCard: {
-        width: 174, // (360 - 12) / 2 = 174 for two cards with gap
-        height: 174, // Square
+        width: 150, // Made smaller
+        height: 150, // Made smaller
         backgroundColor: '#fff',
         borderWidth: 2,
         borderColor: '#252525',
@@ -496,15 +510,7 @@ export const styles = StyleSheet.create({
         padding: 16,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#252525',
-        shadowOffset: {
-            width: 0,
-            height: 4,
-        },
-        shadowOpacity: 1,
-        shadowRadius: 0,
-        elevation: 4,
-        overflow: 'hidden',
+        // Shadow is handled by separate shadow layer, not here
     },
     goalCardSelected: {
         backgroundColor: '#526EFF',
@@ -530,6 +536,8 @@ export const styles = StyleSheet.create({
         width: 360,
         alignSelf: 'center',
         marginTop: 20,
+        paddingBottom: 4, // Prevent shadow clipping
+        overflow: 'visible', // Allow shadow to be visible
     },
     activityCard: {
         width: '100%',
@@ -539,15 +547,7 @@ export const styles = StyleSheet.create({
         borderRadius: 12,
         padding: 20,
         marginBottom: 18,
-        shadowColor: '#252525',
-        shadowOffset: {
-            width: 0,
-            height: 4,
-        },
-        shadowOpacity: 1,
-        shadowRadius: 0,
-        elevation: 4,
-        overflow: 'hidden',
+        // Shadow is handled by separate shadow layer, not here
     },
     activityCardSelected: {
         backgroundColor: '#526EFF',
@@ -605,12 +605,12 @@ export const styles = StyleSheet.create({
         marginTop: 20,
         flexDirection: 'row',
         flexWrap: 'wrap',
-        justifyContent: 'space-between',
-        gap: 12,
+        justifyContent: 'center',
+        gap: 20,
     },
     dietCard: {
-        width: 174, // (360 - 24) / 2 = 168, but using 174 to match goal cards
-        height: 174, // Square
+        width: 150, // Made smaller to match goal cards
+        height: 150, // Made smaller to match goal cards
         backgroundColor: '#fff',
         borderWidth: 2,
         borderColor: '#252525',
@@ -619,15 +619,7 @@ export const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 12,
-        shadowColor: '#252525',
-        shadowOffset: {
-            width: 0,
-            height: 4,
-        },
-        shadowOpacity: 1,
-        shadowRadius: 0,
-        elevation: 4,
-        overflow: 'hidden',
+        // Shadow is handled by separate shadow layer, not here
     },
     dietCardSelected: {
         backgroundColor: '#526EFF',
@@ -672,7 +664,7 @@ export const styles = StyleSheet.create({
         borderRadius: 12,
         paddingHorizontal: 20,
         paddingVertical: 12,
-        overflow: 'hidden',
+        // overflow removed to allow shadow to be visible
     },
     chipSelected: {
         backgroundColor: '#526EFF',
@@ -728,22 +720,25 @@ export const styles = StyleSheet.create({
         borderWidth: 2,
         borderColor: '#252525',
         padding: 4,
-        marginBottom: 20,
+        marginBottom: 12, // Reduced spacing to bring dropdown closer
         position: 'relative',
-        overflow: 'hidden',
+        overflow: 'hidden', // Changed to hidden to keep background within boundaries
     },
     unitToggleBackground: {
         position: 'absolute',
         top: 4,
         bottom: 4,
+        left: 4,
+        width: 172, // 176px button width - 4px (2px border on each side) to maintain spacing
         backgroundColor: '#526EFF',
         borderRadius: 8,
         borderWidth: 2,
         borderColor: '#252525',
     },
     unitButton: {
-        flex: 1,
+        width: 176, // Explicit width to ensure both buttons are exactly equal: (360 - 8) / 2 = 176px
         paddingVertical: 12,
+        paddingHorizontal: 0,
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: 8,
@@ -907,6 +902,177 @@ export const styles = StyleSheet.create({
         width: '100%',
         height: 50,
         marginTop: 15,
+    },
+    // Measurement display styles
+    measurementDisplayContainer: {
+        width: 360,
+        alignSelf: 'center',
+        alignItems: 'center',
+        marginBottom: 30,
+    },
+    measurementIcon: {
+        fontSize: 64,
+        marginBottom: 20,
+    },
+    measurementValueContainer: {
+        backgroundColor: '#F5F5F5',
+        borderRadius: 20,
+        borderWidth: 2,
+        borderColor: '#252525',
+        paddingVertical: 24,
+        paddingHorizontal: 40,
+        marginBottom: 24,
+        minWidth: 200,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    measurementValue: {
+        fontSize: 48,
+        fontFamily: fonts.bold,
+        color: '#252525',
+        textTransform: 'lowercase',
+    },
+    measurementControls: {
+        flexDirection: 'row',
+        gap: 20,
+        width: '100%',
+        justifyContent: 'center',
+    },
+    measurementButton: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: '#fff',
+        borderWidth: 2,
+        borderColor: '#252525',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'visible',
+    },
+    measurementButtonInner: {
+        width: '100%',
+        height: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    // Height visual styles
+    heightVisualContainer: {
+        width: 360,
+        alignSelf: 'center',
+        alignItems: 'center',
+        marginBottom: 30,
+    },
+    heightRulerContainer: {
+        width: '100%',
+        height: 200,
+        marginBottom: 30,
+        position: 'relative',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    heightRulerTrack: {
+        width: '100%',
+        height: 8,
+        backgroundColor: '#F5F5F5',
+        borderRadius: 4,
+        borderWidth: 2,
+        borderColor: '#252525',
+        position: 'relative',
+        marginTop: 100,
+    },
+    heightRulerMark: {
+        position: 'absolute',
+        width: 2,
+        backgroundColor: '#252525',
+        top: -4,
+        transform: [{ translateX: -1 }],
+    },
+    heightIndicator: {
+        position: 'absolute',
+        top: -20,
+        alignItems: 'center',
+    },
+    heightIndicatorDot: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: '#526EFF',
+        borderWidth: 3,
+        borderColor: '#252525',
+        marginBottom: 4,
+    },
+    heightIndicatorLine: {
+        width: 3,
+        height: 20,
+        backgroundColor: '#526EFF',
+        borderRadius: 2,
+    },
+    heightPersonIcon: {
+        position: 'absolute',
+        top: -80,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    heightPersonEmoji: {
+        fontSize: 80,
+    },
+    // Weight visual styles
+    weightVisualContainer: {
+        width: 360,
+        alignSelf: 'center',
+        alignItems: 'center',
+        marginBottom: 30,
+    },
+    weightScaleContainer: {
+        width: '100%',
+        height: 200,
+        marginBottom: 30,
+        position: 'relative',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+    },
+    weightScaleBase: {
+        position: 'absolute',
+        bottom: 0,
+        width: 200,
+        height: 120,
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+    },
+    weightScalePlatform: {
+        width: 120,
+        height: 8,
+        backgroundColor: '#252525',
+        borderRadius: 4,
+        marginBottom: 8,
+    },
+    weightScaleStand: {
+        width: 4,
+        height: 100,
+        backgroundColor: '#252525',
+        borderRadius: 2,
+    },
+    weightBarsContainer: {
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        justifyContent: 'center',
+        height: 150,
+        gap: 8,
+        marginBottom: 20,
+    },
+    weightBar: {
+        width: 24,
+        backgroundColor: '#F5F5F5',
+        borderWidth: 2,
+        borderColor: '#252525',
+        borderRadius: 4,
+        minHeight: 10,
+    },
+    weightScaleIcon: {
+        fontSize: 64,
+        position: 'absolute',
+        bottom: 20,
     },
 });
 
