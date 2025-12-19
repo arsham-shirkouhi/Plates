@@ -10,7 +10,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({ children }) => {
     const insets = useSafeAreaInsets();
 
     return (
-        <View style={[styles.container, { bottom: 25 + insets.bottom }]}>
+        <View style={[styles.container, { bottom: 25 }]}>
             {children}
         </View>
     );

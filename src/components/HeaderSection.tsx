@@ -47,7 +47,7 @@ export const HeaderSection: React.FC<HeaderSectionProps> = ({ streak, topInset =
     };
 
     return (
-        <View style={[styles.container, { paddingTop: topInset + 20 }]}>
+        <View style={[styles.container, { paddingTop: 12 }]}>
             {/* Streak and date row */}
             <View style={styles.topRow}>
                 <View style={styles.streakSection}>
@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
     container: {
         position: 'relative',
         // paddingHorizontal: 25,
-        paddingTop: 20,
+        paddingTop: 0,
         paddingBottom: 20,
         zIndex: 1,
         marginTop: -250,
@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
         fontFamily: fonts.regular,
         color: '#fff',
         textTransform: 'lowercase',
-        marginBottom: 2,
+        marginBottom: -4,
     },
     streakNumber: {
         fontFamily: fonts.bold,
@@ -132,12 +132,12 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         position: 'relative',
-        width: 81, // Main circle (61px) + blue circle extends to 81px
+        width: 80, // Main circle (60px) + blue circle extends to 80px
     },
     profileCircle: {
-        width: 61,
-        height: 61,
-        borderRadius: 30.5,
+        width: 60,
+        height: 60,
+        borderRadius: 30,
         backgroundColor: '#fff',
         borderWidth: 3,
         borderColor: '#252525',
@@ -148,14 +148,14 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
     },
     profileImage: {
-        width: 61,
-        height: 61,
-        borderRadius: 30.5,
+        width: 60,
+        height: 60,
+        borderRadius: 30,
     },
     profileCircleGreen: {
-        width: 61,
-        height: 61,
-        borderRadius: 30.5,
+        width: 60,
+        height: 60,
+        borderRadius: 30,
         backgroundColor: '#26F170',
         borderWidth: 3,
         borderColor: '#252525',
@@ -163,9 +163,9 @@ const styles = StyleSheet.create({
         zIndex: 2,
     },
     profileCircleBlue: {
-        width: 61,
-        height: 61,
-        borderRadius: 30.5,
+        width: 60,
+        height: 60,
+        borderRadius: 30,
         backgroundColor: '#4463F7',
         borderWidth: 3,
         borderColor: '#252525',

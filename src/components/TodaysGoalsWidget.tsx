@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, Easing, TextInput, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { fonts } from '../constants/fonts';
 
 interface Goal {
@@ -41,6 +42,8 @@ export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
     const visibleGoals = goals.slice(0, maxVisible);
     const remainingCount = goals.length - maxVisible;
     const showMore = remainingCount > 0;
+    const moreTextOpacity = useRef(new Animated.Value(showMore ? 1 : 0)).current;
+    const moreTextTranslateY = useRef(new Animated.Value(0)).current;
 
     // Calculate which items are newly appearing
     const currentVisibleTexts = new Set(visibleGoals.map(g => g.text));
@@ -54,6 +57,33 @@ export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
     React.useEffect(() => {
         previousVisibleTextsRef.current = currentVisibleTexts;
     });
+
+    // Animate "+X more" text when it appears or count changes
+    React.useEffect(() => {
+        if (showMore) {
+            // Fade in animation similar to todo items
+            moreTextOpacity.setValue(0);
+            moreTextTranslateY.setValue(10);
+            
+            Animated.parallel([
+                Animated.timing(moreTextOpacity, {
+                    toValue: 1,
+                    duration: 300,
+                    easing: Easing.out(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(moreTextTranslateY, {
+                    toValue: 0,
+                    duration: 300,
+                    easing: Easing.out(Easing.ease),
+                    useNativeDriver: true,
+                }),
+            ]).start();
+        } else {
+            moreTextOpacity.setValue(0);
+            moreTextTranslateY.setValue(10);
+        }
+    }, [remainingCount, showMore]);
 
     const containerRef = useRef<View>(null);
     const [containerPosition, setContainerPosition] = useState({ x: 0, y: 0 });
@@ -84,6 +114,9 @@ export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
     const handleGoalPress = (index: number, originX: number, originY: number) => {
         if (goals[index].completed) return; // Don't animate if already completed
 
+        // Haptic feedback when task is completed
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
         // Measure container position at click time to get accurate relative position
         containerRef.current?.measureInWindow((containerX, containerY) => {
             // Calculate relative position within the container
@@ -96,11 +129,11 @@ export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
             setGoals(updatedGoals);
 
             // Create confetti particles shooting out from the click position
-            const particles = Array.from({ length: 8 }, (_, i) => ({
+            const particles = Array.from({ length: 16 }, (_, i) => ({
                 id: Date.now() + i,
                 originX: relativeX,
                 originY: relativeY,
-                angle: (i / 8) * 360, // Distribute particles in a circle (0-360 degrees)
+                angle: (i / 16) * 360, // Distribute particles in a circle (0-360 degrees)
             }));
             setConfettiParticles(particles);
 
@@ -157,12 +190,16 @@ export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
                     <Text style={styles.emptyText}>hold to add a todo</Text>
                 </TouchableOpacity>
             ) : (
-                <View style={styles.goalsContainer}>
+                <TouchableOpacity
+                    style={styles.goalsContainer}
+                    onLongPress={handleAddTodo}
+                    activeOpacity={1}
+                >
                     {visibleGoals.map((goal, index) => {
                         const isNewlyAppearing = newlyAppearingTexts.has(goal.text);
                         return (
                             <GoalItem
-                                key={goal.text}
+                                key={`${goal.text}-${index}`}
                                 goal={goal}
                                 index={index}
                                 isRemoving={removingIndex === index}
@@ -171,14 +208,17 @@ export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
                             />
                         );
                     })}
-                </View>
+                </TouchableOpacity>
             )}
 
             {/* More indicator */}
             {showMore && (
-                <View style={styles.moreContainer}>
+                <Animated.View style={[styles.moreContainer, {
+                    opacity: moreTextOpacity,
+                    transform: [{ translateY: moreTextTranslateY }]
+                }]}>
                     <Text style={styles.moreText}>+{remainingCount} more</Text>
-                </View>
+                </Animated.View>
             )}
 
             {/* Confetti particles */}
@@ -209,7 +249,9 @@ const GoalItem: React.FC<GoalItemProps> = ({ goal, index, isRemoving, isNewlyApp
     const itemTranslateY = useRef(new Animated.Value(0)).current;
     const itemHeight = useRef(new Animated.Value(1)).current;
     const goalItemRef = useRef<TouchableOpacity>(null);
+    const textRef = useRef<Text>(null);
     const hasAnimatedIn = useRef(false);
+    const [textWidth, setTextWidth] = React.useState(0);
 
     React.useEffect(() => {
         // Only set initial values once, don't animate in
@@ -235,11 +277,11 @@ const GoalItem: React.FC<GoalItemProps> = ({ goal, index, isRemoving, isNewlyApp
     }, [isNewlyAppearing]);
 
     React.useEffect(() => {
-        if (goal.completed) {
-            // Animate strikethrough appearing
+        if (goal.completed && textWidth > 0) {
+            // Animate strikethrough appearing - use text width in pixels
             Animated.parallel([
                 Animated.timing(strikethroughWidth, {
-                    toValue: 1,
+                    toValue: textWidth,
                     duration: 400,
                     easing: Easing.out(Easing.ease),
                     useNativeDriver: false,
@@ -256,7 +298,7 @@ const GoalItem: React.FC<GoalItemProps> = ({ goal, index, isRemoving, isNewlyApp
             strikethroughWidth.setValue(0);
             opacity.setValue(0);
         }
-    }, [goal.completed]);
+    }, [goal.completed, textWidth]);
 
     React.useEffect(() => {
         if (isRemoving) {
@@ -321,23 +363,33 @@ const GoalItem: React.FC<GoalItemProps> = ({ goal, index, isRemoving, isNewlyApp
                 delayLongPress={300} // 300ms hold to trigger
             >
                 <View style={styles.goalTextContainer}>
-                    <Text
-                        style={[
-                            styles.goalText,
-                            goal.completed && styles.goalTextCompleted
-                        ]}
+                    <View
+                        onLayout={(e) => {
+                            const { width } = e.nativeEvent.layout;
+                            if (width > 0 && width !== textWidth) {
+                                setTextWidth(width);
+                            }
+                        }}
+                        style={styles.goalTextWrapper}
                     >
-                        {goal.text}
-                    </Text>
-                    {goal.completed && (
+                        <Text
+                            ref={textRef}
+                            style={[
+                                styles.goalText,
+                                goal.completed && styles.goalTextCompleted
+                            ]}
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                        >
+                            {goal.text}
+                        </Text>
+                    </View>
+                    {goal.completed && textWidth > 0 && (
                         <Animated.View
                             style={[
                                 styles.strikethrough,
                                 {
-                                    width: strikethroughWidth.interpolate({
-                                        inputRange: [0, 1],
-                                        outputRange: ['0%', '100%'],
-                                    }),
+                                    width: strikethroughWidth,
                                     opacity,
                                 },
                             ]}
@@ -366,7 +418,7 @@ const ConfettiParticle: React.FC<ConfettiParticleProps> = ({ originX, originY, a
         const angleRad = (angle * Math.PI) / 180;
 
         // Distance and direction for particle to travel - smaller range for minimalistic feel
-        const distance = 20 + Math.random() * 10; // 20-30px distance
+        const distance = 50 + Math.random() * 30; // 50-80px distance
         const deltaX = Math.cos(angleRad) * distance;
         const deltaY = Math.sin(angleRad) * distance;
 
@@ -446,7 +498,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingBottom: 5,
+        paddingTop: 1,
+        paddingBottom: 6,
     },
     headerText: {
         fontSize: 18,
@@ -485,6 +538,11 @@ const styles = StyleSheet.create({
     goalTextContainer: {
         position: 'relative',
         alignSelf: 'flex-start',
+        width: 'auto',
+    },
+    goalTextWrapper: {
+        alignSelf: 'flex-start',
+        maxWidth: widgetSize - 30, // Account for padding
     },
     goalText: {
         fontSize: 16,

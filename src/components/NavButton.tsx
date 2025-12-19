@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text, Animated, Alert, Dimensions, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 
 interface NavButtonProps {
     onPress?: () => void;
@@ -56,6 +57,9 @@ export const AddButton: React.FC<NavButtonProps> = ({ onPress, onMenuStateChange
     };
 
     const handlePress = () => {
+        // Haptic feedback when plus button is pressed
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        
         if (isMenuOpen) {
             // Close menu - slide back to green button position (reverse order: 3, 2, 1)
             Animated.parallel([
@@ -83,6 +87,10 @@ export const AddButton: React.FC<NavButtonProps> = ({ onPress, onMenuStateChange
             // Open menu - slide out from green button position
             setIsMenuOpen(true);
             onMenuStateChange?.(true);
+            
+            // Haptic feedback for button 1 as it starts animating
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            
             Animated.parallel([
                 Animated.timing(plusIconRotation, { toValue: 135, duration: 200, useNativeDriver: true }), // Rotate to 135 degrees (90+45)
                 Animated.stagger(50, [
@@ -100,6 +108,16 @@ export const AddButton: React.FC<NavButtonProps> = ({ onPress, onMenuStateChange
                     ]),
                 ]),
             ]).start();
+            
+            // Haptic feedback for button 2 (50ms delay to match stagger)
+            setTimeout(() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            }, 50);
+            
+            // Haptic feedback for button 3 (100ms delay to match stagger)
+            setTimeout(() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            }, 100);
         }
     };
 
@@ -129,6 +147,8 @@ export const AddButton: React.FC<NavButtonProps> = ({ onPress, onMenuStateChange
             >
                 <TouchableOpacity
                     onPress={() => {
+                        // Haptic feedback for menu button 1
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                         handlePress();
                         Alert.alert('Menu 1', 'Menu option 1');
                     }}
@@ -158,6 +178,8 @@ export const AddButton: React.FC<NavButtonProps> = ({ onPress, onMenuStateChange
             >
                 <TouchableOpacity
                     onPress={() => {
+                        // Haptic feedback for menu button 2
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                         handlePress();
                         Alert.alert('Menu 2', 'Menu option 2');
                     }}
@@ -187,6 +209,8 @@ export const AddButton: React.FC<NavButtonProps> = ({ onPress, onMenuStateChange
             >
                 <TouchableOpacity
                     onPress={() => {
+                        // Haptic feedback for menu button 3
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                         handlePress();
                         Alert.alert('Menu 3', 'Menu option 3');
                     }}

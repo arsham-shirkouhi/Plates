@@ -76,14 +76,14 @@ const styles = StyleSheet.create({
         paddingBottom: 10,
         paddingHorizontal: 15,
         marginTop: 16,
-        height: 155,
+        height: 140,
     },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingTop: 0,
-        paddingBottom: 5,
+        paddingTop: 1,
+        paddingBottom: 6,
     },
     headerText: {
         fontSize: 18,
@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
         height: 2,
         backgroundColor: '#E0E0E0',
         marginHorizontal: -15,
-        marginBottom: 9,
+        marginBottom: 4,
     },
     itemsContainer: {
         width: '100%',
@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
         paddingTop: 5,
     },
     itemSpacing: {
-        marginBottom: 12,
+        marginBottom: 9,
     },
     itemName: {
         fontSize: 16,

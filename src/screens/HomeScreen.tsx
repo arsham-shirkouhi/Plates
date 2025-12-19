@@ -272,9 +272,10 @@ export const HomeScreen: React.FC = () => {
                     nestedScrollEnabled={true}
                     keyboardShouldPersistTaps="handled"
                     decelerationRate="normal"
-                    bounces={true}
-                    overScrollMode="auto"
+                    bounces={false}
+                    overScrollMode="never"
                     scrollEnabled={true}
+                    alwaysBounceVertical={false}
                 >
                     {/* Gradient background */}
                     <GradientBackground />

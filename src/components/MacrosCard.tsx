@@ -137,12 +137,12 @@ const CalorieCircularProgress: React.FC<CalorieCircularProgressProps> = ({
                         strokeLinecap="round"
                     />
 
-                    {/* Background circle (white) - full circle */}
+                    {/* Background circle (very light gray) - full circle */}
                     <Circle
                         cx={center}
                         cy={center}
                         r={radius}
-                        stroke="#fff"
+                        stroke="#F5F5F5"
                         strokeWidth={strokeWidth}
                         fill="transparent"
                         strokeDasharray={`${circumference} ${circumference}`}
@@ -385,7 +385,7 @@ const macroBarStyles = StyleSheet.create({
         width: '100%',
         maxWidth: 220,
         height: 15,
-        backgroundColor: '#fff',
+        backgroundColor: '#F5F5F5',
         borderRadius: 16,
         borderWidth: 2,
         borderColor: '#252525',

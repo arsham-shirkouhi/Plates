@@ -10,6 +10,7 @@ import { Slider } from '../components/Slider';
 import { styles } from './OnboardingScreen.styles';
 import { fonts } from '../constants/fonts';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useAuth } from '../context/AuthContext';
 import { saveOnboardingData, OnboardingData as OnboardingDataType, hasCompletedOnboarding, checkUsernameExists } from '../services/userService';
 import { OnboardingData } from './onboarding/types';
@@ -50,6 +51,11 @@ export const OnboardingScreen: React.FC = () => {
     // Confetti state
     const [confettiParticles, setConfettiParticles] = useState<ConfettiParticle[]>([]);
     const containerRef = useRef<View>(null);
+
+    // Helper function for haptic feedback
+    const triggerHaptic = useCallback(() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }, []);
 
     // Helper function to trigger confetti from a press event
     const triggerConfetti = useCallback((event: any, color?: string) => {
@@ -1266,7 +1272,11 @@ export const OnboardingScreen: React.FC = () => {
             return (
                 <TouchableOpacity
                     style={[baseStyle || styles.dateDropdown, style]}
-                    onPress={onPress}
+                    onPress={() => {
+                        // Haptic feedback
+                        triggerHaptic();
+                        onPress();
+                    }}
                 >
                     <Text
                         style={[
@@ -2420,6 +2430,8 @@ export const OnboardingScreen: React.FC = () => {
                                 <TouchableOpacity
                                     key={option.key}
                                     onPress={(e) => {
+                                        // Haptic feedback
+                                        triggerHaptic();
                                         // Blue confetti when selecting (card becomes blue), white when deselecting
                                         const willBeSelected = data.sex !== option.key;
                                         triggerConfetti(e, willBeSelected ? '#526EFF' : '#fff');
@@ -2571,6 +2583,8 @@ export const OnboardingScreen: React.FC = () => {
         });
 
         const handleClose = () => {
+            // Haptic feedback
+            triggerHaptic();
             // Animate out first, then close
             Animated.parallel([
                 Animated.timing(slideAnim, {
@@ -2640,6 +2654,8 @@ export const OnboardingScreen: React.FC = () => {
                                                 isSelected && styles.modalItemSelected
                                             ]}
                                             onPress={() => {
+                                                // Haptic feedback
+                                                triggerHaptic();
                                                 onSelect(value);
                                                 handleClose();
                                             }}
@@ -2706,6 +2722,8 @@ export const OnboardingScreen: React.FC = () => {
         const clampedValue = Math.max(minValue, Math.min(maxValue, steppedValue));
 
         const handleUnitChange = (newUnit: string) => {
+            // Haptic feedback
+            triggerHaptic();
             if (newUnit === config.unit1 && currentUnit === config.unit2) {
                 const converted = config.convert2To1(currentValue);
                 const rounded = config.step1 >= 1
@@ -2739,6 +2757,8 @@ export const OnboardingScreen: React.FC = () => {
         const selectedIndex = items.findIndex(item => item === formattedValue);
 
         const handleOpenModal = () => {
+            // Haptic feedback
+            triggerHaptic();
             setModalVisible(true);
             Animated.parallel([
                 Animated.timing(slideAnim, {
@@ -2762,6 +2782,8 @@ export const OnboardingScreen: React.FC = () => {
         };
 
         const handleCloseModal = () => {
+            // Haptic feedback
+            triggerHaptic();
             Animated.parallel([
                 Animated.timing(slideAnim, {
                     toValue: 0,
@@ -2835,6 +2857,8 @@ export const OnboardingScreen: React.FC = () => {
                                                     isSelected && styles.modalItemSelected
                                                 ]}
                                                 onPress={() => {
+                                                    // Haptic feedback
+                                                    triggerHaptic();
                                                     handleSelect(index);
                                                     handleCloseModal();
                                                 }}
@@ -3008,6 +3032,8 @@ export const OnboardingScreen: React.FC = () => {
             // Update displayed value in real-time (not the actual data)
             if (newDisplayedValue !== displayedHeight) {
                 setDisplayedHeight(newDisplayedValue);
+                // Haptic feedback for each increment/decrement
+                triggerHaptic();
                 // Trigger subtle animation on the display
                 Animated.sequence([
                     Animated.timing(heightValueDisplayAnim, {
@@ -3357,6 +3383,8 @@ export const OnboardingScreen: React.FC = () => {
             // Update displayed value in real-time (not the actual data)
             if (newDisplayedValue !== displayedWeight) {
                 setDisplayedWeight(newDisplayedValue);
+                // Haptic feedback for each increment/decrement
+                triggerHaptic();
                 // Trigger subtle animation on the display
                 Animated.sequence([
                     Animated.timing(weightValueDisplayAnim, {
@@ -3793,6 +3821,8 @@ export const OnboardingScreen: React.FC = () => {
                                     />
                                     <TouchableOpacity
                                         onPress={(e) => {
+                                            // Haptic feedback
+                                            triggerHaptic();
                                             // Blue confetti when selecting (card becomes blue), white when deselecting
                                             const willBeSelected = data.goal !== option.key;
                                             triggerConfetti(e, willBeSelected ? '#526EFF' : '#fff');
@@ -3960,6 +3990,8 @@ export const OnboardingScreen: React.FC = () => {
                                     />
                                     <TouchableOpacity
                                         onPress={(e) => {
+                                            // Haptic feedback
+                                            triggerHaptic();
                                             // Blue confetti when selecting (card becomes blue), white when deselecting
                                             const willBeSelected = data.goal !== option.key;
                                             triggerConfetti(e, willBeSelected ? '#526EFF' : '#fff');
@@ -4116,7 +4148,7 @@ export const OnboardingScreen: React.FC = () => {
                         const cardShadowHeightAnim = getCardShadowAnim();
 
                         return (
-                            <View key={option.key} style={{ position: 'relative', marginBottom: 8, paddingBottom: 4 }}>
+                            <View key={option.key} style={{ position: 'relative', marginBottom: 10, paddingBottom: 4 }}>
                                 {/* Shadow layer - harsh drop shadow */}
                                 <Animated.View
                                     style={[
@@ -4141,6 +4173,8 @@ export const OnboardingScreen: React.FC = () => {
                                 />
                                 <TouchableOpacity
                                     onPress={(e) => {
+                                        // Haptic feedback
+                                        triggerHaptic();
                                         // Blue confetti when selecting (card becomes blue), white when deselecting
                                         const willBeSelected = data.activityLevel !== option.key;
                                         triggerConfetti(e, willBeSelected ? '#526EFF' : '#fff');
@@ -4156,6 +4190,14 @@ export const OnboardingScreen: React.FC = () => {
                                             styles.activityCard,
                                             {
                                                 transform: [{ translateY: animations.translateY }],
+                                                shadowColor: '#252525',
+                                                shadowOffset: {
+                                                    width: 0,
+                                                    height: animations.shadowHeight,
+                                                },
+                                                shadowOpacity: 1,
+                                                shadowRadius: 0,
+                                                elevation: animations.shadowHeight,
                                             },
                                         ]}
                                     >
@@ -4348,6 +4390,8 @@ export const OnboardingScreen: React.FC = () => {
                                 />
                                 <TouchableOpacity
                                     onPress={(e) => {
+                                        // Haptic feedback
+                                        triggerHaptic();
                                         // Blue confetti when selecting (card becomes blue), white when deselecting
                                         const willBeSelected = data.dietPreference !== option.key;
                                         triggerConfetti(e, willBeSelected ? '#526EFF' : '#fff');
@@ -4552,6 +4596,8 @@ export const OnboardingScreen: React.FC = () => {
                     />
                     <TouchableOpacity
                         onPress={(e) => {
+                            // Haptic feedback
+                            triggerHaptic();
                             // Blue confetti when selected (blue background), white when not selected
                             const confettiColor = isSelected ? '#526EFF' : '#fff';
                             triggerConfetti(e, confettiColor);
@@ -4733,6 +4779,8 @@ export const OnboardingScreen: React.FC = () => {
                                 />
                                 <TouchableOpacity
                                     onPress={(e) => {
+                                        // Haptic feedback
+                                        triggerHaptic();
                                         // Blue confetti when selecting (card becomes blue), white when deselecting
                                         const willBeSelected = data.goalIntensity !== option.key;
                                         triggerConfetti(e, willBeSelected ? '#526EFF' : '#fff');
@@ -4789,10 +4837,14 @@ export const OnboardingScreen: React.FC = () => {
         const isMetric = data.unitPreference.weight === 'kg' && data.unitPreference.height === 'cm';
 
         const handleMetricPress = () => {
+            // Haptic feedback
+            triggerHaptic();
             updateData('unitPreference', { weight: 'kg', height: 'cm' });
         };
 
         const handleImperialPress = () => {
+            // Haptic feedback
+            triggerHaptic();
             updateData('unitPreference', { weight: 'lbs', height: 'ft' });
         };
 
@@ -4990,6 +5042,8 @@ export const OnboardingScreen: React.FC = () => {
                     />
                     <TouchableOpacity
                         onPress={(e) => {
+                            // Haptic feedback
+                            triggerHaptic();
                             // Blue confetti when selecting (card becomes blue), white when deselecting
                             const willBeSelected = data.purpose !== option.key;
                             triggerConfetti(e, willBeSelected ? '#526EFF' : '#fff');
@@ -5156,6 +5210,8 @@ export const OnboardingScreen: React.FC = () => {
                                 />
                                 <TouchableOpacity
                                     onPress={(e) => {
+                                        // Haptic feedback
+                                        triggerHaptic();
                                         // Blue confetti when selecting (card becomes blue), white when deselecting
                                         const willBeSelected = data.macrosSetup !== option.key;
                                         triggerConfetti(e, willBeSelected ? '#526EFF' : '#fff');
@@ -5303,6 +5359,8 @@ export const OnboardingScreen: React.FC = () => {
                     <TouchableOpacity
                         style={styles.topBackButton}
                         onPress={(e) => {
+                            // Haptic feedback
+                            triggerHaptic();
                             // White confetti for back button (transparent/white background)
                             triggerConfetti(e, '#fff');
                             prevStep();
@@ -5336,6 +5394,8 @@ export const OnboardingScreen: React.FC = () => {
                         variant="primary"
                         title={currentStep === 1 ? "get started!" : currentStep === TOTAL_STEPS ? "let's go!" : `continue (${currentStep}/${TOTAL_STEPS})`}
                         onPress={(e: any) => {
+                            // Haptic feedback
+                            triggerHaptic();
                             // Blue confetti for primary button (blue background)
                             triggerConfetti(e, '#526EFF');
                             if (currentStep === TOTAL_STEPS) {

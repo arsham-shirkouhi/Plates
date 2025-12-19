@@ -26,8 +26,8 @@ const ConfettiParticle: React.FC<ConfettiParticleProps> = ({ originX, originY, a
         // Convert angle to radians
         const angleRad = (angle * Math.PI) / 180;
 
-        // Distance and direction for particle to travel - smaller range for minimalistic feel
-        const distance = 20 + Math.random() * 10; // 20-30px distance
+        // Distance and direction for particle to travel - increased for better visibility
+        const distance = 50 + Math.random() * 30; // 50-80px distance
         const deltaX = Math.cos(angleRad) * distance;
         const deltaY = Math.sin(angleRad) * distance;
 

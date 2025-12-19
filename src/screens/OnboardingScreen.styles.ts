@@ -546,7 +546,7 @@ export const styles = StyleSheet.create({
         borderColor: '#252525',
         borderRadius: 12,
         padding: 20,
-        marginBottom: 18,
+        marginBottom: 0, // Spacing handled by wrapper View
         // Shadow is handled by separate shadow layer, not here
     },
     activityCardSelected: {
