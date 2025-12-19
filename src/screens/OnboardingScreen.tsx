@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, Animated, ScrollView, TouchableOpacity, Alert, PanResponder, Easing, Image, StyleSheet, Modal } from 'react-native';
+import { View, Text, Animated, ScrollView, TouchableOpacity, Alert, PanResponder, Easing, Image, StyleSheet, Modal, Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -15,6 +15,7 @@ import { saveOnboardingData, OnboardingData as OnboardingDataType, hasCompletedO
 import { OnboardingData } from './onboarding/types';
 import { TOTAL_STEPS } from './onboarding/constants';
 import { generateDailyMacrosFromAge, generateManualMacros } from '../utils/macroCalculator';
+import { Confetti, ConfettiParticle } from '../components/Confetti';
 
 type OnboardingScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Onboarding'>;
 
@@ -32,9 +33,9 @@ export const OnboardingScreen: React.FC = () => {
         birthDay: 0,
         birthYear: 0,
         sex: '',
-        height: 170,
+        height: 168,
         heightUnit: 'cm',
-        weight: 70,
+        weight: 65,
         weightUnit: 'kg',
         goal: '',
         activityLevel: '',
@@ -45,6 +46,61 @@ export const OnboardingScreen: React.FC = () => {
         purpose: '',
         macrosSetup: '',
     });
+
+    // Confetti state
+    const [confettiParticles, setConfettiParticles] = useState<ConfettiParticle[]>([]);
+    const containerRef = useRef<View>(null);
+
+    // Helper function to trigger confetti from a press event
+    const triggerConfetti = useCallback((event: any, color?: string) => {
+        // Handle both direct events and events from Button component
+        const nativeEvent = event?.nativeEvent || event;
+        const pageX = nativeEvent?.pageX || (nativeEvent?.locationX ? nativeEvent.locationX : 0);
+        const pageY = nativeEvent?.pageY || (nativeEvent?.locationY ? nativeEvent.locationY : 0);
+
+        // If we don't have coordinates, use center of screen as fallback
+        if (!pageX && !pageY) {
+            const { width, height } = Dimensions.get('window');
+            const fallbackX = width / 2;
+            const fallbackY = height / 2;
+
+            containerRef.current?.measureInWindow((containerX, containerY) => {
+                const relativeX = fallbackX - containerX;
+                const relativeY = fallbackY - containerY;
+                const particles = Array.from({ length: 8 }, (_, i) => ({
+                    id: Date.now() + i,
+                    originX: relativeX,
+                    originY: relativeY,
+                    angle: (i / 8) * 360,
+                    color: color,
+                }));
+                setConfettiParticles(particles);
+                setTimeout(() => setConfettiParticles([]), 500);
+            });
+            return;
+        }
+
+        // Measure container position to get accurate relative position
+        containerRef.current?.measureInWindow((containerX, containerY) => {
+            // Calculate relative position within the container
+            const relativeX = pageX - containerX;
+            const relativeY = pageY - containerY;
+
+            // Create confetti particles shooting out from the click position
+            const particles = Array.from({ length: 8 }, (_, i) => ({
+                id: Date.now() + i,
+                originX: relativeX,
+                originY: relativeY,
+                angle: (i / 8) * 360, // Distribute particles in a circle (0-360 degrees)
+            }));
+            setConfettiParticles(particles);
+
+            // Remove confetti after animation
+            setTimeout(() => {
+                setConfettiParticles([]);
+            }, 500);
+        });
+    }, []);
 
     // Animation refs
     const contentFade = useRef(new Animated.Value(1)).current;
@@ -260,6 +316,12 @@ export const OnboardingScreen: React.FC = () => {
     const heightFadeAnim = useRef(new Animated.Value(0)).current;
     const weightSlideAnim = useRef(new Animated.Value(0)).current;
     const weightFadeAnim = useRef(new Animated.Value(0)).current;
+    const heightRulerRef = useRef<ScrollView>(null);
+    const isScrollingProgrammatically = useRef(false);
+    const [displayedHeight, setDisplayedHeight] = useState(170); // Track displayed height during scroll
+    const weightRulerRef = useRef<ScrollView>(null);
+    const isScrollingProgrammaticallyWeight = useRef(false);
+    const [displayedWeight, setDisplayedWeight] = useState(70); // Track displayed weight during scroll
 
     const months = [
         'january', 'february', 'march', 'april', 'may', 'june',
@@ -503,6 +565,167 @@ export const OnboardingScreen: React.FC = () => {
         }
     }, [yearModalVisible]);
 
+    // Animate height modal when it opens/closes
+    useEffect(() => {
+        if (heightModalVisible) {
+            Animated.parallel([
+                Animated.timing(heightSlideAnim, {
+                    toValue: 1,
+                    duration: 300,
+                    easing: Easing.out(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(heightFadeAnim, {
+                    toValue: 1,
+                    duration: 300,
+                    easing: Easing.out(Easing.ease),
+                    useNativeDriver: true,
+                }),
+            ]).start();
+        } else {
+            Animated.parallel([
+                Animated.timing(heightSlideAnim, {
+                    toValue: 0,
+                    duration: 250,
+                    easing: Easing.in(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(heightFadeAnim, {
+                    toValue: 0,
+                    duration: 250,
+                    easing: Easing.in(Easing.ease),
+                    useNativeDriver: true,
+                }),
+            ]).start();
+        }
+    }, [heightModalVisible]);
+
+    // Animate weight modal when it opens/closes
+    useEffect(() => {
+        if (weightModalVisible) {
+            Animated.parallel([
+                Animated.timing(weightSlideAnim, {
+                    toValue: 1,
+                    duration: 300,
+                    easing: Easing.out(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(weightFadeAnim, {
+                    toValue: 1,
+                    duration: 300,
+                    easing: Easing.out(Easing.ease),
+                    useNativeDriver: true,
+                }),
+            ]).start();
+        } else {
+            Animated.parallel([
+                Animated.timing(weightSlideAnim, {
+                    toValue: 0,
+                    duration: 250,
+                    easing: Easing.in(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(weightFadeAnim, {
+                    toValue: 0,
+                    duration: 250,
+                    easing: Easing.in(Easing.ease),
+                    useNativeDriver: true,
+                }),
+            ]).start();
+        }
+    }, [weightModalVisible]);
+
+    // Scroll height ruler to selected value only when entering height step or unit changes
+    useEffect(() => {
+        if (currentStep === 6) { // Height step
+            const currentUnit = data.unitPreference.height;
+            const TICK_HEIGHT = 14; // Must match renderHeightStep
+            const unitIsMetric = currentUnit === 'cm';
+            const MIN_VALUE = unitIsMetric ? 122 : 48;
+            const MAX_VALUE = unitIsMetric ? 213 : 84;
+            const TOTAL_TICKS = MAX_VALUE - MIN_VALUE + 1;
+            const BUFFER_TICKS = 10; // Must match renderHeightStep
+
+            // Clamp value
+            const clampedValue = Math.max(MIN_VALUE, Math.min(MAX_VALUE, Math.round(data.height)));
+
+            const selectedIndex = clampedValue - MIN_VALUE;
+            const reversedIndex = TOTAL_TICKS - 1 - selectedIndex;
+            // Calculate exact scroll position (account for top buffer ticks)
+            const initialScrollY = (reversedIndex + BUFFER_TICKS) * TICK_HEIGHT;
+
+            isScrollingProgrammatically.current = true;
+            setTimeout(() => {
+                heightRulerRef.current?.scrollTo({
+                    y: initialScrollY,
+                    animated: false,
+                });
+                setTimeout(() => {
+                    isScrollingProgrammatically.current = false;
+                }, 200);
+            }, 100);
+        }
+        // Only trigger on step change or unit preference change, NOT on height value change
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentStep, data.unitPreference.height]);
+
+    // Initialize displayed height when entering height step or when height value changes
+    useEffect(() => {
+        if (currentStep === 6) {
+            const isMetric = data.unitPreference.height === 'cm';
+            const MIN_VALUE = isMetric ? 122 : 48;
+            const MAX_VALUE = isMetric ? 213 : 84;
+            const clampedValue = Math.max(MIN_VALUE, Math.min(MAX_VALUE, Math.round(data.height || (isMetric ? 168 : 66))));
+            setDisplayedHeight(clampedValue);
+        }
+    }, [currentStep, data.height, data.unitPreference.height]);
+
+    // Initialize displayed weight when entering weight step or when weight value changes
+    useEffect(() => {
+        if (currentStep === 7) {
+            const isMetric = data.unitPreference.weight === 'kg';
+            const minValue = isMetric ? 20 : 45;
+            const maxValue = isMetric ? 250 : 550;
+            const steppedValue = Math.round(data.weight || (isMetric ? 65 : 143));
+            const clampedValue = Math.max(minValue, Math.min(maxValue, steppedValue));
+            setDisplayedWeight(clampedValue);
+        }
+    }, [currentStep, data.weight, data.unitPreference.weight]);
+
+    // Scroll weight ruler to selected value only when entering weight step or unit changes
+    useEffect(() => {
+        if (currentStep === 7) { // Weight step
+            const currentUnit = data.unitPreference.weight;
+            const TICK_WIDTH = 14; // Must match renderWeightStep
+            const unitIsMetric = currentUnit === 'kg';
+            const MIN_VALUE = unitIsMetric ? 20 : 45;
+            const MAX_VALUE = unitIsMetric ? 250 : 550;
+            const STEP = 1; // Integers only
+            const TOTAL_TICKS = MAX_VALUE - MIN_VALUE + 1;
+            const BUFFER_TICKS = 10; // Must match renderWeightStep
+
+            // Clamp value (integers only)
+            const steppedValue = Math.round(data.weight || (unitIsMetric ? 65 : 143));
+            const clampedValue = Math.max(MIN_VALUE, Math.min(MAX_VALUE, steppedValue));
+
+            const selectedIndex = clampedValue - MIN_VALUE;
+            // Calculate exact scroll position (account for left buffer ticks)
+            const initialScrollX = (selectedIndex + BUFFER_TICKS) * TICK_WIDTH;
+
+            isScrollingProgrammaticallyWeight.current = true;
+            setTimeout(() => {
+                weightRulerRef.current?.scrollTo({
+                    x: initialScrollX,
+                    animated: false,
+                });
+                setTimeout(() => {
+                    isScrollingProgrammaticallyWeight.current = false;
+                }, 200);
+            }, 100);
+        }
+        // Only trigger on step change or unit preference change, NOT on weight value change
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentStep, data.unitPreference.weight]);
 
     // Track if this is the first time the screen is mounted
     const isFirstMount = useRef(true);
@@ -519,9 +742,9 @@ export const OnboardingScreen: React.FC = () => {
                 birthDay: 0,
                 birthYear: 0,
                 sex: '',
-                height: 170,
+                height: 168,
                 heightUnit: 'cm',
-                weight: 70,
+                weight: 65,
                 weightUnit: 'kg',
                 goal: '',
                 activityLevel: '',
@@ -1065,111 +1288,6 @@ export const OnboardingScreen: React.FC = () => {
             );
         };
 
-        const renderPickerModal = (
-            visible: boolean,
-            onClose: () => void,
-            title: string,
-            items: (string | number)[],
-            selectedValue: number,
-            onSelect: (value: number) => void,
-            slideAnim: Animated.Value,
-            fadeAnim: Animated.Value
-        ) => {
-            const translateY = slideAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [300, 0],
-            });
-
-            const handleClose = () => {
-                // Animate out first, then close
-                Animated.parallel([
-                    Animated.timing(slideAnim, {
-                        toValue: 0,
-                        duration: 250,
-                        easing: Easing.in(Easing.ease),
-                        useNativeDriver: true,
-                    }),
-                    Animated.timing(fadeAnim, {
-                        toValue: 0,
-                        duration: 250,
-                        easing: Easing.in(Easing.ease),
-                        useNativeDriver: true,
-                    }),
-                ]).start(() => {
-                    onClose();
-                });
-            };
-
-            return (
-                <Modal
-                    visible={visible}
-                    transparent={true}
-                    animationType="none"
-                    onRequestClose={handleClose}
-                >
-                    <TouchableOpacity
-                        style={styles.modalOverlay}
-                        activeOpacity={1}
-                        onPress={handleClose}
-                    >
-                        <Animated.View
-                            style={[
-                                styles.modalOverlayAnimated,
-                                {
-                                    opacity: fadeAnim,
-                                },
-                            ]}
-                        >
-                            <Animated.View
-                                style={[
-                                    styles.modalContent,
-                                    {
-                                        transform: [{ translateY }],
-                                    },
-                                ]}
-                            >
-                                <Text style={styles.modalTitle}>{title}</Text>
-                                <ScrollView
-                                    style={styles.modalScrollView}
-                                    scrollEventThrottle={16}
-                                    removeClippedSubviews={true}
-                                    nestedScrollEnabled={true}
-                                    keyboardShouldPersistTaps="handled"
-                                    decelerationRate="normal"
-                                    bounces={true}
-                                    overScrollMode="auto"
-                                >
-                                    {items.map((item, index) => {
-                                        const value = typeof item === 'number' ? item : index + 1;
-                                        const isSelected = selectedValue === value;
-                                        return (
-                                            <TouchableOpacity
-                                                key={index}
-                                                style={[
-                                                    styles.modalItem,
-                                                    isSelected && styles.modalItemSelected
-                                                ]}
-                                                onPress={() => {
-                                                    onSelect(value);
-                                                    handleClose();
-                                                }}
-                                            >
-                                                <Text style={[
-                                                    styles.modalItemText,
-                                                    isSelected && styles.modalItemTextSelected
-                                                ]}>
-                                                    {item}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        );
-                                    })}
-                                </ScrollView>
-                            </Animated.View>
-                        </Animated.View>
-                    </TouchableOpacity>
-                </Modal>
-            );
-        };
 
         // Get available days based on selected month and year
         const availableDays = data.birthMonth && data.birthYear
@@ -2301,7 +2419,12 @@ export const OnboardingScreen: React.FC = () => {
                                 />
                                 <TouchableOpacity
                                     key={option.key}
-                                    onPress={() => updateData('sex', option.key)}
+                                    onPress={(e) => {
+                                        // Blue confetti when selecting (card becomes blue), white when deselecting
+                                        const willBeSelected = data.sex !== option.key;
+                                        triggerConfetti(e, willBeSelected ? '#526EFF' : '#fff');
+                                        updateData('sex', option.key);
+                                    }}
                                     onPressIn={handlePressIn}
                                     onPressOut={handlePressOut}
                                     activeOpacity={1}
@@ -2430,6 +2553,113 @@ export const OnboardingScreen: React.FC = () => {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentStep]);
+
+    // Shared renderPickerModal function for date, height, and weight selection
+    const renderPickerModal = (
+        visible: boolean,
+        onClose: () => void,
+        title: string,
+        items: (string | number)[],
+        selectedValue: number,
+        onSelect: (value: number) => void,
+        slideAnim: Animated.Value,
+        fadeAnim: Animated.Value
+    ) => {
+        const translateY = slideAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [300, 0],
+        });
+
+        const handleClose = () => {
+            // Animate out first, then close
+            Animated.parallel([
+                Animated.timing(slideAnim, {
+                    toValue: 0,
+                    duration: 250,
+                    easing: Easing.in(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(fadeAnim, {
+                    toValue: 0,
+                    duration: 250,
+                    easing: Easing.in(Easing.ease),
+                    useNativeDriver: true,
+                }),
+            ]).start(() => {
+                onClose();
+            });
+        };
+
+        return (
+            <Modal
+                visible={visible}
+                transparent={true}
+                animationType="none"
+                onRequestClose={handleClose}
+            >
+                <TouchableOpacity
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={handleClose}
+                >
+                    <Animated.View
+                        style={[
+                            styles.modalOverlayAnimated,
+                            {
+                                opacity: fadeAnim,
+                            },
+                        ]}
+                    >
+                        <Animated.View
+                            style={[
+                                styles.modalContent,
+                                {
+                                    transform: [{ translateY }],
+                                },
+                            ]}
+                        >
+                            <Text style={styles.modalTitle}>{title}</Text>
+                            <ScrollView
+                                style={styles.modalScrollView}
+                                scrollEventThrottle={16}
+                                removeClippedSubviews={true}
+                                nestedScrollEnabled={true}
+                                keyboardShouldPersistTaps="handled"
+                                decelerationRate="normal"
+                                bounces={true}
+                                overScrollMode="auto"
+                            >
+                                {items.map((item, index) => {
+                                    const value = typeof item === 'number' ? item : index + 1;
+                                    const isSelected = selectedValue === value;
+                                    return (
+                                        <TouchableOpacity
+                                            key={index}
+                                            style={[
+                                                styles.modalItem,
+                                                isSelected && styles.modalItemSelected
+                                            ]}
+                                            onPress={() => {
+                                                onSelect(value);
+                                                handleClose();
+                                            }}
+                                        >
+                                            <Text style={[
+                                                styles.modalItemText,
+                                                isSelected && styles.modalItemTextSelected
+                                            ]}>
+                                                {item}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </ScrollView>
+                        </Animated.View>
+                    </Animated.View>
+                </TouchableOpacity>
+            </Modal>
+        );
+    };
 
     // Helper function to convert inches to feet and inches string (e.g., 71 -> "5'11\"")
     const inchesToFeetInches = (inches: number): string => {
@@ -2719,197 +2949,352 @@ export const OnboardingScreen: React.FC = () => {
         // Use unit preference for height
         const currentUnit = data.unitPreference.height;
         const isMetric = currentUnit === 'cm';
-        const minValue = isMetric ? 100 : 39; // 100cm = ~39 inches (3'3")
-        const maxValue = isMetric ? 300 : 118; // 300cm = ~118 inches (9'10")
-        const step = 1;
 
-        // Clamp and round value
-        const steppedValue = Math.round(data.height / step) * step;
-        const clampedValue = Math.max(minValue, Math.min(maxValue, steppedValue));
+        // Constants - copy from weight selector
+        const TICK_HEIGHT = 14; // px - horizontal spacing (similar to TICK_WIDTH for weight)
 
-        // Generate items for dropdown
-        const items: string[] = [];
-        for (let val = minValue; val <= maxValue; val += step) {
-            if (isMetric) {
-                items.push(`${Math.round(val)} cm`);
-            } else {
-                items.push(inchesToFeetInches(val));
-            }
+        // Range based on unit - rebuild ruler data, don't scale
+        const MIN_VALUE = isMetric ? 122 : 48; // 122cm or 48 inches (4'0)
+        const MAX_VALUE = isMetric ? 213 : 84; // 213cm or 84 inches (7'0)
+        const STEP = 1; // 1cm or 1 inch increments (integers only)
+        // Calculate total ticks based on step
+        const TOTAL_TICKS = MAX_VALUE - MIN_VALUE + 1;
+        // Buffer ticks to fill empty space above and below (no numbers, just visual ticks)
+        // Top buffer shows gradient but scrolling stops at maximum value
+        const BUFFER_TICKS = 10;
+        const TOTAL_TICKS_WITH_BUFFER = TOTAL_TICKS + (2 * BUFFER_TICKS);
+
+        // Set default to middle of range: (122 + 213) / 2 = 167.5 ≈ 168cm or (48 + 84) / 2 = 66 inches
+        const defaultHeight = isMetric ? 168 : 66;
+        if (!data.height || data.height < MIN_VALUE || data.height > MAX_VALUE) {
+            updateData('height', defaultHeight);
         }
 
+        // Clamp and round value to step (integers only)
+        const steppedValue = Math.round(data.height);
+        const clampedValue = Math.max(MIN_VALUE, Math.min(MAX_VALUE, steppedValue));
+
+        // Format display value using displayedHeight for real-time updates
         const formattedValue = isMetric
-            ? `${Math.round(clampedValue)} cm`
-            : inchesToFeetInches(clampedValue);
-        const selectedIndex = items.findIndex(item => item === formattedValue);
+            ? `${displayedHeight} cm`
+            : (() => {
+                const feet = Math.floor(displayedHeight / 12);
+                const inches = displayedHeight % 12;
+                return `${feet}'${inches} ft`;
+            })();
 
-        const handleOpenModal = () => {
-            setHeightModalVisible(true);
-            Animated.parallel([
-                Animated.timing(heightSlideAnim, {
-                    toValue: 1,
-                    duration: 250,
-                    easing: Easing.out(Easing.ease),
-                    useNativeDriver: true,
-                }),
-                Animated.timing(heightFadeAnim, {
-                    toValue: 1,
-                    duration: 250,
-                    easing: Easing.out(Easing.ease),
-                    useNativeDriver: true,
-                }),
-            ]).start(() => {
-                // Scroll to selected item after modal animation completes
-                if (selectedIndex >= 0 && heightScrollViewRef.current) {
-                    // Calculate item height: padding 20px top + 20px bottom + text ~24px (fontSize 18 with line height) + border 1px = ~61px
-                    const itemHeight = 61;
-                    // Use measured scroll view height or default to 400
-                    const viewportHeight = heightScrollViewHeight.current;
-                    // Calculate position to center: item position - half viewport + half item height
-                    // Add positive offset to scroll more, moving the item up in the viewport to center it
-                    const itemPosition = selectedIndex * itemHeight;
-                    const scrollPosition = Math.max(0, itemPosition - (viewportHeight / 2) + (itemHeight / 2) + 100);
-                    setTimeout(() => {
-                        heightScrollViewRef.current?.scrollTo({
-                            y: scrollPosition,
-                            animated: true,
-                        });
-                    }, 150);
+        const screenHeight = Dimensions.get('window').height;
+        const rulerHeight = Math.min(screenHeight * 0.5, 400);
+        // Perfect center alignment: CENTER_OFFSET = rulerHeight / 2 - tickHeight / 2
+        const CENTER_OFFSET = rulerHeight / 2 - TICK_HEIGHT / 2;
+
+        // Handle scroll - update displayed value in real-time - copy from weight selector
+        const onScroll = (e: any) => {
+            if (isScrollingProgrammatically.current) {
+                return;
+            }
+
+            const offsetY = e.nativeEvent.contentOffset.y;
+            // Calculate which tick should be centered (account for top buffer)
+            const index = Math.round(offsetY / TICK_HEIGHT);
+            const adjustedIndex = index - BUFFER_TICKS;
+            // Clamp to valid range: 0 (MAX_VALUE) to TOTAL_TICKS - 1 (MIN_VALUE)
+            const clampedIndex = Math.max(0, Math.min(TOTAL_TICKS - 1, adjustedIndex));
+
+            // Reverse: index 0 = maxValue (top), index TOTAL_TICKS-1 = minValue (bottom)
+            const reversedIndex = TOTAL_TICKS - 1 - clampedIndex;
+            const newDisplayedValue = MIN_VALUE + reversedIndex;
+
+            // Update displayed value in real-time (not the actual data)
+            if (newDisplayedValue !== displayedHeight) {
+                setDisplayedHeight(newDisplayedValue);
+                // Trigger subtle animation on the display
+                Animated.sequence([
+                    Animated.timing(heightValueDisplayAnim, {
+                        toValue: 0.95,
+                        duration: 50,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(heightValueDisplayAnim, {
+                        toValue: 1,
+                        duration: 100,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                ]).start();
+            }
+        };
+
+        // Clamp scroll to prevent overscrolling past min/max
+        // Hard stop at maximum valid tick (scrollY = BUFFER_TICKS * TICK_HEIGHT)
+        // Minimum valid tick at bottom (scrollY = (BUFFER_TICKS + TOTAL_TICKS - 1) * TICK_HEIGHT)
+        const clampScrollPosition = (offsetY: number): number => {
+            const minScrollY = (BUFFER_TICKS + TOTAL_TICKS - 1) * TICK_HEIGHT; // Minimum value at bottom
+            const maxScrollY = BUFFER_TICKS * TICK_HEIGHT; // Maximum value at top - hard stop
+            return Math.max(maxScrollY, Math.min(minScrollY, offsetY));
+        };
+
+        // Handle scroll end drag - clamp position if needed
+        const onScrollEndDrag = (e: any) => {
+            if (isScrollingProgrammatically.current) {
+                return;
+            }
+
+            const offsetY = e.nativeEvent.contentOffset.y;
+            const clampedY = clampScrollPosition(offsetY);
+
+            if (clampedY !== offsetY) {
+                isScrollingProgrammatically.current = true;
+                heightRulerRef.current?.scrollTo({
+                    y: clampedY,
+                    animated: true,
+                });
+                setTimeout(() => {
+                    isScrollingProgrammatically.current = false;
+                }, 300);
+            }
+        };
+
+        // Handle scroll end - ONLY update actual state here (after momentum ends)
+        const onMomentumScrollEnd = (e: any) => {
+            if (isScrollingProgrammatically.current) {
+                return;
+            }
+
+            const offsetY = e.nativeEvent.contentOffset.y;
+            // Calculate which tick should be centered (account for top buffer)
+            const index = Math.round(offsetY / TICK_HEIGHT);
+            const adjustedIndex = index - BUFFER_TICKS;
+            // Clamp to valid range: 0 (MAX_VALUE) to TOTAL_TICKS - 1 (MIN_VALUE)
+            const clampedIndex = Math.max(0, Math.min(TOTAL_TICKS - 1, adjustedIndex));
+
+            // Calculate exact scroll position for perfect snapping (add top buffer offset)
+            const exactScrollY = (clampedIndex + BUFFER_TICKS) * TICK_HEIGHT;
+
+            // Reverse: index 0 = maxValue (top), index TOTAL_TICKS-1 = minValue (bottom)
+            const reversedIndex = TOTAL_TICKS - 1 - clampedIndex;
+            const newValue = MIN_VALUE + reversedIndex;
+
+            // Update value only after momentum ends with animation
+            if (newValue !== clampedValue) {
+                // Animate value display
+                Animated.sequence([
+                    Animated.timing(heightValueDisplayAnim, {
+                        toValue: 0.8,
+                        duration: 100,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(heightValueDisplayAnim, {
+                        toValue: 1,
+                        duration: 200,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                ]).start();
+
+                updateData('height', newValue);
+            }
+
+            // Snap to exact position smoothly
+            isScrollingProgrammatically.current = true;
+            heightRulerRef.current?.scrollTo({
+                y: exactScrollY,
+                animated: true,
+            });
+            setTimeout(() => {
+                isScrollingProgrammatically.current = false;
+            }, 400);
+        };
+
+        const renderTick = (index: number) => {
+            // Check if this is a buffer tick (above or below valid range) - copy from weight selector
+            const isBufferTick = index < BUFFER_TICKS || index >= BUFFER_TICKS + TOTAL_TICKS;
+
+            if (isBufferTick) {
+                // Calculate the "virtual" value this buffer tick represents
+                let virtualValue: number;
+                let distanceFromValidRange: number;
+
+                if (index < BUFFER_TICKS) {
+                    // Top buffer: ticks above MAX_VALUE
+                    const ticksAboveMax = BUFFER_TICKS - index;
+                    virtualValue = MAX_VALUE + ticksAboveMax;
+                    distanceFromValidRange = ticksAboveMax;
+                } else {
+                    // Bottom buffer: ticks below MIN_VALUE
+                    const adjustedIndex = index - BUFFER_TICKS - TOTAL_TICKS;
+                    virtualValue = MIN_VALUE - (adjustedIndex + 1);
+                    distanceFromValidRange = adjustedIndex + 1;
                 }
-            });
-        };
 
-        const handleSelect = (index: number) => {
-            const selectedValue = minValue + (index * step);
-            updateData('height', selectedValue);
-        };
+                // Determine tick type - match the pattern inside valid range
+                let isMajor = false;
+                let isMedium = false;
+                const roundedValue = Math.round(virtualValue);
+                if (isMetric) {
+                    // Metric: major = 10cm intervals, medium = 5cm intervals
+                    isMajor = roundedValue % 10 === 0;
+                    isMedium = roundedValue % 5 === 0 && !isMajor;
+                } else {
+                    // Imperial: major = 10 inch intervals, medium = 5 inch intervals
+                    isMajor = roundedValue % 10 === 0;
+                    isMedium = roundedValue % 5 === 0 && !isMajor;
+                }
 
-        const handleCloseModal = () => {
-            Animated.parallel([
-                Animated.timing(heightSlideAnim, {
-                    toValue: 0,
-                    duration: 250,
-                    easing: Easing.in(Easing.ease),
-                    useNativeDriver: true,
-                }),
-                Animated.timing(heightFadeAnim, {
-                    toValue: 0,
-                    duration: 250,
-                    easing: Easing.in(Easing.ease),
-                    useNativeDriver: true,
-                }),
-            ]).start(() => {
-                setHeightModalVisible(false);
-            });
-        };
+                // Calculate fade opacity: stronger fade for ticks further from valid range
+                // Fade from 0.6 (closest) to 0.2 (furthest)
+                const maxDistance = BUFFER_TICKS;
+                const fadeOpacity = Math.max(0.2, 0.6 - (distanceFromValidRange / maxDistance) * 0.4);
 
-        const renderPickerModal = () => {
-            const translateY = heightSlideAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [300, 0],
-            });
+                return (
+                    <View
+                        key={index}
+                        style={{
+                            height: TICK_HEIGHT,
+                            justifyContent: 'center',
+                            alignItems: 'flex-start',
+                            flexDirection: 'row',
+                            width: '100%',
+                            position: 'relative',
+                        }}
+                    >
+                        {/* Tick mark with fade - match valid range pattern, just faded */}
+                        <View
+                            style={{
+                                height: isMajor ? 3 : isMedium ? 2.5 : 2,
+                                width: isMajor ? 50 : isMedium ? 34 : 22,
+                                backgroundColor: '#DADADA',
+                                borderRadius: 3,
+                                position: 'absolute',
+                                left: 0,
+                                alignSelf: 'center',
+                                opacity: fadeOpacity,
+                            }}
+                        />
+                        {/* No number indicators on buffer ticks - they're out of range */}
+                    </View>
+                );
+            }
+
+            // Valid tick: calculate value (account for top buffer offset)
+            const adjustedIndex = index - BUFFER_TICKS;
+            // Reverse: index 0 = MAX_VALUE (top), index TOTAL_TICKS - 1 = MIN_VALUE (bottom)
+            const reversedIndex = TOTAL_TICKS - 1 - adjustedIndex;
+            const value = MIN_VALUE + reversedIndex;
+            const isSelected = value === clampedValue;
+
+            // Tick intervals based on unit - match image: major at 10-unit intervals, medium at 5-unit intervals
+            let isMajor = false; // 10-unit intervals (100, 110, 120, etc.)
+            let isMedium = false; // 5-unit intervals (105, 115, 125, etc.)
+
+            if (isMetric) {
+                // Metric: major = 10cm intervals, medium = 5cm intervals, small = 1cm
+                isMajor = value % 10 === 0;
+                isMedium = value % 5 === 0 && !isMajor;
+            } else {
+                // Imperial: major = 10 inch intervals, medium = 5 inch intervals, small = 1 inch
+                isMajor = value % 10 === 0;
+                isMedium = value % 5 === 0 && !isMajor;
+            }
 
             return (
-                <Modal
-                    visible={heightModalVisible}
-                    transparent={true}
-                    animationType="none"
-                    onRequestClose={handleCloseModal}
+                <View
+                    key={index}
+                    style={{
+                        height: TICK_HEIGHT,
+                        justifyContent: 'center',
+                        alignItems: 'flex-start',
+                        flexDirection: 'row',
+                        width: '100%',
+                        position: 'relative',
+                    }}
                 >
-                    <TouchableOpacity
-                        style={styles.modalOverlay}
-                        activeOpacity={1}
-                        onPress={handleCloseModal}
-                    >
-                        <Animated.View
-                            style={[
-                                styles.modalOverlayAnimated,
-                                {
-                                    opacity: heightFadeAnim,
-                                },
-                            ]}
-                        >
-                            <Animated.View
-                                style={[
-                                    styles.modalContent,
-                                    {
-                                        transform: [{ translateY }],
-                                    },
-                                ]}
-                            >
-                                <Text style={styles.modalTitle}>what's your height?</Text>
-                                <ScrollView
-                                    ref={heightScrollViewRef}
-                                    style={styles.modalScrollView}
-                                    scrollEventThrottle={16}
-                                    removeClippedSubviews={true}
-                                    nestedScrollEnabled={true}
-                                    keyboardShouldPersistTaps="handled"
-                                    decelerationRate="normal"
-                                    bounces={true}
-                                    overScrollMode="auto"
-                                    onLayout={(event) => {
-                                        const { height } = event.nativeEvent.layout;
-                                        heightScrollViewHeight.current = height;
-                                    }}
-                                >
-                                    {items.map((item, index) => {
-                                        const isSelected = index === selectedIndex;
-                                        return (
-                                            <TouchableOpacity
-                                                key={index}
-                                                style={[
-                                                    styles.modalItem,
-                                                    isSelected && styles.modalItemSelected
-                                                ]}
-                                                onPress={() => {
-                                                    handleSelect(index);
-                                                    handleCloseModal();
-                                                }}
-                                            >
-                                                <Text style={[
-                                                    styles.modalItemText,
-                                                    isSelected && styles.modalItemTextSelected
-                                                ]}>
-                                                    {item}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        );
-                                    })}
-                                </ScrollView>
-                            </Animated.View>
-                        </Animated.View>
-                    </TouchableOpacity>
-                </Modal>
+                    {/* Tick mark - aligned to left, fixed position like image */}
+                    <View
+                        style={{
+                            height: isSelected ? 3 : (isMajor ? 3 : isMedium ? 2.5 : 2),
+                            width: isSelected
+                                ? (isMajor ? 50 : isMedium ? 34 : 22) // Selected width matches tick type
+                                : (isMajor ? 50 : isMedium ? 34 : 22), // Major = 50px, medium = 34px, small = 22px
+                            backgroundColor: isSelected ? '#526EFF' : '#DADADA',
+                            borderRadius: 3,
+                            position: 'absolute',
+                            left: 0,
+                            alignSelf: 'center',
+                        }}
+                    />
+                    {/* Number indicator on the right for major and medium ticks - positioned after tick mark */}
+                    {(isMajor || isMedium) && (
+                        <Text style={[
+                            styles.heightRulerLabel,
+                            isSelected && styles.heightRulerLabelSelected,
+                            {
+                                marginLeft: isMajor ? 58 : 40, // Position after tick: major=50px+8px, medium=34px+6px
+                            }
+                        ]}>
+                            {isMetric
+                                ? `${value}`
+                                : `${Math.floor(value / 12)}'${value % 12}"`
+                            }
+                        </Text>
+                    )}
+                </View>
             );
         };
 
         return (
             <View style={styles.stepContent}>
-                <Text style={styles.stepTitle}>what's your height?</Text>
+                <Text style={styles.stepTitle}>Select your height</Text>
 
-                {/* Dropdown */}
-                <View style={styles.datePickerContainer}>
-                    <TouchableOpacity
-                        style={styles.dateDropdown}
-                        onPress={handleOpenModal}
+                {/* Fixed height value ABOVE the ruler */}
+                <View style={styles.heightValueDisplayFixed}>
+                    <Animated.Text
+                        style={[
+                            styles.heightValueText,
+                            {
+                                transform: [{ scale: heightValueDisplayAnim }],
+                                opacity: heightValueDisplayAnim,
+                            }
+                        ]}
                     >
-                        <Text
-                            style={styles.dateDropdownText}
-                            numberOfLines={1}
-                            ellipsizeMode="tail"
-                        >
-                            {formattedValue}
-                        </Text>
-                        <Ionicons
-                            name="chevron-down"
-                            size={20}
-                            color="#252525"
-                            style={styles.dateDropdownIcon}
-                        />
-                    </TouchableOpacity>
+                        {formattedValue}
+                    </Animated.Text>
                 </View>
 
-                {renderPickerModal()}
+                {/* Vertical ruler centered horizontally */}
+                <View style={styles.heightRulerWrapper}>
+                    <View style={[styles.heightRulerContainer, { height: rulerHeight }]}>
+                        <ScrollView
+                            ref={heightRulerRef}
+                            showsVerticalScrollIndicator={false}
+                            showsHorizontalScrollIndicator={false}
+                            snapToInterval={TICK_HEIGHT}
+                            decelerationRate={0.92}
+                            onScroll={onScroll}
+                            onScrollEndDrag={onScrollEndDrag}
+                            onMomentumScrollEnd={onMomentumScrollEnd}
+                            scrollEnabled={true}
+                            horizontal={false}
+                            bounces={true}
+                            alwaysBounceVertical={true}
+                            alwaysBounceHorizontal={false}
+                            scrollEventThrottle={16}
+                            contentContainerStyle={{
+                                paddingVertical: CENTER_OFFSET,
+                            }}
+                            style={{
+                                width: '100%',
+                            }}
+                        >
+                            {Array.from({ length: TOTAL_TICKS_WITH_BUFFER }).map((_, i) => renderTick(i))}
+                        </ScrollView>
+
+                        {/* Center indicator line */}
+                        <View style={styles.heightRulerCenterLine} />
+                    </View>
+                </View>
             </View>
         );
     };
@@ -2918,169 +3303,279 @@ export const OnboardingScreen: React.FC = () => {
         // Use unit preference for weight
         const currentUnit = data.unitPreference.weight;
         const isMetric = currentUnit === 'kg';
-        const minValue = isMetric ? 20 : 45;
-        const maxValue = isMetric ? 250 : 550;
-        const step = isMetric ? 0.5 : 1;
 
-        // Clamp and round value
-        const steppedValue = isMetric
-            ? Math.round(data.weight / step) * step
-            : Math.round(data.weight / step) * step;
-        const clampedValue = Math.max(minValue, Math.min(maxValue, steppedValue));
+        // Constants
+        const TICK_WIDTH = 14; // px - horizontal spacing (similar to TICK_HEIGHT for vertical)
 
-        // Generate items for dropdown
-        const items: string[] = [];
-        for (let val = minValue; val <= maxValue; val += step) {
-            if (isMetric) {
-                items.push(`${val.toFixed(1)} kg`);
-            } else {
-                items.push(`${Math.round(val)} lbs`);
-            }
+        // Range based on unit - rebuild ruler data, don't scale
+        const MIN_VALUE = isMetric ? 20 : 45; // 20kg or 45lbs
+        const MAX_VALUE = isMetric ? 250 : 550; // 250kg or 550lbs
+        const STEP = 1; // 1kg or 1lb increments (integers only)
+        // Calculate total ticks based on step
+        const TOTAL_TICKS = Math.round((MAX_VALUE - MIN_VALUE) / STEP) + 1;
+        // Buffer ticks to fill empty space left and right (no numbers, just visual ticks)
+        // Right buffer shows gradient but scrolling stops at maximum value
+        const BUFFER_TICKS = 10;
+        const TOTAL_TICKS_WITH_BUFFER = TOTAL_TICKS + (2 * BUFFER_TICKS);
+
+        // Set default to 65kg or 143lbs (65kg ≈ 143lbs)
+        const defaultWeight = isMetric ? 65 : 143;
+        if (!data.weight || data.weight < MIN_VALUE || data.weight > MAX_VALUE) {
+            updateData('weight', defaultWeight);
         }
 
+        // Clamp and round value to step (integers only)
+        const steppedValue = Math.round(data.weight);
+        const clampedValue = Math.max(MIN_VALUE, Math.min(MAX_VALUE, steppedValue));
+
+        // Format display value using displayedWeight for real-time updates
         const formattedValue = isMetric
-            ? `${clampedValue.toFixed(1)} kg`
-            : `${Math.round(clampedValue)} lbs`;
-        const selectedIndex = items.findIndex(item => item === formattedValue);
+            ? `${Math.round(displayedWeight)} kg`
+            : `${Math.round(displayedWeight)} lbs`;
 
-        const handleOpenModal = () => {
-            setWeightModalVisible(true);
-            Animated.parallel([
-                Animated.timing(weightSlideAnim, {
-                    toValue: 1,
-                    duration: 250,
-                    easing: Easing.out(Easing.ease),
-                    useNativeDriver: true,
-                }),
-                Animated.timing(weightFadeAnim, {
-                    toValue: 1,
-                    duration: 250,
-                    easing: Easing.out(Easing.ease),
-                    useNativeDriver: true,
-                }),
-            ]).start(() => {
-                // Scroll to selected item after modal animation completes
-                if (selectedIndex >= 0 && weightScrollViewRef.current) {
-                    // Calculate item height: padding 20px top + 20px bottom + text ~24px (fontSize 18 with line height) + border 1px = ~61px
-                    const itemHeight = 61;
-                    // Use measured scroll view height or default to 400
-                    const viewportHeight = weightScrollViewHeight.current;
-                    // Calculate position to center: item position - half viewport + half item height
-                    // Add positive offset to scroll more, moving the item up in the viewport to center it
-                    const itemPosition = selectedIndex * itemHeight;
-                    const scrollPosition = Math.max(0, itemPosition - (viewportHeight / 2) + (itemHeight / 2) + 100);
-                    setTimeout(() => {
-                        weightScrollViewRef.current?.scrollTo({
-                            y: scrollPosition,
-                            animated: true,
-                        });
-                    }, 150);
+        const screenWidth = Dimensions.get('window').width;
+        const rulerWidth = Math.min(screenWidth * 0.9, 400);
+        // Perfect center alignment: CENTER_OFFSET = rulerWidth / 2 - tickWidth / 2
+        const CENTER_OFFSET = rulerWidth / 2 - TICK_WIDTH / 2;
+
+        // Handle scroll - update displayed value in real-time
+        const onScroll = (e: any) => {
+            if (isScrollingProgrammaticallyWeight.current) {
+                return;
+            }
+
+            const offsetX = e.nativeEvent.contentOffset.x;
+            // Calculate which tick should be centered (account for left buffer)
+            const index = Math.round(offsetX / TICK_WIDTH);
+            const adjustedIndex = index - BUFFER_TICKS;
+            // Clamp to valid range: 0 (MIN_VALUE) to TOTAL_TICKS - 1 (MAX_VALUE)
+            const clampedIndex = Math.max(0, Math.min(TOTAL_TICKS - 1, adjustedIndex));
+
+            // Calculate value (left to right: MIN_VALUE to MAX_VALUE)
+            const newDisplayedValue = MIN_VALUE + (clampedIndex * STEP);
+
+            // Update displayed value in real-time (not the actual data)
+            if (newDisplayedValue !== displayedWeight) {
+                setDisplayedWeight(newDisplayedValue);
+                // Trigger subtle animation on the display
+                Animated.sequence([
+                    Animated.timing(weightValueDisplayAnim, {
+                        toValue: 0.95,
+                        duration: 50,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(weightValueDisplayAnim, {
+                        toValue: 1,
+                        duration: 100,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                ]).start();
+            }
+        };
+
+        // Clamp scroll to prevent overscrolling past min/max
+        // Hard stop at maximum valid tick (scrollX = (BUFFER_TICKS + TOTAL_TICKS - 1) * TICK_WIDTH)
+        // Minimum valid tick at left (scrollX = BUFFER_TICKS * TICK_WIDTH)
+        const clampScrollPosition = (offsetX: number): number => {
+            const minScrollX = BUFFER_TICKS * TICK_WIDTH; // Minimum value at left
+            const maxScrollX = (BUFFER_TICKS + TOTAL_TICKS - 1) * TICK_WIDTH; // Maximum value at right - hard stop
+            return Math.max(minScrollX, Math.min(maxScrollX, offsetX));
+        };
+
+        // Handle scroll end drag - clamp position if needed
+        const onScrollEndDrag = (e: any) => {
+            if (isScrollingProgrammaticallyWeight.current) {
+                return;
+            }
+
+            const offsetX = e.nativeEvent.contentOffset.x;
+            const clampedX = clampScrollPosition(offsetX);
+
+            if (clampedX !== offsetX) {
+                isScrollingProgrammaticallyWeight.current = true;
+                weightRulerRef.current?.scrollTo({
+                    x: clampedX,
+                    animated: true,
+                });
+                setTimeout(() => {
+                    isScrollingProgrammaticallyWeight.current = false;
+                }, 300);
+            }
+        };
+
+        // Handle scroll end - ONLY update actual state here (after momentum ends)
+        const onMomentumScrollEnd = (e: any) => {
+            if (isScrollingProgrammaticallyWeight.current) {
+                return;
+            }
+
+            const offsetX = e.nativeEvent.contentOffset.x;
+            // Calculate which tick should be centered (account for left buffer)
+            const index = Math.round(offsetX / TICK_WIDTH);
+            const adjustedIndex = index - BUFFER_TICKS;
+            // Clamp to valid range: 0 (MIN_VALUE) to TOTAL_TICKS - 1 (MAX_VALUE)
+            const clampedIndex = Math.max(0, Math.min(TOTAL_TICKS - 1, adjustedIndex));
+
+            // Calculate exact scroll position for perfect snapping (add left buffer offset)
+            const exactScrollX = (clampedIndex + BUFFER_TICKS) * TICK_WIDTH;
+
+            // Calculate value (left to right: MIN_VALUE to MAX_VALUE)
+            const newValue = MIN_VALUE + (clampedIndex * STEP);
+
+            // Update value only after momentum ends with animation
+            if (Math.abs(newValue - clampedValue) > 0.01) {
+                // Animate value display
+                Animated.sequence([
+                    Animated.timing(weightValueDisplayAnim, {
+                        toValue: 0.8,
+                        duration: 100,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(weightValueDisplayAnim, {
+                        toValue: 1,
+                        duration: 200,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                ]).start();
+
+                updateData('weight', Math.round(newValue));
+            }
+
+            // Snap to exact position smoothly
+            isScrollingProgrammaticallyWeight.current = true;
+            weightRulerRef.current?.scrollTo({
+                x: exactScrollX,
+                animated: true,
+            });
+            setTimeout(() => {
+                isScrollingProgrammaticallyWeight.current = false;
+            }, 400);
+        };
+
+        const renderTick = (index: number) => {
+            // Check if this is a buffer tick (left or right of valid range)
+            const isBufferTick = index < BUFFER_TICKS || index >= BUFFER_TICKS + TOTAL_TICKS;
+
+            if (isBufferTick) {
+                // Calculate the "virtual" value this buffer tick represents
+                let virtualValue: number;
+                let distanceFromValidRange: number;
+
+                if (index < BUFFER_TICKS) {
+                    // Left buffer: ticks below MIN_VALUE
+                    const ticksBelowMin = BUFFER_TICKS - index;
+                    virtualValue = MIN_VALUE - (ticksBelowMin * STEP);
+                    distanceFromValidRange = ticksBelowMin;
+                } else {
+                    // Right buffer: ticks above MAX_VALUE
+                    const adjustedIndex = index - BUFFER_TICKS - TOTAL_TICKS;
+                    virtualValue = MAX_VALUE + ((adjustedIndex + 1) * STEP);
+                    distanceFromValidRange = adjustedIndex + 1;
                 }
-            });
-        };
 
-        const handleSelect = (index: number) => {
-            const selectedValue = minValue + (index * step);
-            updateData('weight', isMetric ? parseFloat(selectedValue.toFixed(1)) : Math.round(selectedValue));
-        };
+                // Determine if this should be a medium tick
+                let isMedium = false;
+                const roundedValue = Math.round(virtualValue);
+                if (isMetric) {
+                    // Metric: medium = 5kg intervals
+                    isMedium = roundedValue % 5 === 0;
+                } else {
+                    // Imperial: medium = 10lb intervals
+                    isMedium = roundedValue % 10 === 0;
+                }
 
-        const handleCloseModal = () => {
-            Animated.parallel([
-                Animated.timing(weightSlideAnim, {
-                    toValue: 0,
-                    duration: 250,
-                    easing: Easing.in(Easing.ease),
-                    useNativeDriver: true,
-                }),
-                Animated.timing(weightFadeAnim, {
-                    toValue: 0,
-                    duration: 250,
-                    easing: Easing.in(Easing.ease),
-                    useNativeDriver: true,
-                }),
-            ]).start(() => {
-                setWeightModalVisible(false);
-            });
-        };
+                // Calculate fade opacity: stronger fade for ticks further from valid range
+                // Fade from 0.6 (closest) to 0.2 (furthest)
+                const maxDistance = BUFFER_TICKS;
+                const fadeOpacity = Math.max(0.2, 0.6 - (distanceFromValidRange / maxDistance) * 0.4);
 
-        const renderPickerModal = () => {
-            const translateY = weightSlideAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [300, 0],
-            });
+                return (
+                    <View
+                        key={index}
+                        style={{
+                            width: TICK_WIDTH,
+                            justifyContent: 'flex-start',
+                            alignItems: 'center',
+                            flexDirection: 'column',
+                            height: '100%',
+                        }}
+                    >
+                        {/* Tick mark with fade - medium ticks are taller, small ticks are shorter */}
+                        {/* No numbers on buffer ticks - they're out of range */}
+                        <View
+                            style={{
+                                width: isMedium ? 2.5 : 2,
+                                height: isMedium ? 34 : 22,
+                                backgroundColor: '#DADADA',
+                                borderRadius: 3,
+                                alignSelf: 'center',
+                                opacity: fadeOpacity,
+                            }}
+                        />
+                    </View>
+                );
+            }
+
+            // Valid tick: calculate value (account for left buffer offset)
+            const adjustedIndex = index - BUFFER_TICKS;
+            // Left to right: index 0 = MIN_VALUE, index TOTAL_TICKS - 1 = MAX_VALUE
+            const value = MIN_VALUE + (adjustedIndex * STEP);
+            const isSelected = value === clampedValue;
+
+            // Tick intervals based on unit
+            let isMajor = false;
+            let isMedium = false;
+            let isTenIncrement = false;
+
+            if (isMetric) {
+                // Metric: small = 1kg, medium = 5kg, large = 10kg
+                isMajor = value % 10 === 0;
+                isMedium = value % 5 === 0 && !isMajor;
+                isTenIncrement = value % 10 === 0; // Every 10kg
+            } else {
+                // Imperial: small = 1lb, medium = 10lbs, large = 50lbs
+                isMajor = value % 50 === 0;
+                isMedium = value % 10 === 0 && !isMajor;
+                isTenIncrement = value % 10 === 0; // Every 10lbs
+            }
 
             return (
-                <Modal
-                    visible={weightModalVisible}
-                    transparent={true}
-                    animationType="none"
-                    onRequestClose={handleCloseModal}
+                <View
+                    key={index}
+                    style={{
+                        width: TICK_WIDTH,
+                        justifyContent: 'flex-start',
+                        alignItems: 'center',
+                        flexDirection: 'column',
+                        height: '100%',
+                    }}
                 >
-                    <TouchableOpacity
-                        style={styles.modalOverlay}
-                        activeOpacity={1}
-                        onPress={handleCloseModal}
-                    >
-                        <Animated.View
-                            style={[
-                                styles.modalOverlayAnimated,
-                                {
-                                    opacity: weightFadeAnim,
-                                },
-                            ]}
-                        >
-                            <Animated.View
-                                style={[
-                                    styles.modalContent,
-                                    {
-                                        transform: [{ translateY }],
-                                    },
-                                ]}
-                            >
-                                <Text style={styles.modalTitle}>what's your weight?</Text>
-                                <ScrollView
-                                    ref={weightScrollViewRef}
-                                    style={styles.modalScrollView}
-                                    scrollEventThrottle={16}
-                                    removeClippedSubviews={true}
-                                    nestedScrollEnabled={true}
-                                    keyboardShouldPersistTaps="handled"
-                                    decelerationRate="normal"
-                                    bounces={true}
-                                    overScrollMode="auto"
-                                    onLayout={(event) => {
-                                        const { height } = event.nativeEvent.layout;
-                                        weightScrollViewHeight.current = height;
-                                    }}
-                                >
-                                    {items.map((item, index) => {
-                                        const isSelected = index === selectedIndex;
-                                        return (
-                                            <TouchableOpacity
-                                                key={index}
-                                                style={[
-                                                    styles.modalItem,
-                                                    isSelected && styles.modalItemSelected
-                                                ]}
-                                                onPress={() => {
-                                                    handleSelect(index);
-                                                    handleCloseModal();
-                                                }}
-                                            >
-                                                <Text style={[
-                                                    styles.modalItemText,
-                                                    isSelected && styles.modalItemTextSelected
-                                                ]}>
-                                                    {item}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        );
-                                    })}
-                                </ScrollView>
-                            </Animated.View>
-                        </Animated.View>
-                    </TouchableOpacity>
-                </Modal>
+                    {/* Tick mark - vertical, at the top */}
+                    <View
+                        style={{
+                            width: isSelected ? 3 : (isMajor ? 3 : isMedium ? 2.5 : isTenIncrement ? 2.5 : 2),
+                            height: isMajor ? 50 : isMedium ? 34 : isTenIncrement ? 34 : 22,
+                            backgroundColor: isSelected ? '#526EFF' : '#DADADA',
+                            borderRadius: 3,
+                            marginBottom: (isMajor || isMedium || isTenIncrement) ? 4 : 0,
+                            alignSelf: 'center',
+                            transform: isSelected ? [{ scaleY: 1.15 }] : [{ scaleY: 1 }],
+                        }}
+                    />
+                    {/* Number indicator below for major, medium, and 10-increment ticks */}
+                    {(isMajor || isMedium || isTenIncrement) && (
+                        <Text style={[
+                            styles.weightRulerLabel,
+                            isSelected && styles.weightRulerLabelSelected
+                        ]}>
+                            {`${value}`}
+                        </Text>
+                    )}
+                </View>
             );
         };
 
@@ -3088,29 +3583,53 @@ export const OnboardingScreen: React.FC = () => {
             <View style={styles.stepContent}>
                 <Text style={styles.stepTitle}>what's your weight?</Text>
 
-                {/* Dropdown */}
-                <View style={styles.datePickerContainer}>
-                    <TouchableOpacity
-                        style={styles.dateDropdown}
-                        onPress={handleOpenModal}
+                {/* Fixed weight value ABOVE the ruler */}
+                <View style={styles.weightValueDisplayFixed}>
+                    <Animated.Text
+                        style={[
+                            styles.weightValueText,
+                            {
+                                transform: [{ scale: weightValueDisplayAnim }],
+                                opacity: weightValueDisplayAnim,
+                            }
+                        ]}
                     >
-                        <Text
-                            style={styles.dateDropdownText}
-                            numberOfLines={1}
-                            ellipsizeMode="tail"
-                        >
-                            {formattedValue}
-                        </Text>
-                        <Ionicons
-                            name="chevron-down"
-                            size={20}
-                            color="#252525"
-                            style={styles.dateDropdownIcon}
-                        />
-                    </TouchableOpacity>
+                        {formattedValue}
+                    </Animated.Text>
                 </View>
 
-                {renderPickerModal()}
+                {/* Horizontal ruler centered vertically */}
+                <View style={styles.weightRulerWrapper}>
+                    <View style={[styles.weightRulerContainer, { width: rulerWidth }]}>
+                        <ScrollView
+                            ref={weightRulerRef}
+                            showsVerticalScrollIndicator={false}
+                            showsHorizontalScrollIndicator={false}
+                            snapToInterval={TICK_WIDTH}
+                            decelerationRate={0.92}
+                            onScroll={onScroll}
+                            onScrollEndDrag={onScrollEndDrag}
+                            onMomentumScrollEnd={onMomentumScrollEnd}
+                            scrollEnabled={true}
+                            horizontal={true}
+                            bounces={true}
+                            alwaysBounceVertical={false}
+                            alwaysBounceHorizontal={true}
+                            scrollEventThrottle={16}
+                            contentContainerStyle={{
+                                paddingHorizontal: CENTER_OFFSET,
+                            }}
+                            style={{
+                                height: '100%',
+                            }}
+                        >
+                            {Array.from({ length: TOTAL_TICKS_WITH_BUFFER }).map((_, i) => renderTick(i))}
+                        </ScrollView>
+
+                        {/* Center indicator line */}
+                        <View style={styles.weightRulerCenterLine} />
+                    </View>
+                </View>
             </View>
         );
     };
@@ -3273,7 +3792,12 @@ export const OnboardingScreen: React.FC = () => {
                                         pointerEvents="none"
                                     />
                                     <TouchableOpacity
-                                        onPress={() => updateData('goal', option.key)}
+                                        onPress={(e) => {
+                                            // Blue confetti when selecting (card becomes blue), white when deselecting
+                                            const willBeSelected = data.goal !== option.key;
+                                            triggerConfetti(e, willBeSelected ? '#526EFF' : '#fff');
+                                            updateData('goal', option.key);
+                                        }}
                                         onPressIn={handlePressIn}
                                         onPressOut={handlePressOut}
                                         activeOpacity={1}
@@ -3435,7 +3959,12 @@ export const OnboardingScreen: React.FC = () => {
                                         pointerEvents="none"
                                     />
                                     <TouchableOpacity
-                                        onPress={() => updateData('goal', option.key)}
+                                        onPress={(e) => {
+                                            // Blue confetti when selecting (card becomes blue), white when deselecting
+                                            const willBeSelected = data.goal !== option.key;
+                                            triggerConfetti(e, willBeSelected ? '#526EFF' : '#fff');
+                                            updateData('goal', option.key);
+                                        }}
                                         onPressIn={handlePressIn}
                                         onPressOut={handlePressOut}
                                         activeOpacity={1}
@@ -3611,7 +4140,12 @@ export const OnboardingScreen: React.FC = () => {
                                     pointerEvents="none"
                                 />
                                 <TouchableOpacity
-                                    onPress={() => updateData('activityLevel', option.key)}
+                                    onPress={(e) => {
+                                        // Blue confetti when selecting (card becomes blue), white when deselecting
+                                        const willBeSelected = data.activityLevel !== option.key;
+                                        triggerConfetti(e, willBeSelected ? '#526EFF' : '#fff');
+                                        updateData('activityLevel', option.key);
+                                    }}
                                     onPressIn={handlePressIn}
                                     onPressOut={handlePressOut}
                                     activeOpacity={1}
@@ -3813,7 +4347,12 @@ export const OnboardingScreen: React.FC = () => {
                                     pointerEvents="none"
                                 />
                                 <TouchableOpacity
-                                    onPress={() => updateData('dietPreference', option.key)}
+                                    onPress={(e) => {
+                                        // Blue confetti when selecting (card becomes blue), white when deselecting
+                                        const willBeSelected = data.dietPreference !== option.key;
+                                        triggerConfetti(e, willBeSelected ? '#526EFF' : '#fff');
+                                        updateData('dietPreference', option.key);
+                                    }}
                                     onPressIn={handlePressIn}
                                     onPressOut={handlePressOut}
                                     activeOpacity={1}
@@ -4012,7 +4551,10 @@ export const OnboardingScreen: React.FC = () => {
                         pointerEvents="none"
                     />
                     <TouchableOpacity
-                        onPress={() => {
+                        onPress={(e) => {
+                            // Blue confetti when selected (blue background), white when not selected
+                            const confettiColor = isSelected ? '#526EFF' : '#fff';
+                            triggerConfetti(e, confettiColor);
                             if (isSelected) {
                                 updateData('allergies', data.allergies.filter(a => a !== allergy));
                             } else {
@@ -4190,7 +4732,12 @@ export const OnboardingScreen: React.FC = () => {
                                     pointerEvents="none"
                                 />
                                 <TouchableOpacity
-                                    onPress={() => updateData('goalIntensity', option.key)}
+                                    onPress={(e) => {
+                                        // Blue confetti when selecting (card becomes blue), white when deselecting
+                                        const willBeSelected = data.goalIntensity !== option.key;
+                                        triggerConfetti(e, willBeSelected ? '#526EFF' : '#fff');
+                                        updateData('goalIntensity', option.key);
+                                    }}
                                     onPressIn={handlePressIn}
                                     onPressOut={handlePressOut}
                                     activeOpacity={1}
@@ -4442,7 +4989,12 @@ export const OnboardingScreen: React.FC = () => {
                         pointerEvents="none"
                     />
                     <TouchableOpacity
-                        onPress={() => updateData('purpose', option.key)}
+                        onPress={(e) => {
+                            // Blue confetti when selecting (card becomes blue), white when deselecting
+                            const willBeSelected = data.purpose !== option.key;
+                            triggerConfetti(e, willBeSelected ? '#526EFF' : '#fff');
+                            updateData('purpose', option.key);
+                        }}
                         onPressIn={handlePressIn}
                         onPressOut={handlePressOut}
                         activeOpacity={1}
@@ -4603,7 +5155,12 @@ export const OnboardingScreen: React.FC = () => {
                                     pointerEvents="none"
                                 />
                                 <TouchableOpacity
-                                    onPress={() => updateData('macrosSetup', option.key)}
+                                    onPress={(e) => {
+                                        // Blue confetti when selecting (card becomes blue), white when deselecting
+                                        const willBeSelected = data.macrosSetup !== option.key;
+                                        triggerConfetti(e, willBeSelected ? '#526EFF' : '#fff');
+                                        updateData('macrosSetup', option.key);
+                                    }}
                                     onPressIn={handlePressIn}
                                     onPressOut={handlePressOut}
                                     activeOpacity={1}
@@ -4740,12 +5297,16 @@ export const OnboardingScreen: React.FC = () => {
                 ]}
                 resizeMode="contain"
             />
-            <View style={styles.contentBox}>
+            <View style={styles.contentBox} ref={containerRef}>
                 {/* Back button in top left */}
                 {currentStep > 1 && (
                     <TouchableOpacity
                         style={styles.topBackButton}
-                        onPress={prevStep}
+                        onPress={(e) => {
+                            // White confetti for back button (transparent/white background)
+                            triggerConfetti(e, '#fff');
+                            prevStep();
+                        }}
                     >
                         <Ionicons name="chevron-back" size={24} color="#526EFF" />
                         <Text style={styles.backButtonText}>back</Text>
@@ -4774,7 +5335,9 @@ export const OnboardingScreen: React.FC = () => {
                     <Button
                         variant="primary"
                         title={currentStep === 1 ? "get started!" : currentStep === TOTAL_STEPS ? "let's go!" : `continue (${currentStep}/${TOTAL_STEPS})`}
-                        onPress={() => {
+                        onPress={(e: any) => {
+                            // Blue confetti for primary button (blue background)
+                            triggerConfetti(e, '#526EFF');
                             if (currentStep === TOTAL_STEPS) {
                                 console.log(`🎯 Step ${TOTAL_STEPS} - "let's go!" button clicked`);
                                 handleComplete();
@@ -4788,6 +5351,9 @@ export const OnboardingScreen: React.FC = () => {
                     />
                 </View>
             </View>
+
+            {/* Confetti particles */}
+            <Confetti particles={confettiParticles} />
 
         </View>
     );
