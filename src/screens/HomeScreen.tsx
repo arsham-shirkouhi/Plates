@@ -352,8 +352,8 @@ export const HomeScreen: React.FC = () => {
             </View>
 
 
-            {/* Border ring animation (Apple AI style) */}
-            <AuraOverlay isActive={showBorderRing} />
+            {/* Border ring animation (Apple AI style) - only render when active */}
+            {showBorderRing && <AuraOverlay isActive={showBorderRing} />}
 
             {/* White to transparent gradient behind buttons */}
             <LinearGradient

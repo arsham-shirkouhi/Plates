@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { StyleSheet, Dimensions, Animated, Easing } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, RadialGradient, LinearGradient as SvgLinearGradient, Stop, Rect, Mask, Circle, Path } from 'react-native-svg';
@@ -27,9 +27,11 @@ export const AuraOverlay: React.FC<AuraOverlayProps> = ({ isActive }) => {
     // State to track current thickness and rotation for SVG updates
     const [currentThickness, setCurrentThickness] = useState(0); // Start at 0
     const [rotationDeg, setRotationDeg] = useState(0); // Rotation in degrees (0-360)
+    const lastRotationUpdateRef = useRef(0);
     const lastThicknessRef = useRef(0);
     const baseScaleRef = useRef(0);
     const pulseValueRef = useRef(1);
+    const isActiveRef = useRef(false); // Ref to track active state for listeners (avoids stale closures)
 
     // 🚨 CRITICAL: Start continuous thickness pulse animation ONCE at mount - runs forever
     useEffect(() => {
@@ -64,9 +66,13 @@ export const AuraOverlay: React.FC<AuraOverlayProps> = ({ isActive }) => {
         );
         rotationAnim.start();
 
-        // Track rotation value for SVG updates
+        // Track rotation value for SVG updates - only update when active to avoid re-renders during scroll
+        // Use ref to check active state to avoid stale closure issues
         const rotationListener = rotation.addListener(({ value }) => {
-            setRotationDeg(value);
+            // Only update state when component is active (visible) - use ref to avoid stale closure
+            if (isActiveRef.current) {
+                setRotationDeg(value);
+            }
         });
 
         // Track combined thickness value for SVG updates (base scale × pulse scale)
@@ -75,10 +81,14 @@ export const AuraOverlay: React.FC<AuraOverlayProps> = ({ isActive }) => {
 
         const updateThickness = ({ value: baseScale }: { value: number }) => {
             baseScaleRef.current = baseScale;
+            // Only update state when active to prevent re-renders during scroll
+            if (!isActiveRef.current) return;
             if (rafId) return; // Skip if already scheduled
 
             rafId = requestAnimationFrame(() => {
                 rafId = null;
+                // Double-check isActive in case it changed - use ref to avoid stale closure
+                if (!isActiveRef.current) return;
                 try {
                     const safeBaseScale = Math.max(0, Math.min(1, baseScaleRef.current || 0)); // Clamp 0-1
                     const safePulseValue = Math.max(0.5, Math.min(2, pulseValueRef.current || 1)); // Clamp 0.5-2
@@ -99,10 +109,14 @@ export const AuraOverlay: React.FC<AuraOverlayProps> = ({ isActive }) => {
 
         const updatePulse = ({ value: pulseValue }: { value: number }) => {
             pulseValueRef.current = pulseValue;
+            // Only update state when active to prevent re-renders during scroll
+            if (!isActiveRef.current) return;
             if (rafId) return; // Skip if already scheduled
 
             rafId = requestAnimationFrame(() => {
                 rafId = null;
+                // Double-check isActive in case it changed - use ref to avoid stale closure
+                if (!isActiveRef.current) return;
                 try {
                     const safeBaseScale = Math.max(0, Math.min(1, baseScaleRef.current || 0)); // Clamp 0-1
                     const safePulseValue = Math.max(0.5, Math.min(2, pulseValueRef.current || 1)); // Clamp 0.5-2
@@ -146,6 +160,9 @@ export const AuraOverlay: React.FC<AuraOverlayProps> = ({ isActive }) => {
     // 🚨 CRITICAL: Opacity and thickness control - instant response on press
     // Controls visibility AND initial thickness reveal
     useEffect(() => {
+        // Update ref immediately so listeners can check current state (avoids stale closures)
+        isActiveRef.current = isActive;
+
         // Cancel any running animations
         if (opacityAnimationRef.current) {
             opacityAnimationRef.current.stop();
@@ -256,7 +273,7 @@ export const AuraOverlay: React.FC<AuraOverlayProps> = ({ isActive }) => {
                 <Defs>
                     {/* Calculate purple accent position along perimeter */}
                     {/* Perimeter: top (0→width) → right (0→height) → bottom (width→0) → left (height→0) */}
-                    {(() => {
+                    {useMemo(() => {
                         const perimeter = 2 * (SCREEN_WIDTH + SCREEN_HEIGHT);
                         const position = (rotationDeg / 360) * perimeter;
                         const purpleWidth = 60; // Width of purple accent in pixels
@@ -327,7 +344,7 @@ export const AuraOverlay: React.FC<AuraOverlayProps> = ({ isActive }) => {
                                 {createEdgeGradient("leftEdgeGradient", leftPos, 'v')}
                             </>
                         );
-                    })()}
+                    }, [rotationDeg, blueColor])}
 
 
                     {/* Mask - ensures center is ALWAYS fully transparent */}
