@@ -28,6 +28,7 @@ export const OnboardingScreen: React.FC = () => {
     const [usernameError, setUsernameError] = useState<string>('');
     const [checkingUsername, setCheckingUsername] = useState(false);
     const usernameCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const checkingUsernameOpacity = useRef(new Animated.Value(0.5)).current;
     const [data, setData] = useState<OnboardingData>({
         name: '',
         birthMonth: 0,
@@ -838,6 +839,23 @@ export const OnboardingScreen: React.FC = () => {
                 }
 
                 setCheckingUsername(true);
+                // Start pulsing animation
+                Animated.loop(
+                    Animated.sequence([
+                        Animated.timing(checkingUsernameOpacity, {
+                            toValue: 1,
+                            duration: 800,
+                            easing: Easing.inOut(Easing.ease),
+                            useNativeDriver: true,
+                        }),
+                        Animated.timing(checkingUsernameOpacity, {
+                            toValue: 0.5,
+                            duration: 800,
+                            easing: Easing.inOut(Easing.ease),
+                            useNativeDriver: true,
+                        }),
+                    ])
+                ).start();
                 try {
                     const exists = await checkUsernameExists(username, user.uid);
                     if (exists) {
@@ -850,6 +868,9 @@ export const OnboardingScreen: React.FC = () => {
                     // Don't show error on network issues - allow user to proceed
                 } finally {
                     setCheckingUsername(false);
+                    // Stop animation
+                    checkingUsernameOpacity.stopAnimation();
+                    checkingUsernameOpacity.setValue(0.5);
                 }
             }, 500);
         }
@@ -943,16 +964,6 @@ export const OnboardingScreen: React.FC = () => {
                     return { valid: false, message: 'please select what you\'re here for' };
                 }
                 break;
-            case 14: // Macros Setup - This step still exists as step 14
-                if (data.macrosSetup === '') {
-                    return { valid: false, message: 'please select macros setup' };
-                }
-                // If manual, validate custom macros
-                if (data.macrosSetup === 'manual' && (!data.customMacros ||
-                    !data.customMacros.protein || !data.customMacros.carbs || !data.customMacros.fats)) {
-                    return { valid: false, message: 'please enter all macro values' };
-                }
-                break;
         }
         return { valid: true };
     };
@@ -989,7 +1000,7 @@ export const OnboardingScreen: React.FC = () => {
 
         // Validate required fields
         if (!data.name || !data.birthMonth || !data.birthDay || !data.birthYear || !data.sex || !data.goal || !data.activityLevel ||
-            !data.dietPreference || !data.goalIntensity || !data.purpose || !data.macrosSetup) {
+            !data.dietPreference || !data.goalIntensity || !data.purpose) {
             console.log('❌ Validation failed - missing required fields');
             Alert.alert('Incomplete', 'Please complete all required fields.');
             return;
@@ -1023,14 +1034,12 @@ export const OnboardingScreen: React.FC = () => {
                 goalIntensity: data.goalIntensity as 'mild' | 'moderate' | 'aggressive',
                 unitPreference: data.unitPreference,
                 purpose: data.purpose as 'meals' | 'workouts' | 'both' | 'discipline',
-                macrosSetup: data.macrosSetup as 'auto' | 'manual',
-                customMacros: data.customMacros,
+                macrosSetup: 'auto' as 'auto' | 'manual', // Always auto calculate
+                customMacros: undefined,
             };
 
-            // Calculate macros before saving to show in results modal
-            let macros = null;
-            if (onboardingData.macrosSetup === 'auto') {
-                macros = generateDailyMacrosFromAge(
+            // Calculate macros before saving to show in results modal (always auto)
+            const macros = generateDailyMacrosFromAge(
                     onboardingData.age,
                     onboardingData.sex,
                     onboardingData.height,
@@ -1041,9 +1050,6 @@ export const OnboardingScreen: React.FC = () => {
                     onboardingData.goal,
                     onboardingData.goalIntensity
                 );
-            } else if (onboardingData.macrosSetup === 'manual' && onboardingData.customMacros) {
-                macros = generateManualMacros(onboardingData.customMacros);
-            }
 
             await saveOnboardingData(user, onboardingData);
             console.log('✅ Onboarding data saved successfully');
@@ -1141,7 +1147,7 @@ export const OnboardingScreen: React.FC = () => {
                                     styles.weightPlate,
                                     isFilled && styles.weightPlateFilled,
                                     {
-                                        transform: [{ scale: anim.scale }],
+                                        transform: [{ scale: isFilled ? anim.scale : 1 }],
                                         opacity: isFilled ? anim.opacity : 1,
                                     },
                                 ]}
@@ -1211,8 +1217,6 @@ export const OnboardingScreen: React.FC = () => {
                 return renderGoalIntensityStep();
             case 13:
                 return renderPurposeStep();
-            case 14:
-                return renderMacrosStep();
             default:
                 return null;
         }
@@ -1242,7 +1246,9 @@ export const OnboardingScreen: React.FC = () => {
                         />
                     </View>
                     {checkingUsername && (
-                        <Text style={styles.usernameStatusText}>checking availability...</Text>
+                        <Animated.Text style={[styles.usernameStatusText, { opacity: checkingUsernameOpacity }]}>
+                            checking availability...
+                        </Animated.Text>
                     )}
                     {usernameError && !checkingUsername && (
                         <Text style={styles.usernameErrorText}>{usernameError}</Text>
@@ -1280,8 +1286,8 @@ export const OnboardingScreen: React.FC = () => {
                 >
                     <Text
                         style={[
-                            styles.dateDropdownText,
-                            isPlaceholder && styles.dateDropdownTextPlaceholder
+                        styles.dateDropdownText,
+                        isPlaceholder && styles.dateDropdownTextPlaceholder
                         ]}
                         numberOfLines={1}
                         ellipsizeMode="tail"
@@ -2274,8 +2280,8 @@ export const OnboardingScreen: React.FC = () => {
 
     // Animate macro cards when selection changes - pressed button state when selected
     useEffect(() => {
-        // Always run animations when on step 14, or when macrosSetup changes
-        if (currentStep === 14) { // Macros step is step 14
+        // Macros step removed - always auto calculate
+        if (false) { // Macros step is removed
             const isAutoSelected = data.macrosSetup === 'auto';
             const isManualSelected = data.macrosSetup === 'manual';
 
@@ -2326,9 +2332,9 @@ export const OnboardingScreen: React.FC = () => {
         }
     }, [data.macrosSetup, currentStep]);
 
-    // Animate macro inputs container when manual is selected
+    // Animate macro inputs container when manual is selected (removed - macros step removed)
     useEffect(() => {
-        if (currentStep === 14) { // Macros step is step 14
+        if (false) { // Macros step is removed
             const isManual = data.macrosSetup === 'manual';
 
             // Reset to lower position when entering the step
@@ -2416,7 +2422,6 @@ export const OnboardingScreen: React.FC = () => {
                                             top: 4,
                                             left: 0,
                                             right: 0,
-                                            transform: [{ translateY: 0 }],
                                             opacity: cardShadowHeightAnim.interpolate({
                                                 inputRange: [0, 4],
                                                 outputRange: [0, 1],
@@ -2427,8 +2432,8 @@ export const OnboardingScreen: React.FC = () => {
                                     ]}
                                     pointerEvents="none"
                                 />
-                                <TouchableOpacity
-                                    key={option.key}
+                            <TouchableOpacity
+                                key={option.key}
                                     onPress={(e) => {
                                         // Haptic feedback
                                         triggerHaptic();
@@ -2439,58 +2444,58 @@ export const OnboardingScreen: React.FC = () => {
                                     }}
                                     onPressIn={handlePressIn}
                                     onPressOut={handlePressOut}
-                                    activeOpacity={1}
+                                activeOpacity={1}
                                     style={{ zIndex: 1 }}
+                            >
+                                <Animated.View
+                                    style={[
+                                        styles.sexCard,
+                                        {
+                                            transform: [{ translateY: cardTranslateY }],
+                                        },
+                                    ]}
                                 >
+                                    {/* Blue color overlay that fades in when selected */}
                                     <Animated.View
                                         style={[
-                                            styles.sexCard,
+                                            StyleSheet.absoluteFill,
                                             {
-                                                transform: [{ translateY: cardTranslateY }],
+                                                backgroundColor: '#526EFF',
+                                                borderRadius: 10,
+                                                opacity: cardColorOpacity,
+                                            },
+                                        ]}
+                                        pointerEvents="none"
+                                    />
+                                    <Animated.Text
+                                        style={[
+                                            styles.sexCardIcon,
+                                            {
+                                                transform: [{ scale: iconScale }],
+                                                color: cardColorOpacity.interpolate({
+                                                    inputRange: [0, 1],
+                                                    outputRange: ['#666', '#fff'],
+                                                }),
                                             },
                                         ]}
                                     >
-                                        {/* Blue color overlay that fades in when selected */}
-                                        <Animated.View
-                                            style={[
-                                                StyleSheet.absoluteFill,
-                                                {
-                                                    backgroundColor: '#526EFF',
-                                                    borderRadius: 10,
-                                                    opacity: cardColorOpacity,
-                                                },
-                                            ]}
-                                            pointerEvents="none"
-                                        />
-                                        <Animated.Text
-                                            style={[
-                                                styles.sexCardIcon,
-                                                {
-                                                    transform: [{ scale: iconScale }],
-                                                    color: cardColorOpacity.interpolate({
-                                                        inputRange: [0, 1],
-                                                        outputRange: ['#666', '#fff'],
-                                                    }),
-                                                },
-                                            ]}
-                                        >
-                                            {option.symbol}
-                                        </Animated.Text>
-                                        <Animated.Text
-                                            style={[
-                                                styles.sexCardText,
-                                                {
-                                                    color: cardColorOpacity.interpolate({
-                                                        inputRange: [0, 1],
-                                                        outputRange: ['#333', '#fff'],
-                                                    }),
-                                                },
-                                            ]}
-                                        >
-                                            {option.label}
-                                        </Animated.Text>
-                                    </Animated.View>
-                                </TouchableOpacity>
+                                        {option.symbol}
+                                    </Animated.Text>
+                                    <Animated.Text
+                                        style={[
+                                            styles.sexCardText,
+                                            {
+                                                color: cardColorOpacity.interpolate({
+                                                    inputRange: [0, 1],
+                                                    outputRange: ['#333', '#fff'],
+                                                }),
+                                            },
+                                        ]}
+                                    >
+                                        {option.label}
+                                    </Animated.Text>
+                                </Animated.View>
+                            </TouchableOpacity>
                             </View>
                         );
                     })}
@@ -2677,13 +2682,13 @@ export const OnboardingScreen: React.FC = () => {
         );
     };
 
-    // Helper function to convert inches to feet and inches string (e.g., 71 -> "5'11\"")
-    const inchesToFeetInches = (inches: number): string => {
-        const clampedInches = Math.max(48, Math.min(95, Math.round(inches)));
-        const feet = Math.floor(clampedInches / 12);
-        const remainingInches = clampedInches % 12;
-        return `${feet}'${remainingInches}"`;
-    };
+        // Helper function to convert inches to feet and inches string (e.g., 71 -> "5'11\"")
+        const inchesToFeetInches = (inches: number): string => {
+            const clampedInches = Math.max(48, Math.min(95, Math.round(inches)));
+            const feet = Math.floor(clampedInches / 12);
+            const remainingInches = clampedInches % 12;
+            return `${feet}'${remainingInches}"`;
+        };
 
     // Shared helper for rendering measurement step (height or weight) - Simple dropdown version
     const renderMeasurementStep = (
@@ -2904,42 +2909,42 @@ export const OnboardingScreen: React.FC = () => {
                         pointerEvents="none"
                     />
                     <View style={[styles.unitToggle, { zIndex: 1 }]}>
-                        <Animated.View
-                            style={[
-                                styles.unitToggleBackground,
-                                {
+                    <Animated.View
+                        style={[
+                            styles.unitToggleBackground,
+                            {
                                     transform: [{
                                         translateX: unitToggleSlideAnim.interpolate({
-                                            inputRange: [0, 1],
+                                    inputRange: [0, 1],
                                             outputRange: [0, 176],
-                                        }),
+                                }),
                                     }],
-                                },
-                            ]}
-                        />
-                        <TouchableOpacity
-                            style={styles.unitButton}
+                            },
+                        ]}
+                    />
+                    <TouchableOpacity
+                        style={styles.unitButton}
                             onPress={() => handleUnitChange(config.unit1)}
-                        >
-                            <Text style={[
-                                styles.unitButtonText,
+                    >
+                        <Text style={[
+                            styles.unitButtonText,
                                 currentUnit === config.unit1 && styles.unitButtonTextActive
-                            ]}>
+                        ]}>
                                 {config.unit1}
-                            </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.unitButton}
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.unitButton}
                             onPress={() => handleUnitChange(config.unit2)}
-                        >
-                            <Text style={[
-                                styles.unitButtonText,
+                    >
+                        <Text style={[
+                            styles.unitButtonText,
                                 currentUnit === config.unit2 && styles.unitButtonTextActive
-                            ]}>
+                        ]}>
                                 {config.unit2}
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
+                        </Text>
+                    </TouchableOpacity>
+                </View>
                 </View>
 
                 {/* Dropdown */}
@@ -3148,7 +3153,7 @@ export const OnboardingScreen: React.FC = () => {
                     const ticksAboveMax = BUFFER_TICKS - index;
                     virtualValue = MAX_VALUE + ticksAboveMax;
                     distanceFromValidRange = ticksAboveMax;
-                } else {
+                        } else {
                     // Bottom buffer: ticks below MIN_VALUE
                     const adjustedIndex = index - BUFFER_TICKS - TOTAL_TICKS;
                     virtualValue = MIN_VALUE - (adjustedIndex + 1);
@@ -3198,10 +3203,10 @@ export const OnboardingScreen: React.FC = () => {
                                 alignSelf: 'center',
                                 opacity: fadeOpacity,
                             }}
-                        />
+                />
                         {/* No number indicators on buffer ticks - they're out of range */}
-                    </View>
-                );
+            </View>
+        );
             }
 
             // Valid tick: calculate value (account for top buffer offset)
@@ -3819,7 +3824,7 @@ export const OnboardingScreen: React.FC = () => {
                                         ]}
                                         pointerEvents="none"
                                     />
-                                    <TouchableOpacity
+                                <TouchableOpacity
                                         onPress={(e) => {
                                             // Haptic feedback
                                             triggerHaptic();
@@ -3830,46 +3835,38 @@ export const OnboardingScreen: React.FC = () => {
                                         }}
                                         onPressIn={handlePressIn}
                                         onPressOut={handlePressOut}
-                                        activeOpacity={1}
+                                    activeOpacity={1}
                                         style={{ zIndex: 1, position: 'absolute', top: 0, left: 0 }}
+                                >
+                                    <Animated.View
+                                        style={[
+                                            styles.goalCard,
+                                            {
+                                                transform: [{ translateY: animations.translateY }],
+                                            },
+                                        ]}
                                     >
+                                        {/* Color overlay that fades in when selected */}
                                         <Animated.View
                                             style={[
-                                                styles.goalCard,
+                                                StyleSheet.absoluteFill,
                                                 {
-                                                    transform: [{ translateY: animations.translateY }],
-                                                    shadowColor: '#252525',
-                                                    shadowOffset: {
-                                                        width: 0,
-                                                        height: animations.shadowHeight,
-                                                    },
-                                                    shadowOpacity: 1,
-                                                    shadowRadius: 0,
-                                                    elevation: animations.shadowHeight,
+                                                    backgroundColor: option.color,
+                                                    borderRadius: 12,
+                                                    opacity: animations.colorOpacity,
                                                 },
                                             ]}
-                                        >
-                                            {/* Color overlay that fades in when selected */}
-                                            <Animated.View
-                                                style={[
-                                                    StyleSheet.absoluteFill,
-                                                    {
-                                                        backgroundColor: option.color,
-                                                        borderRadius: 12,
-                                                        opacity: animations.colorOpacity,
-                                                    },
-                                                ]}
-                                                pointerEvents="none"
-                                            />
-                                            <Text style={styles.goalIcon}>{option.icon}</Text>
-                                            <Text style={[
-                                                styles.goalCardText,
-                                                isSelected && styles.goalCardTextSelected
-                                            ]}>
-                                                {option.label}
-                                            </Text>
-                                        </Animated.View>
-                                    </TouchableOpacity>
+                                            pointerEvents="none"
+                                        />
+                                        <Text style={styles.goalIcon}>{option.icon}</Text>
+                                        <Text style={[
+                                            styles.goalCardText,
+                                            isSelected && styles.goalCardTextSelected
+                                        ]}>
+                                            {option.label}
+                                        </Text>
+                                    </Animated.View>
+                                </TouchableOpacity>
                                 </View>
                             );
                         })}
@@ -3988,7 +3985,7 @@ export const OnboardingScreen: React.FC = () => {
                                         ]}
                                         pointerEvents="none"
                                     />
-                                    <TouchableOpacity
+                                <TouchableOpacity
                                         onPress={(e) => {
                                             // Haptic feedback
                                             triggerHaptic();
@@ -3999,38 +3996,38 @@ export const OnboardingScreen: React.FC = () => {
                                         }}
                                         onPressIn={handlePressIn}
                                         onPressOut={handlePressOut}
-                                        activeOpacity={1}
+                                    activeOpacity={1}
                                         style={{ zIndex: 1, position: 'absolute', top: 0, left: 0 }}
+                                >
+                                    <Animated.View
+                                        style={[
+                                            styles.goalCard,
+                                            {
+                                                transform: [{ translateY: animations.translateY }],
+                                            },
+                                        ]}
                                     >
+                                        {/* Color overlay that fades in when selected */}
                                         <Animated.View
                                             style={[
-                                                styles.goalCard,
+                                                StyleSheet.absoluteFill,
                                                 {
-                                                    transform: [{ translateY: animations.translateY }],
+                                                    backgroundColor: option.color,
+                                                    borderRadius: 12,
+                                                    opacity: animations.colorOpacity,
                                                 },
                                             ]}
-                                        >
-                                            {/* Color overlay that fades in when selected */}
-                                            <Animated.View
-                                                style={[
-                                                    StyleSheet.absoluteFill,
-                                                    {
-                                                        backgroundColor: option.color,
-                                                        borderRadius: 12,
-                                                        opacity: animations.colorOpacity,
-                                                    },
-                                                ]}
-                                                pointerEvents="none"
-                                            />
-                                            <Text style={styles.goalIcon}>{option.icon}</Text>
-                                            <Text style={[
-                                                styles.goalCardText,
-                                                isSelected && styles.goalCardTextSelected
-                                            ]}>
-                                                {option.label}
-                                            </Text>
-                                        </Animated.View>
-                                    </TouchableOpacity>
+                                            pointerEvents="none"
+                                        />
+                                        <Text style={styles.goalIcon}>{option.icon}</Text>
+                                        <Text style={[
+                                            styles.goalCardText,
+                                            isSelected && styles.goalCardTextSelected
+                                        ]}>
+                                            {option.label}
+                                        </Text>
+                                    </Animated.View>
+                                </TouchableOpacity>
                                 </View>
                             );
                         })}
@@ -4148,14 +4145,16 @@ export const OnboardingScreen: React.FC = () => {
                         const cardShadowHeightAnim = getCardShadowAnim();
 
                         return (
-                            <View key={option.key} style={{ position: 'relative', marginBottom: 10, paddingBottom: 4 }}>
+                            <View key={option.key} style={{ position: 'relative', marginBottom: 10, paddingBottom: 4, overflow: 'visible' }}>
                                 {/* Shadow layer - harsh drop shadow */}
                                 <Animated.View
                                     style={[
-                                        styles.activityCard,
                                         {
                                             position: 'absolute',
+                                            width: '100%',
+                                            height: '100%',
                                             backgroundColor: '#252525',
+                                            borderRadius: 12,
                                             top: 4,
                                             left: 0,
                                             right: 0,
@@ -4164,14 +4163,11 @@ export const OnboardingScreen: React.FC = () => {
                                                 outputRange: [0, 1],
                                             }),
                                             zIndex: 0,
-                                            borderWidth: 0,
-                                            marginBottom: 0,
-                                            padding: 20, // Match card padding
                                         },
                                     ]}
                                     pointerEvents="none"
                                 />
-                                <TouchableOpacity
+                            <TouchableOpacity
                                     onPress={(e) => {
                                         // Haptic feedback
                                         triggerHaptic();
@@ -4182,51 +4178,43 @@ export const OnboardingScreen: React.FC = () => {
                                     }}
                                     onPressIn={handlePressIn}
                                     onPressOut={handlePressOut}
-                                    activeOpacity={1}
+                                activeOpacity={1}
                                     style={{ zIndex: 1 }}
+                            >
+                                <Animated.View
+                                    style={[
+                                        styles.activityCard,
+                                        {
+                                            transform: [{ translateY: animations.translateY }],
+                                        },
+                                    ]}
                                 >
+                                    {/* Color overlay that fades in when selected */}
                                     <Animated.View
                                         style={[
-                                            styles.activityCard,
+                                            StyleSheet.absoluteFill,
                                             {
-                                                transform: [{ translateY: animations.translateY }],
-                                                shadowColor: '#252525',
-                                                shadowOffset: {
-                                                    width: 0,
-                                                    height: animations.shadowHeight,
-                                                },
-                                                shadowOpacity: 1,
-                                                shadowRadius: 0,
-                                                elevation: animations.shadowHeight,
+                                                backgroundColor: option.color,
+                                                borderRadius: 12,
+                                                opacity: animations.colorOpacity,
                                             },
                                         ]}
-                                    >
-                                        {/* Color overlay that fades in when selected */}
-                                        <Animated.View
-                                            style={[
-                                                StyleSheet.absoluteFill,
-                                                {
-                                                    backgroundColor: option.color,
-                                                    borderRadius: 12,
-                                                    opacity: animations.colorOpacity,
-                                                },
-                                            ]}
-                                            pointerEvents="none"
-                                        />
-                                        <Text style={[
-                                            styles.activityCardTitle,
-                                            isSelected && styles.activityCardTitleSelected
-                                        ]}>
-                                            {option.label}
-                                        </Text>
-                                        <Text style={[
-                                            styles.activityCardDesc,
-                                            isSelected && styles.activityCardDescSelected
-                                        ]}>
-                                            {option.desc}
-                                        </Text>
-                                    </Animated.View>
-                                </TouchableOpacity>
+                                        pointerEvents="none"
+                                    />
+                                    <Text style={[
+                                        styles.activityCardTitle,
+                                        isSelected && styles.activityCardTitleSelected
+                                    ]}>
+                                        {option.label}
+                                    </Text>
+                                    <Text style={[
+                                        styles.activityCardDesc,
+                                        isSelected && styles.activityCardDescSelected
+                                    ]}>
+                                        {option.desc}
+                                    </Text>
+                                </Animated.View>
+                            </TouchableOpacity>
                             </View>
                         );
                     })}
@@ -4388,7 +4376,7 @@ export const OnboardingScreen: React.FC = () => {
                                     ]}
                                     pointerEvents="none"
                                 />
-                                <TouchableOpacity
+                            <TouchableOpacity
                                     onPress={(e) => {
                                         // Haptic feedback
                                         triggerHaptic();
@@ -4399,38 +4387,38 @@ export const OnboardingScreen: React.FC = () => {
                                     }}
                                     onPressIn={handlePressIn}
                                     onPressOut={handlePressOut}
-                                    activeOpacity={1}
+                                activeOpacity={1}
                                     style={{ zIndex: 1 }}
+                            >
+                                <Animated.View
+                                    style={[
+                                        styles.dietCard,
+                                        {
+                                            transform: [{ translateY: animations.translateY }],
+                                        },
+                                    ]}
                                 >
+                                    {/* Color overlay that fades in when selected */}
                                     <Animated.View
                                         style={[
-                                            styles.dietCard,
+                                            StyleSheet.absoluteFill,
                                             {
-                                                transform: [{ translateY: animations.translateY }],
+                                                backgroundColor: option.color,
+                                                borderRadius: 12,
+                                                opacity: animations.colorOpacity,
                                             },
                                         ]}
-                                    >
-                                        {/* Color overlay that fades in when selected */}
-                                        <Animated.View
-                                            style={[
-                                                StyleSheet.absoluteFill,
-                                                {
-                                                    backgroundColor: option.color,
-                                                    borderRadius: 12,
-                                                    opacity: animations.colorOpacity,
-                                                },
-                                            ]}
-                                            pointerEvents="none"
-                                        />
-                                        <Text style={styles.dietIcon}>{option.icon}</Text>
-                                        <Text style={[
-                                            styles.dietCardText,
-                                            isSelected && styles.dietCardTextSelected
-                                        ]}>
-                                            {option.label}
-                                        </Text>
-                                    </Animated.View>
-                                </TouchableOpacity>
+                                        pointerEvents="none"
+                                    />
+                                    <Text style={styles.dietIcon}>{option.icon}</Text>
+                                    <Text style={[
+                                        styles.dietCardText,
+                                        isSelected && styles.dietCardTextSelected
+                                    ]}>
+                                        {option.label}
+                                    </Text>
+                                </Animated.View>
+                            </TouchableOpacity>
                             </View>
                         );
                     })}
@@ -4573,14 +4561,16 @@ export const OnboardingScreen: React.FC = () => {
             const chipShadowHeightAnim = getChipShadowAnim();
 
             return (
-                <View key={allergy} style={{ position: 'relative', marginBottom: 4, paddingBottom: 4 }}>
+                <View key={allergy} style={{ position: 'relative', marginBottom: 4, paddingBottom: 4, overflow: 'visible' }}>
                     {/* Shadow layer - harsh drop shadow */}
                     <Animated.View
                         style={[
-                            styles.chip,
                             {
                                 position: 'absolute',
+                                width: '100%',
+                                height: '100%',
                                 backgroundColor: '#252525',
+                                borderRadius: 12,
                                 top: 4,
                                 left: 0,
                                 right: 0,
@@ -4589,57 +4579,56 @@ export const OnboardingScreen: React.FC = () => {
                                     outputRange: [0, 1],
                                 }),
                                 zIndex: 0,
-                                borderWidth: 0,
                             },
                         ]}
                         pointerEvents="none"
                     />
-                    <TouchableOpacity
+                <TouchableOpacity
                         onPress={(e) => {
                             // Haptic feedback
                             triggerHaptic();
                             // Blue confetti when selected (blue background), white when not selected
                             const confettiColor = isSelected ? '#526EFF' : '#fff';
                             triggerConfetti(e, confettiColor);
-                            if (isSelected) {
-                                updateData('allergies', data.allergies.filter(a => a !== allergy));
-                            } else {
-                                updateData('allergies', [...data.allergies, allergy]);
-                            }
-                        }}
+                        if (isSelected) {
+                            updateData('allergies', data.allergies.filter(a => a !== allergy));
+                        } else {
+                            updateData('allergies', [...data.allergies, allergy]);
+                        }
+                    }}
                         onPressIn={handlePressIn}
                         onPressOut={handlePressOut}
-                        activeOpacity={1}
+                    activeOpacity={1}
                         style={{ zIndex: 1 }}
+                >
+                    <Animated.View
+                        style={[
+                            styles.chip,
+                            {
+                                transform: [{ translateY: animations.translateY }],
+                            },
+                        ]}
                     >
+                        {/* Color overlay that fades in when selected */}
                         <Animated.View
                             style={[
-                                styles.chip,
+                                StyleSheet.absoluteFill,
                                 {
-                                    transform: [{ translateY: animations.translateY }],
+                                    backgroundColor: '#526EFF',
+                                    borderRadius: 12,
+                                    opacity: animations.colorOpacity,
                                 },
                             ]}
-                        >
-                            {/* Color overlay that fades in when selected */}
-                            <Animated.View
-                                style={[
-                                    StyleSheet.absoluteFill,
-                                    {
-                                        backgroundColor: '#526EFF',
-                                        borderRadius: 12,
-                                        opacity: animations.colorOpacity,
-                                    },
-                                ]}
-                                pointerEvents="none"
-                            />
-                            <Text style={[
-                                styles.chipText,
-                                isSelected && styles.chipTextSelected
-                            ]}>
-                                {allergy}
-                            </Text>
-                        </Animated.View>
-                    </TouchableOpacity>
+                            pointerEvents="none"
+                        />
+                        <Text style={[
+                            styles.chipText,
+                            isSelected && styles.chipTextSelected
+                        ]}>
+                            {allergy}
+                        </Text>
+                    </Animated.View>
+                </TouchableOpacity>
                 </View>
             );
         };
@@ -4755,14 +4744,16 @@ export const OnboardingScreen: React.FC = () => {
                         const cardShadowHeightAnim = getCardShadowAnim();
 
                         return (
-                            <View key={option.key} style={{ position: 'relative', marginBottom: 22 }}>
+                            <View key={option.key} style={{ position: 'relative', marginBottom: 22, overflow: 'visible' }}>
                                 {/* Shadow layer - harsh drop shadow */}
                                 <Animated.View
                                     style={[
-                                        styles.activityCard,
                                         {
                                             position: 'absolute',
+                                            width: '100%',
+                                            height: '100%',
                                             backgroundColor: '#252525',
+                                            borderRadius: 12,
                                             top: 4,
                                             left: 0,
                                             right: 0,
@@ -4771,13 +4762,11 @@ export const OnboardingScreen: React.FC = () => {
                                                 outputRange: [0, 1],
                                             }),
                                             zIndex: 0,
-                                            borderWidth: 0,
-                                            marginBottom: 0,
                                         },
                                     ]}
                                     pointerEvents="none"
                                 />
-                                <TouchableOpacity
+                            <TouchableOpacity
                                     onPress={(e) => {
                                         // Haptic feedback
                                         triggerHaptic();
@@ -4788,43 +4777,43 @@ export const OnboardingScreen: React.FC = () => {
                                     }}
                                     onPressIn={handlePressIn}
                                     onPressOut={handlePressOut}
-                                    activeOpacity={1}
+                                activeOpacity={1}
                                     style={{ zIndex: 1 }}
+                            >
+                                <Animated.View
+                                    style={[
+                                        styles.activityCard,
+                                        {
+                                            transform: [{ translateY: animations.translateY }],
+                                        },
+                                    ]}
                                 >
+                                    {/* Color overlay that fades in when selected */}
                                     <Animated.View
                                         style={[
-                                            styles.activityCard,
+                                            StyleSheet.absoluteFill,
                                             {
-                                                transform: [{ translateY: animations.translateY }],
+                                                backgroundColor: option.color,
+                                                borderRadius: 12,
+                                                opacity: animations.colorOpacity,
                                             },
                                         ]}
-                                    >
-                                        {/* Color overlay that fades in when selected */}
-                                        <Animated.View
-                                            style={[
-                                                StyleSheet.absoluteFill,
-                                                {
-                                                    backgroundColor: option.color,
-                                                    borderRadius: 12,
-                                                    opacity: animations.colorOpacity,
-                                                },
-                                            ]}
-                                            pointerEvents="none"
-                                        />
-                                        <Text style={[
-                                            styles.activityCardTitle,
-                                            isSelected && styles.activityCardTitleSelected
-                                        ]}>
-                                            {option.label}
-                                        </Text>
-                                        <Text style={[
-                                            styles.activityCardDesc,
-                                            isSelected && styles.activityCardDescSelected
-                                        ]}>
-                                            {option.desc}
-                                        </Text>
-                                    </Animated.View>
-                                </TouchableOpacity>
+                                        pointerEvents="none"
+                                    />
+                                    <Text style={[
+                                        styles.activityCardTitle,
+                                        isSelected && styles.activityCardTitleSelected
+                                    ]}>
+                                        {option.label}
+                                    </Text>
+                                    <Text style={[
+                                        styles.activityCardDesc,
+                                        isSelected && styles.activityCardDescSelected
+                                    ]}>
+                                        {option.desc}
+                                    </Text>
+                                </Animated.View>
+                            </TouchableOpacity>
                             </View>
                         );
                     })}
@@ -4849,8 +4838,8 @@ export const OnboardingScreen: React.FC = () => {
         };
 
         return (
-            <View style={styles.stepContent}>
-                <Text style={styles.stepTitle}>unit preferences?</Text>
+        <View style={styles.stepContent}>
+            <Text style={styles.stepTitle}>unit preferences?</Text>
                 <View style={{ position: 'relative', marginBottom: 24, marginTop: 20, alignItems: 'center' }}>
                     {/* Shadow layer - harsh drop shadow */}
                     <Animated.View
@@ -4870,45 +4859,45 @@ export const OnboardingScreen: React.FC = () => {
                         pointerEvents="none"
                     />
                     <View style={[styles.unitToggle, { zIndex: 1 }]}>
-                        <Animated.View
-                            style={[
-                                styles.unitToggleBackground,
-                                {
+                    <Animated.View
+                        style={[
+                            styles.unitToggleBackground,
+                            {
                                     transform: [{
                                         translateX: unitPreferenceToggleSlide.interpolate({
-                                            inputRange: [0, 1],
+                                    inputRange: [0, 1],
                                             outputRange: [0, 176], // Button width for translation
-                                        }),
+                                }),
                                     }],
-                                },
-                            ]}
-                        />
-                        <TouchableOpacity
-                            style={styles.unitButton}
+                            },
+                        ]}
+                    />
+                    <TouchableOpacity
+                        style={styles.unitButton}
                             onPress={handleMetricPress}
-                        >
-                            <Text style={[
-                                styles.unitButtonText,
+                    >
+                        <Text style={[
+                            styles.unitButtonText,
                                 isMetric && styles.unitButtonTextActive
-                            ]}>
+                        ]}>
                                 cm/kg
-                            </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.unitButton}
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.unitButton}
                             onPress={handleImperialPress}
-                        >
-                            <Text style={[
-                                styles.unitButtonText,
+                    >
+                        <Text style={[
+                            styles.unitButtonText,
                                 !isMetric && styles.unitButtonTextActive
-                            ]}>
+                        ]}>
                                 ft/lbs
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
+                        </Text>
+                    </TouchableOpacity>
                 </View>
             </View>
-        );
+        </View>
+    );
     };
 
     const renderPurposeStep = () => {
@@ -5029,7 +5018,6 @@ export const OnboardingScreen: React.FC = () => {
                                 top: 4,
                                 left: 0,
                                 right: 0,
-                                transform: [{ translateY: 0 }],
                                 opacity: cardShadowHeightAnim.interpolate({
                                     inputRange: [0, 4],
                                     outputRange: [0, 1],
@@ -5040,7 +5028,7 @@ export const OnboardingScreen: React.FC = () => {
                         ]}
                         pointerEvents="none"
                     />
-                    <TouchableOpacity
+                <TouchableOpacity
                         onPress={(e) => {
                             // Haptic feedback
                             triggerHaptic();
@@ -5051,38 +5039,38 @@ export const OnboardingScreen: React.FC = () => {
                         }}
                         onPressIn={handlePressIn}
                         onPressOut={handlePressOut}
-                        activeOpacity={1}
+                    activeOpacity={1}
                         style={{ zIndex: 1 }}
+                >
+                    <Animated.View
+                        style={[
+                            styles.goalCard,
+                            {
+                                transform: [{ translateY: animations.translateY }],
+                            },
+                        ]}
                     >
+                        {/* Color overlay that fades in when selected */}
                         <Animated.View
                             style={[
-                                styles.goalCard,
+                                StyleSheet.absoluteFill,
                                 {
-                                    transform: [{ translateY: animations.translateY }],
+                                    backgroundColor: option.color,
+                                    borderRadius: 12,
+                                    opacity: animations.colorOpacity,
                                 },
                             ]}
-                        >
-                            {/* Color overlay that fades in when selected */}
-                            <Animated.View
-                                style={[
-                                    StyleSheet.absoluteFill,
-                                    {
-                                        backgroundColor: option.color,
-                                        borderRadius: 12,
-                                        opacity: animations.colorOpacity,
-                                    },
-                                ]}
-                                pointerEvents="none"
-                            />
-                            <Text style={styles.goalIcon}>{option.icon}</Text>
-                            <Text style={[
-                                styles.goalCardText,
-                                isSelected && styles.goalCardTextSelected
-                            ]}>
-                                {option.label}
-                            </Text>
-                        </Animated.View>
-                    </TouchableOpacity>
+                            pointerEvents="none"
+                        />
+                        <Text style={styles.goalIcon}>{option.icon}</Text>
+                        <Text style={[
+                            styles.goalCardText,
+                            isSelected && styles.goalCardTextSelected
+                        ]}>
+                            {option.label}
+                        </Text>
+                    </Animated.View>
+                </TouchableOpacity>
                 </View>
             );
         };
@@ -5208,7 +5196,7 @@ export const OnboardingScreen: React.FC = () => {
                                     ]}
                                     pointerEvents="none"
                                 />
-                                <TouchableOpacity
+                            <TouchableOpacity
                                     onPress={(e) => {
                                         // Haptic feedback
                                         triggerHaptic();
@@ -5219,43 +5207,43 @@ export const OnboardingScreen: React.FC = () => {
                                     }}
                                     onPressIn={handlePressIn}
                                     onPressOut={handlePressOut}
-                                    activeOpacity={1}
+                                activeOpacity={1}
                                     style={{ zIndex: 1 }}
+                            >
+                                <Animated.View
+                                    style={[
+                                        styles.activityCard,
+                                        {
+                                            transform: [{ translateY: animations.translateY }],
+                                        },
+                                    ]}
                                 >
+                                    {/* Color overlay that fades in when selected */}
                                     <Animated.View
                                         style={[
-                                            styles.activityCard,
+                                            StyleSheet.absoluteFill,
                                             {
-                                                transform: [{ translateY: animations.translateY }],
+                                                backgroundColor: option.color,
+                                                borderRadius: 12,
+                                                opacity: animations.colorOpacity,
                                             },
                                         ]}
-                                    >
-                                        {/* Color overlay that fades in when selected */}
-                                        <Animated.View
-                                            style={[
-                                                StyleSheet.absoluteFill,
-                                                {
-                                                    backgroundColor: option.color,
-                                                    borderRadius: 12,
-                                                    opacity: animations.colorOpacity,
-                                                },
-                                            ]}
-                                            pointerEvents="none"
-                                        />
-                                        <Text style={[
-                                            styles.activityCardTitle,
-                                            isSelected && styles.activityCardTitleSelected
-                                        ]}>
-                                            {option.label}
-                                        </Text>
-                                        <Text style={[
-                                            styles.activityCardDesc,
-                                            isSelected && styles.activityCardDescSelected
-                                        ]}>
-                                            {option.desc}
-                                        </Text>
-                                    </Animated.View>
-                                </TouchableOpacity>
+                                        pointerEvents="none"
+                                    />
+                                    <Text style={[
+                                        styles.activityCardTitle,
+                                        isSelected && styles.activityCardTitleSelected
+                                    ]}>
+                                        {option.label}
+                                    </Text>
+                                    <Text style={[
+                                        styles.activityCardDesc,
+                                        isSelected && styles.activityCardDescSelected
+                                    ]}>
+                                        {option.desc}
+                                    </Text>
+                                </Animated.View>
+                            </TouchableOpacity>
                             </View>
                         );
                     })}
@@ -5377,11 +5365,11 @@ export const OnboardingScreen: React.FC = () => {
                         style={[
                             styles.scrollContent,
                             {
-                                opacity: contentFade,
-                                transform: [
-                                    { translateY: contentSlide },
-                                    { scale: contentScale },
-                                ],
+                            opacity: contentFade,
+                            transform: [
+                                { translateY: contentSlide },
+                                { scale: contentScale },
+                            ],
                             },
                         ]}
                     >

@@ -5,6 +5,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { Button } from '../components/Button';
 import { fonts } from '../constants/fonts';
+import * as Haptics from 'expo-haptics';
 
 type MacroResultsScreenRouteProp = RouteProp<RootStackParamList, 'MacroResults'>;
 type MacroResultsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'MacroResults'>;
@@ -57,6 +58,7 @@ export const MacroResultsScreen: React.FC = () => {
         fats: new Animated.Value(0),
         baseTDEE: new Animated.Value(0),
     }).current;
+    const lastHapticValue = useRef(0);
 
     // Function to animate numbers to new targets
     const animateToTargets = useCallback((targetMacros: typeof currentMacros) => {
@@ -142,6 +144,47 @@ export const MacroResultsScreen: React.FC = () => {
     useEffect(() => {
         animateToTargets(currentMacros);
     }, [animateToTargets]);
+
+    // Haptic feedback that ramps up as calories counter increases
+    useEffect(() => {
+        // Reset haptic tracking when animation starts
+        lastHapticValue.current = 0;
+
+        const listener = numberAnimations.calories.addListener(({ value }) => {
+            const currentValue = Math.round(value);
+            const targetValue = currentMacros.calories;
+            
+            if (targetValue === 0) return;
+            
+            // Calculate progress (0 to 1)
+            const progress = currentValue / targetValue;
+            
+            // Determine haptic intensity based on progress
+            let hapticStyle: Haptics.ImpactFeedbackStyle;
+            if (progress < 0.33) {
+                hapticStyle = Haptics.ImpactFeedbackStyle.Light;
+            } else if (progress < 0.66) {
+                hapticStyle = Haptics.ImpactFeedbackStyle.Medium;
+            } else {
+                hapticStyle = Haptics.ImpactFeedbackStyle.Heavy;
+            }
+
+            // Trigger haptic at intervals (every ~50 calories or every 5% progress)
+            const calorieDiff = currentValue - lastHapticValue.current;
+            const progressDiff = Math.floor(progress * 20) - Math.floor((lastHapticValue.current / targetValue) * 20);
+            const shouldTrigger = currentValue > lastHapticValue.current && 
+                                   (calorieDiff >= 50 || progressDiff >= 1);
+
+            if (shouldTrigger && currentValue > 0) {
+                Haptics.impactAsync(hapticStyle);
+                lastHapticValue.current = currentValue;
+            }
+        });
+
+        return () => {
+            numberAnimations.calories.removeListener(listener);
+        };
+    }, [currentMacros.calories, numberAnimations.calories]);
 
     const getCalorieDifference = () => {
         if (!currentMacros.baseTDEE) return null;

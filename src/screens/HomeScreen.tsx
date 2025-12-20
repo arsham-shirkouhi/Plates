@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Alert, ScrollView, StyleSheet, TouchableOpacity, Dimensions, Animated } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
@@ -17,8 +18,7 @@ import { TestControls } from '../components/TestControls';
 import { GradientBackground } from '../components/GradientBackground';
 import { BottomNavBar } from '../components/BottomNavBar';
 import { AddButton, NavButtons } from '../components/NavButton';
-import { BlobAnimation } from '../components/BlobAnimation';
-import { BorderRingAnimation } from '../components/BorderRingAnimation';
+import { AuraOverlay } from '../components/AuraOverlay';
 import { resetOnboarding, getUserProfile, UserProfile, getDailyMacroLog, getTodayDateString, DailyMacroLog } from '../services/userService';
 import { styles } from './HomeScreen.styles';
 
@@ -37,13 +37,12 @@ export const HomeScreen: React.FC = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const closeMenuRef = useRef<(() => void) | null>(null);
 
-    // Blob animation state - single blob that follows finger
-    const [isTouching, setIsTouching] = useState(false);
+    // Aura overlay state
     const [showBorderRing, setShowBorderRing] = useState(false);
     const isTouchingRef = useRef(false);
-    const pan = useRef(new Animated.ValueXY()).current;
     const containerRef = useRef<View>(null);
     const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const hapticIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
     // Test values for manual adjustment
     const [testValues, setTestValues] = useState({
@@ -193,16 +192,26 @@ export const HomeScreen: React.FC = () => {
         touchStartPosition.current = { x: pageX, y: pageY };
         isScrolling.current = false;
 
-        // Start timer for blob and border ring (only if not scrolling)
+        // Start timer for border ring (only if not scrolling)
         longPressTimerRef.current = setTimeout(() => {
             if (!isScrolling.current && touchStartPosition.current) {
-                pan.setValue({
-                    x: touchStartPosition.current.x - containerPositionRef.current.x - 35,
-                    y: touchStartPosition.current.y - containerPositionRef.current.y - 35,
-                });
                 isTouchingRef.current = true;
-                setIsTouching(true);
                 setShowBorderRing(true);
+
+                // Start pulsating haptic feedback
+                const triggerHaptic = () => {
+                    try {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    } catch (error) {
+                        // Haptics not available
+                    }
+                };
+
+                // Initial haptic
+                triggerHaptic();
+
+                // Pulsating haptic every 800ms
+                hapticIntervalRef.current = setInterval(triggerHaptic, 800);
             }
         }, 1000);
     }, []);
@@ -219,17 +228,13 @@ export const HomeScreen: React.FC = () => {
                     clearTimeout(longPressTimerRef.current);
                     longPressTimerRef.current = null;
                 }
+                if (hapticIntervalRef.current) {
+                    clearInterval(hapticIntervalRef.current);
+                    hapticIntervalRef.current = null;
+                }
             }
         }
 
-        // Update blob position if it's active - use ref to avoid dependency
-        if (isTouchingRef.current) {
-            const { pageX, pageY } = evt.nativeEvent;
-            pan.setValue({
-                x: pageX - containerPositionRef.current.x - 35,
-                y: pageY - containerPositionRef.current.y - 35,
-            });
-        }
     }, []);
 
     const handleTouchEnd = useCallback(() => {
@@ -237,10 +242,13 @@ export const HomeScreen: React.FC = () => {
             clearTimeout(longPressTimerRef.current);
             longPressTimerRef.current = null;
         }
+        if (hapticIntervalRef.current) {
+            clearInterval(hapticIntervalRef.current);
+            hapticIntervalRef.current = null;
+        }
         touchStartPosition.current = null;
         isScrolling.current = false;
         isTouchingRef.current = false;
-        setIsTouching(false);
         setShowBorderRing(false);
     }, []);
 
@@ -343,32 +351,9 @@ export const HomeScreen: React.FC = () => {
                 </ScrollView>
             </View>
 
-            {/* Blob that follows finger */}
-            {isTouching && (
-                <Animated.View
-                    style={[
-                        {
-                            position: 'absolute',
-                            width: 70,
-                            height: 70,
-                            transform: [
-                                { translateX: pan.x },
-                                { translateY: pan.y },
-                            ],
-                        },
-                    ]}
-                    pointerEvents="none"
-                >
-                    <BlobAnimation
-                        x={35}
-                        y={35}
-                        onComplete={() => { }}
-                    />
-                </Animated.View>
-            )}
 
             {/* Border ring animation (Apple AI style) */}
-            <BorderRingAnimation isActive={showBorderRing} />
+            <AuraOverlay isActive={showBorderRing} />
 
             {/* White to transparent gradient behind buttons */}
             <LinearGradient

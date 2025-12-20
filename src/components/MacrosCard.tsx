@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { fonts } from '../constants/fonts';
 import { styles as homeScreenStyles } from '../screens/HomeScreen.styles';
+import * as Haptics from 'expo-haptics';
 
 // Helper component to display animated numbers
 const AnimatedNumber: React.FC<{
@@ -79,6 +80,9 @@ const CalorieCircularProgress: React.FC<CalorieCircularProgressProps> = ({
     // Animation value for number counting
     const numberAnimation = useRef(new Animated.Value(remaining)).current;
     const previousRemaining = useRef(remaining);
+    
+    // Track last haptic value for calories
+    const lastHapticPercentage = useRef(percentage);
     // Inner and outer border radii
     // Outer border: sits at the outer edge of the progress ring
     const outerBorderRadius = radius + strokeWidth / 2;
@@ -115,7 +119,34 @@ const CalorieCircularProgress: React.FC<CalorieCircularProgressProps> = ({
             // When percentage is 100, offset is 0 (full progress shown)
             const offset = circumference - (value / 100) * circumference;
             setDashOffset(offset);
+            
+            // Ramping haptic feedback as progress increases (only when filling up)
+            const currentPercentage = value;
+            const percentageDiff = currentPercentage - lastHapticPercentage.current;
+            
+            // Trigger haptic every ~0.15% increase with intensity based on progress
+            if (percentageDiff > 0 && percentageDiff >= 0.15) {
+                // Ramp up intensity based on progress: Light (< 33%), Medium (33-66%), Heavy (> 66%)
+                let hapticStyle: Haptics.ImpactFeedbackStyle;
+                if (currentPercentage < 33) {
+                    hapticStyle = Haptics.ImpactFeedbackStyle.Light;
+                } else if (currentPercentage < 66) {
+                    hapticStyle = Haptics.ImpactFeedbackStyle.Medium;
+                } else {
+                    hapticStyle = Haptics.ImpactFeedbackStyle.Heavy;
+                }
+                
+                try {
+                    Haptics.impactAsync(hapticStyle);
+                } catch (error) {
+                    // Silently fail if haptics not available
+                }
+                lastHapticPercentage.current = currentPercentage;
+            }
         });
+
+        // Reset haptic tracking to start from previous value (only trigger on increase)
+        lastHapticPercentage.current = previousPercentage.current;
 
         return () => {
             animatedValue.removeListener(listener);
@@ -217,6 +248,9 @@ const MacroProgressBar: React.FC<MacroProgressBarProps> = ({
     // Animation for number counting
     const numberAnimation = useRef(new Animated.Value(current)).current;
     const previousCurrent = useRef(current);
+    
+    // Track last haptic value for macro bars
+    const lastHapticPercentage = useRef(percentage);
 
     useEffect(() => {
         // Set animations to start from previous values
@@ -238,9 +272,49 @@ const MacroProgressBar: React.FC<MacroProgressBarProps> = ({
             useNativeDriver: false,
         }).start();
 
+        // Check if percentage is increasing before updating
+        const wasIncreasing = percentage > previousPercentage.current;
+        const oldPercentage = previousPercentage.current;
+
         // Update previous values
         previousPercentage.current = percentage;
         previousCurrent.current = current;
+        
+        // Reset haptic tracking to start from old value when increasing
+        if (wasIncreasing) {
+            lastHapticPercentage.current = oldPercentage;
+        }
+        
+        // Listen to animated value changes for haptic feedback
+        const listener = animatedWidth.addListener(({ value }) => {
+            const currentPercentage = value;
+            const percentageDiff = currentPercentage - lastHapticPercentage.current;
+            
+            // Ramping haptic feedback - trigger every ~0.15% increase with intensity based on progress
+            // Only trigger if value is increasing
+            if (percentageDiff > 0 && percentageDiff >= 0.15) {
+                // Ramp up intensity based on progress: Light (< 33%), Medium (33-66%), Heavy (> 66%)
+                let hapticStyle: Haptics.ImpactFeedbackStyle;
+                if (currentPercentage < 33) {
+                    hapticStyle = Haptics.ImpactFeedbackStyle.Light;
+                } else if (currentPercentage < 66) {
+                    hapticStyle = Haptics.ImpactFeedbackStyle.Medium;
+                } else {
+                    hapticStyle = Haptics.ImpactFeedbackStyle.Heavy;
+                }
+                
+                try {
+                    Haptics.impactAsync(hapticStyle);
+                } catch (error) {
+                    // Silently fail if haptics not available
+                }
+                lastHapticPercentage.current = currentPercentage;
+            }
+        });
+
+        return () => {
+            animatedWidth.removeListener(listener);
+        };
     }, [percentage, current]);
 
     const widthInterpolated = animatedWidth.interpolate({

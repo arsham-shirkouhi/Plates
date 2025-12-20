@@ -84,7 +84,7 @@ export const styles = StyleSheet.create({
         width: 20,
         height: 20,
         borderRadius: 10,
-        borderWidth: 2.5,
+        borderWidth: 1.5,
         borderColor: '#252525',
         backgroundColor: '#F5F5F5', // Light gray fill for unfilled circles
     },
@@ -143,14 +143,14 @@ export const styles = StyleSheet.create({
     usernameErrorText: {
         color: '#FF5151',
         fontSize: 18,
-        fontFamily: fonts.regular,
+        fontFamily: fonts.bold,
         marginTop: 8,
         textAlign: 'center',
     },
     usernameSuccessText: {
         color: '#26F170',
         fontSize: 18,
-        fontFamily: fonts.regular,
+        fontFamily: fonts.bold,
         marginTop: 8,
         textAlign: 'center',
     },
@@ -1154,10 +1154,7 @@ export const styles = StyleSheet.create({
         color: '#526EFF',
         fontFamily: fonts.bold,
     },
-    heightRulerLabelMedium: {
-        fontSize: 12,
-        color: '#999',
-    },
+
     heightRulerCenterLine: {
         position: 'absolute',
         left: 0,

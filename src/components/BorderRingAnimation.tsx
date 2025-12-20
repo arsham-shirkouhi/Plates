@@ -25,7 +25,7 @@ export const BorderRingAnimation: React.FC<BorderRingAnimationProps> = ({ isActi
     useEffect(() => {
         if (isActive) {
             setShouldRender(true);
-            // Fade in
+            // Fade in (full opacity)
             Animated.timing(opacity, {
                 toValue: 1,
                 duration: 400,
@@ -38,11 +38,11 @@ export const BorderRingAnimation: React.FC<BorderRingAnimationProps> = ({ isActi
                 setCurrentOpacity(value);
             });
 
-            // Continuous circular animation
+            // Continuous circular animation (slower)
             const progressAnimation = Animated.loop(
                 Animated.timing(progress, {
                     toValue: 1,
-                    duration: 3000, // 3 seconds per full circle
+                    duration: 6000, // 6 seconds per full circle (slower)
                     easing: Easing.linear,
                     useNativeDriver: false,
                 })
@@ -127,21 +127,48 @@ export const BorderRingAnimation: React.FC<BorderRingAnimationProps> = ({ isActi
         }
     };
 
-    // Interpolate colors for gradient
-    const [gradientColors, setGradientColors] = useState(['#526EFF', '#9D4EDD', '#526EFF']);
+    // Interpolate colors for gradient - vibrant multi-color cycle
+    const [gradientColors, setGradientColors] = useState(['#FF64C8', '#64C8FF', '#FF9632']);
 
     useEffect(() => {
         if (!isActive) return;
 
         const colorListener = colorShift.addListener(({ value }: { value: number }) => {
-            // Interpolate between blue and purple
-            const r1 = Math.round(82 + (157 - 82) * value);
-            const g1 = Math.round(110 + (78 - 110) * value);
-            const b1 = Math.round(255 + (221 - 255) * value);
-
-            const r2 = Math.round(157 + (82 - 157) * value);
-            const g2 = Math.round(78 + (110 - 78) * value);
-            const b2 = Math.round(221 + (255 - 221) * value);
+            // Cycle through vibrant colors: pink -> blue -> orange -> purple
+            // Pink (255, 100, 200) -> Blue (100, 200, 255) -> Orange (255, 150, 50) -> Purple (200, 50, 255)
+            let r1, g1, b1, r2, g2, b2;
+            
+            if (value < 0.33) {
+                // Pink to Blue
+                const t = value / 0.33;
+                r1 = Math.round(255 - 155 * t);
+                g1 = Math.round(100 + 100 * t);
+                b1 = Math.round(200 + 55 * t);
+                
+                r2 = Math.round(100 + 155 * t);
+                g2 = Math.round(200 - 50 * t);
+                b2 = Math.round(255 - 205 * t);
+            } else if (value < 0.66) {
+                // Blue to Orange
+                const t = (value - 0.33) / 0.33;
+                r1 = Math.round(100 + 155 * t);
+                g1 = Math.round(200 - 50 * t);
+                b1 = Math.round(255 - 205 * t);
+                
+                r2 = Math.round(255);
+                g2 = Math.round(150);
+                b2 = Math.round(50);
+            } else {
+                // Orange to Purple
+                const t = (value - 0.66) / 0.34;
+                r1 = Math.round(255 - 55 * t);
+                g1 = Math.round(150 - 100 * t);
+                b1 = Math.round(50 + 205 * t);
+                
+                r2 = Math.round(200);
+                g2 = Math.round(50);
+                b2 = Math.round(255);
+            }
 
             setGradientColors([
                 `rgb(${r1}, ${g1}, ${b1})`,
@@ -170,54 +197,96 @@ export const BorderRingAnimation: React.FC<BorderRingAnimationProps> = ({ isActi
             pointerEvents="none"
         >
             {/* Full border with blur and feather effect - always visible around entire perimeter */}
-            {/* Top border */}
-            <View style={[styles.fullBorder, styles.topBorder]}>
-                <BlurView intensity={20} tint="light" style={StyleSheet.absoluteFill} />
+            {/* Top border - Pink/Magenta fading to transparent */}
+            <View style={[styles.fullBorder, styles.topBorder, styles.topBorderRounded]}>
+                <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill} />
                 <LinearGradient
-                    colors={['rgba(82, 110, 255, 0.4)', 'rgba(82, 110, 255, 0.6)', 'rgba(82, 110, 255, 0.4)']}
+                    colors={[
+                        'rgba(255, 100, 200, 1)', // Bright pink
+                        'rgba(255, 100, 200, 0.9)',
+                        'rgba(255, 100, 200, 0.7)',
+                        'rgba(255, 100, 200, 0.5)',
+                        'rgba(255, 100, 200, 0.3)',
+                        'rgba(255, 100, 200, 0.15)',
+                        'rgba(255, 100, 200, 0.05)',
+                        'rgba(255, 100, 200, 0)', // Transparent
+                    ]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
+                    locations={[0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1]}
                     style={styles.fullBorderGradient}
                 />
             </View>
 
-            {/* Right border */}
-            <View style={[styles.fullBorder, styles.rightBorder]}>
-                <BlurView intensity={20} tint="light" style={StyleSheet.absoluteFill} />
+            {/* Right border - Pink fading to purple then to transparent */}
+            <View style={[styles.fullBorder, styles.rightBorder, styles.rightBorderRounded]}>
+                <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill} />
                 <LinearGradient
-                    colors={['rgba(82, 110, 255, 0.4)', 'rgba(82, 110, 255, 0.6)', 'rgba(82, 110, 255, 0.4)']}
+                    colors={[
+                        'rgba(255, 100, 200, 1)', // Bright pink at top
+                        'rgba(255, 100, 200, 0.8)',
+                        'rgba(200, 50, 255, 0.6)', // Purple transition
+                        'rgba(150, 50, 200, 0.4)', // Deep purple
+                        'rgba(150, 50, 200, 0.2)',
+                        'rgba(150, 50, 200, 0.1)',
+                        'rgba(150, 50, 200, 0.05)',
+                        'rgba(150, 50, 200, 0)', // Transparent at bottom
+                    ]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 0, y: 1 }}
+                    locations={[0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1]}
                     style={styles.fullBorderGradient}
                 />
             </View>
 
-            {/* Bottom border */}
-            <View style={[styles.fullBorder, styles.bottomBorder]}>
-                <BlurView intensity={20} tint="light" style={StyleSheet.absoluteFill} />
+            {/* Bottom border - Orange fading to purple then to transparent */}
+            <View style={[styles.fullBorder, styles.bottomBorder, styles.bottomBorderRounded]}>
+                <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill} />
                 <LinearGradient
-                    colors={['rgba(82, 110, 255, 0.4)', 'rgba(82, 110, 255, 0.6)', 'rgba(82, 110, 255, 0.4)']}
+                    colors={[
+                        'rgba(255, 150, 50, 1)',  // Orange/amber
+                        'rgba(255, 150, 50, 0.8)',
+                        'rgba(200, 50, 255, 0.6)', // Purple transition
+                        'rgba(150, 50, 200, 0.4)', // Deep purple
+                        'rgba(150, 50, 200, 0.2)',
+                        'rgba(150, 50, 200, 0.1)',
+                        'rgba(150, 50, 200, 0.05)',
+                        'rgba(150, 50, 200, 0)', // Transparent
+                    ]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
+                    locations={[0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1]}
                     style={styles.fullBorderGradient}
                 />
             </View>
 
-            {/* Left border */}
-            <View style={[styles.fullBorder, styles.leftBorder]}>
-                <BlurView intensity={20} tint="light" style={StyleSheet.absoluteFill} />
+            {/* Left border - Light blue fading to orange then to transparent */}
+            <View style={[styles.fullBorder, styles.leftBorder, styles.leftBorderRounded]}>
+                <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill} />
                 <LinearGradient
-                    colors={['rgba(82, 110, 255, 0.4)', 'rgba(82, 110, 255, 0.6)', 'rgba(82, 110, 255, 0.4)']}
+                    colors={[
+                        'rgba(100, 200, 255, 1)', // Light blue at top
+                        'rgba(100, 200, 255, 0.8)',
+                        'rgba(255, 150, 50, 0.6)', // Orange transition
+                        'rgba(255, 150, 50, 0.4)',
+                        'rgba(255, 150, 50, 0.2)',
+                        'rgba(255, 150, 50, 0.1)',
+                        'rgba(255, 150, 50, 0.05)',
+                        'rgba(255, 150, 50, 0)', // Transparent at bottom
+                    ]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 0, y: 1 }}
+                    locations={[0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1]}
                     style={styles.fullBorderGradient}
                 />
             </View>
 
             {/* Feather/aura layers around entire border with blur */}
-            {[0, 1, 2, 3, 4].map((layerIndex) => {
-                const layerOpacity = currentOpacity * (0.2 - layerIndex * 0.035);
-                const layerSpread = AURA_WIDTH * (layerIndex + 1) * 0.2;
+            {[0, 1, 2, 3, 4, 5, 6].map((layerIndex) => {
+                // Smoother exponential fade
+                const opacityMultiplier = Math.pow(0.7, layerIndex);
+                const layerOpacity = currentOpacity * opacityMultiplier;
+                const layerSpread = AURA_WIDTH * (layerIndex + 1) * 0.15;
 
                 return (
                     <React.Fragment key={`aura-${layerIndex}`}>
@@ -233,18 +302,21 @@ export const BorderRingAnimation: React.FC<BorderRingAnimationProps> = ({ isActi
                                 },
                             ]}
                         >
-                            <BlurView intensity={15 - layerIndex * 2} tint="light" style={StyleSheet.absoluteFill} />
+                            <BlurView intensity={35 - layerIndex * 3} tint="light" style={StyleSheet.absoluteFill} />
                             <LinearGradient
                                 colors={[
-                                    'rgba(82, 110, 255, 0)',
-                                    `rgba(82, 110, 255, ${0.25 - layerIndex * 0.05})`,
-                                    `rgba(157, 78, 221, ${0.3 - layerIndex * 0.05})`,
-                                    `rgba(82, 110, 255, ${0.25 - layerIndex * 0.05})`,
-                                    'rgba(82, 110, 255, 0)',
+                                    `rgba(255, 100, 200, ${opacityMultiplier})`, // Bright pink - full opacity
+                                    `rgba(255, 100, 200, ${opacityMultiplier * 0.9})`,
+                                    `rgba(255, 100, 200, ${opacityMultiplier * 0.7})`,
+                                    `rgba(255, 100, 200, ${opacityMultiplier * 0.5})`,
+                                    `rgba(255, 100, 200, ${opacityMultiplier * 0.3})`,
+                                    `rgba(255, 100, 200, ${opacityMultiplier * 0.15})`,
+                                    `rgba(255, 100, 200, ${opacityMultiplier * 0.05})`,
+                                    'rgba(255, 100, 200, 0)', // Fade to transparent
                                 ]}
                                 start={{ x: 0, y: 0.5 }}
                                 end={{ x: 1, y: 0.5 }}
-                                locations={[0, 0.15, 0.5, 0.85, 1]}
+                                locations={[0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1]}
                                 style={styles.auraGradient}
                             />
                         </View>
@@ -265,9 +337,9 @@ export const BorderRingAnimation: React.FC<BorderRingAnimationProps> = ({ isActi
                             <LinearGradient
                                 colors={[
                                     'rgba(82, 110, 255, 0)',
-                                    `rgba(82, 110, 255, ${0.25 - layerIndex * 0.05})`,
-                                    `rgba(157, 78, 221, ${0.3 - layerIndex * 0.05})`,
-                                    `rgba(82, 110, 255, ${0.25 - layerIndex * 0.05})`,
+                                    `rgba(82, 110, 255, ${1 - layerIndex * 0.2})`,
+                                    `rgba(157, 78, 221, ${1 - layerIndex * 0.2})`,
+                                    `rgba(82, 110, 255, ${1 - layerIndex * 0.2})`,
                                     'rgba(82, 110, 255, 0)',
                                 ]}
                                 start={{ x: 0.5, y: 0 }}
@@ -289,18 +361,21 @@ export const BorderRingAnimation: React.FC<BorderRingAnimationProps> = ({ isActi
                                 },
                             ]}
                         >
-                            <BlurView intensity={15 - layerIndex * 2} tint="light" style={StyleSheet.absoluteFill} />
+                            <BlurView intensity={35 - layerIndex * 3} tint="light" style={StyleSheet.absoluteFill} />
                             <LinearGradient
                                 colors={[
-                                    'rgba(82, 110, 255, 0)',
-                                    `rgba(82, 110, 255, ${0.25 - layerIndex * 0.05})`,
-                                    `rgba(157, 78, 221, ${0.3 - layerIndex * 0.05})`,
-                                    `rgba(82, 110, 255, ${0.25 - layerIndex * 0.05})`,
-                                    'rgba(82, 110, 255, 0)',
+                                    `rgba(255, 100, 200, ${opacityMultiplier})`, // Bright pink - full opacity
+                                    `rgba(255, 100, 200, ${opacityMultiplier * 0.9})`,
+                                    `rgba(255, 100, 200, ${opacityMultiplier * 0.7})`,
+                                    `rgba(255, 100, 200, ${opacityMultiplier * 0.5})`,
+                                    `rgba(255, 100, 200, ${opacityMultiplier * 0.3})`,
+                                    `rgba(255, 100, 200, ${opacityMultiplier * 0.15})`,
+                                    `rgba(255, 100, 200, ${opacityMultiplier * 0.05})`,
+                                    'rgba(255, 100, 200, 0)', // Fade to transparent
                                 ]}
                                 start={{ x: 0, y: 0.5 }}
                                 end={{ x: 1, y: 0.5 }}
-                                locations={[0, 0.15, 0.5, 0.85, 1]}
+                                locations={[0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1]}
                                 style={styles.auraGradient}
                             />
                         </View>
@@ -321,9 +396,9 @@ export const BorderRingAnimation: React.FC<BorderRingAnimationProps> = ({ isActi
                             <LinearGradient
                                 colors={[
                                     'rgba(82, 110, 255, 0)',
-                                    `rgba(82, 110, 255, ${0.25 - layerIndex * 0.05})`,
-                                    `rgba(157, 78, 221, ${0.3 - layerIndex * 0.05})`,
-                                    `rgba(82, 110, 255, ${0.25 - layerIndex * 0.05})`,
+                                    `rgba(82, 110, 255, ${1 - layerIndex * 0.2})`,
+                                    `rgba(157, 78, 221, ${1 - layerIndex * 0.2})`,
+                                    `rgba(82, 110, 255, ${1 - layerIndex * 0.2})`,
                                     'rgba(82, 110, 255, 0)',
                                 ]}
                                 start={{ x: 0.5, y: 0 }}
@@ -349,20 +424,31 @@ export const BorderRingAnimation: React.FC<BorderRingAnimationProps> = ({ isActi
                     },
                 ]}
             >
-                <BlurView intensity={25} tint="light" style={StyleSheet.absoluteFill} />
+                <BlurView intensity={50} tint="light" style={StyleSheet.absoluteFill} />
                 <LinearGradient
-                    colors={['rgba(157, 78, 221, 0)', '#9D4EDD', 'rgba(157, 78, 221, 0)']}
+                    colors={[
+                        'rgba(255, 100, 200, 1)', // Bright pink - full opacity
+                        'rgba(255, 100, 200, 0.9)',
+                        'rgba(255, 100, 200, 0.7)',
+                        'rgba(255, 100, 200, 0.5)',
+                        'rgba(255, 100, 200, 0.3)',
+                        'rgba(255, 100, 200, 0.15)',
+                        'rgba(255, 100, 200, 0.05)',
+                        'rgba(255, 100, 200, 0)', // Fade to transparent
+                    ]}
                     start={{ x: 0, y: 0.5 }}
                     end={{ x: 1, y: 0.5 }}
-                    locations={[0, 0.5, 1]}
+                    locations={[0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1]}
                     style={styles.gradient}
                 />
             </View>
 
             {/* Traveling aura around purple segment with blur */}
-            {[0, 1, 2, 3].map((layerIndex) => {
-                const layerWidth = BORDER_WIDTH + (AURA_WIDTH / 4) * (layerIndex + 1);
-                const layerOpacity = currentOpacity * (0.4 - layerIndex * 0.08);
+            {[0, 1, 2, 3, 4, 5].map((layerIndex) => {
+                const layerWidth = BORDER_WIDTH + (AURA_WIDTH / 5) * (layerIndex + 1);
+                // Smoother exponential fade
+                const opacityMultiplier = Math.pow(0.75, layerIndex);
+                const layerOpacity = currentOpacity * opacityMultiplier;
 
                 return (
                     <View
@@ -379,18 +465,21 @@ export const BorderRingAnimation: React.FC<BorderRingAnimationProps> = ({ isActi
                             },
                         ]}
                     >
-                        <BlurView intensity={20 - layerIndex * 3} tint="light" style={StyleSheet.absoluteFill} />
+                        <BlurView intensity={45 - layerIndex * 4} tint="light" style={StyleSheet.absoluteFill} />
                         <LinearGradient
                             colors={[
-                                'rgba(157, 78, 221, 0)',
-                                `rgba(157, 78, 221, ${0.5 - layerIndex * 0.1})`,
-                                `rgba(157, 78, 221, ${0.6 - layerIndex * 0.1})`,
-                                `rgba(157, 78, 221, ${0.5 - layerIndex * 0.1})`,
-                                'rgba(157, 78, 221, 0)',
+                                `rgba(255, 100, 200, ${opacityMultiplier})`, // Bright pink - full opacity
+                                `rgba(255, 100, 200, ${opacityMultiplier * 0.9})`,
+                                `rgba(255, 100, 200, ${opacityMultiplier * 0.7})`,
+                                `rgba(255, 100, 200, ${opacityMultiplier * 0.5})`,
+                                `rgba(255, 100, 200, ${opacityMultiplier * 0.3})`,
+                                `rgba(255, 100, 200, ${opacityMultiplier * 0.15})`,
+                                `rgba(255, 100, 200, ${opacityMultiplier * 0.05})`,
+                                'rgba(255, 100, 200, 0)', // Fade to transparent
                             ]}
                             start={{ x: 0, y: 0.5 }}
                             end={{ x: 1, y: 0.5 }}
-                            locations={[0, 0.15, 0.5, 0.85, 1]}
+                            locations={[0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1]}
                             style={styles.auraGradient}
                         />
                     </View>
@@ -409,10 +498,11 @@ const styles = StyleSheet.create({
         height: SCREEN_HEIGHT,
         zIndex: 999,
         overflow: 'hidden',
+        borderRadius: 20, // Rounded corners for the screen
     },
     fullBorder: {
         position: 'absolute',
-        backgroundColor: 'rgba(82, 110, 255, 0.4)',
+        backgroundColor: 'rgba(82, 110, 255, 1)',
     },
     topBorder: {
         top: 0,
@@ -420,11 +510,19 @@ const styles = StyleSheet.create({
         right: 0,
         height: BORDER_WIDTH,
     },
+    topBorderRounded: {
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+    },
     rightBorder: {
         top: 0,
         right: 0,
         bottom: 0,
         width: BORDER_WIDTH,
+    },
+    rightBorderRounded: {
+        borderTopRightRadius: 20,
+        borderBottomRightRadius: 20,
     },
     bottomBorder: {
         bottom: 0,
@@ -432,11 +530,19 @@ const styles = StyleSheet.create({
         right: 0,
         height: BORDER_WIDTH,
     },
+    bottomBorderRounded: {
+        borderBottomLeftRadius: 20,
+        borderBottomRightRadius: 20,
+    },
     leftBorder: {
         top: 0,
         left: 0,
         bottom: 0,
         width: BORDER_WIDTH,
+    },
+    leftBorderRounded: {
+        borderTopLeftRadius: 20,
+        borderBottomLeftRadius: 20,
     },
     fullBorderGradient: {
         width: '100%',
