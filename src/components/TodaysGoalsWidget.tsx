@@ -3,16 +3,22 @@ import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, Easing,
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../constants/fonts';
+import { TodaysGoalsOverlay } from './TodaysGoalsOverlay';
 
 interface Goal {
     text: string;
     completed: boolean;
+    createdAt?: string;
+    isRepeating?: boolean;
+    order?: number;
 }
 
 interface TodaysGoalsWidgetProps {
     goals?: Goal[];
     moreCount?: number;
     onPress?: () => void;
+    onGoalsChange?: (goals: Goal[]) => void;
+    onOverlayChange?: (visible: boolean) => void;
 }
 
 const screenWidth = Dimensions.get('window').width;
@@ -23,24 +29,72 @@ const widgetSize = availableWidth / 2; // Two widgets side by side
 
 export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
     goals: initialGoals = [
-        { text: 'hit protein goal', completed: false },
-        { text: 'workout', completed: false },
-        { text: 'reach water goal', completed: false },
-        { text: 'Log meals', completed: false },
-        { text: 'take vitamins', completed: false },
-        { text: 'meditate', completed: false },
-        { text: 'get 8 hours sleep', completed: false },
+        { text: 'hit protein goal', completed: false, category: 'nutrition' as const, icon: 'restaurant' },
+        { text: 'workout', completed: false, category: 'fitness' as const, icon: 'fitness' },
+        { text: 'reach water goal', completed: false, category: 'nutrition' as const, icon: 'restaurant' },
+        { text: 'Log meals', completed: false, category: 'nutrition' as const, icon: 'restaurant' },
+        { text: 'take vitamins', completed: false, category: 'nutrition' as const, icon: 'restaurant' },
+        { text: 'meditate', completed: false, category: 'wellness' as const, icon: 'leaf' },
+        { text: 'get 8 hours sleep', completed: false, category: 'wellness' as const, icon: 'leaf' },
     ],
     moreCount,
-    onPress
+    onPress,
+    onGoalsChange,
+    onOverlayChange,
 }) => {
     const [goals, setGoals] = useState(initialGoals);
+    const [showOverlay, setShowOverlay] = useState(false);
+
+    // Notify parent when overlay state changes
+    React.useEffect(() => {
+        if (onOverlayChange) {
+            onOverlayChange(showOverlay);
+        }
+    }, [showOverlay, onOverlayChange]);
+
+    // Sync with external goals if provided - but only if they're different
+    React.useEffect(() => {
+        if (initialGoals) {
+            setGoals(prevGoals => {
+                // Deep comparison to see if goals actually changed
+                const prevGoalsStr = JSON.stringify(prevGoals.map(g => ({ text: g.text, completed: g.completed, isRepeating: g.isRepeating, order: g.order })));
+                const newGoalsStr = JSON.stringify(initialGoals.map(g => ({ text: g.text, completed: g.completed, isRepeating: g.isRepeating, order: g.order })));
+                
+                if (prevGoalsStr !== newGoalsStr) {
+                    return initialGoals;
+                }
+                return prevGoals;
+            });
+        }
+    }, [initialGoals]);
+
+    const handleGoalsChange = (newGoals: Goal[]) => {
+        setGoals(newGoals);
+        if (onGoalsChange) {
+            onGoalsChange(newGoals);
+        }
+    };
+
+    const handleWidgetPress = () => {
+        if (onPress) {
+            onPress();
+        } else {
+            setShowOverlay(true);
+        }
+    };
     const [confettiParticles, setConfettiParticles] = useState<Array<{ id: number; originX: number; originY: number; angle: number }>>([]);
     const [removingIndex, setRemovingIndex] = useState<number | null>(null);
     const previousVisibleTextsRef = useRef<Set<string>>(new Set());
     const maxVisible = 4;
-    const visibleGoals = goals.slice(0, maxVisible);
-    const remainingCount = goals.length - maxVisible;
+    // Filter out completed items first, then sort by order
+    const incompleteGoals = goals.filter(g => !g.completed);
+    const sortedGoals = [...incompleteGoals].sort((a, b) => {
+        const orderA = a.order ?? Infinity;
+        const orderB = b.order ?? Infinity;
+        return orderA - orderB;
+    });
+    const visibleGoals = sortedGoals.slice(0, maxVisible);
+    const remainingCount = incompleteGoals.length - maxVisible;
     const showMore = remainingCount > 0;
     const moreTextOpacity = useRef(new Animated.Value(showMore ? 1 : 0)).current;
     const moreTextTranslateY = useRef(new Animated.Value(0)).current;
@@ -101,8 +155,14 @@ export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
                     text: 'Add',
                     onPress: (text) => {
                         if (text && text.trim()) {
-                            const newGoal = { text: text.trim().toLowerCase(), completed: false };
-                            setGoals([...goals, newGoal]);
+                            const newGoal: Goal = { 
+                                text: text.trim().toLowerCase(), 
+                                completed: false,
+                                createdAt: new Date().toISOString(),
+                                isRepeating: false,
+                                order: goals.length,
+                            };
+                            handleGoalsChange([...goals, newGoal]);
                         }
                     },
                 },
@@ -126,7 +186,7 @@ export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
             // Update goal to completed (this triggers strikethrough animation)
             const updatedGoals = [...goals];
             updatedGoals[index].completed = true;
-            setGoals(updatedGoals);
+            handleGoalsChange(updatedGoals);
 
             // Create confetti particles shooting out from the click position
             const particles = Array.from({ length: 16 }, (_, i) => ({
@@ -147,10 +207,9 @@ export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
                 // Mark as removing for fade out animation
                 setRemovingIndex(index);
 
-                // After fade out animation completes (400ms), remove from list
+                // After fade out animation completes (400ms), item is filtered out from display
+                // (but stays in goals array for overlay)
                 setTimeout(() => {
-                    const finalGoals = updatedGoals.filter((_, i) => i !== index);
-                    setGoals(finalGoals);
                     setRemovingIndex(null);
                 }, 400);
             }, 400); // Wait for strikethrough animation
@@ -170,7 +229,7 @@ export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
             {/* Header */}
             <TouchableOpacity
                 style={styles.header}
-                onPress={onPress}
+                onPress={handleWidgetPress}
                 activeOpacity={0.7}
             >
                 <Text style={styles.headerText}>today's goals</Text>
@@ -181,7 +240,7 @@ export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
             <View style={styles.separator} />
 
             {/* Goals list */}
-            {goals.length === 0 ? (
+            {incompleteGoals.length === 0 ? (
                 <TouchableOpacity
                     style={styles.emptyContainer}
                     onLongPress={handleAddTodo}
@@ -195,16 +254,23 @@ export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
                     onLongPress={handleAddTodo}
                     activeOpacity={1}
                 >
-                    {visibleGoals.map((goal, index) => {
+                    {visibleGoals.map((goal, displayIndex) => {
+                        // Find original index in full goals array
+                        const originalIndex = goals.findIndex(g => g.text === goal.text && !g.completed);
                         const isNewlyAppearing = newlyAppearingTexts.has(goal.text);
                         return (
                             <GoalItem
-                                key={`${goal.text}-${index}`}
+                                key={`${goal.text}-${originalIndex}`}
                                 goal={goal}
-                                index={index}
-                                isRemoving={removingIndex === index}
+                                index={originalIndex >= 0 ? originalIndex : displayIndex}
+                                isRemoving={removingIndex === originalIndex}
                                 isNewlyAppearing={isNewlyAppearing}
-                                onLongPress={(originX, originY) => handleGoalPress(index, originX, originY)}
+                                onLongPress={(originX, originY) => {
+                                    const idx = goals.findIndex(g => g.text === goal.text && !g.completed);
+                                    if (idx >= 0) {
+                                        handleGoalPress(idx, originX, originY);
+                                    }
+                                }}
                             />
                         );
                     })}
@@ -230,6 +296,14 @@ export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
                     angle={particle.angle}
                 />
             ))}
+
+            {/* Overlay */}
+            <TodaysGoalsOverlay
+                visible={showOverlay}
+                onClose={() => setShowOverlay(false)}
+                goals={goals}
+                onGoalsChange={handleGoalsChange}
+            />
         </View>
     );
 };

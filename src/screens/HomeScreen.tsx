@@ -37,6 +37,38 @@ export const HomeScreen: React.FC = () => {
     const [dailyLog, setDailyLog] = useState<DailyMacroLog | null>(null);
     const [loadingLog, setLoadingLog] = useState(true);
     const [showAddFoodSheet, setShowAddFoodSheet] = useState(false);
+    const [showGoalsOverlay, setShowGoalsOverlay] = useState(false);
+    
+    // Goals state - reset daily
+    const [goals, setGoals] = useState([
+        { text: 'hit protein goal', completed: false, isRepeating: true, order: 0 },
+        { text: 'workout', completed: false, isRepeating: true, order: 1 },
+        { text: 'reach water goal', completed: false, isRepeating: true, order: 2 },
+        { text: 'Log meals', completed: false, isRepeating: true, order: 3 },
+        { text: 'take vitamins', completed: false, isRepeating: true, order: 4 },
+        { text: 'meditate', completed: false, isRepeating: true, order: 5 },
+        { text: 'get 8 hours sleep', completed: false, isRepeating: true, order: 6 },
+    ]);
+
+    // Reset repeating goals daily (check on mount and when date changes)
+    useEffect(() => {
+        const resetRepeatingGoals = () => {
+            setGoals(prev => prev.map(g => ({
+                ...g,
+                completed: g.isRepeating ? false : g.completed,
+            })));
+        };
+        
+        // Reset on mount
+        resetRepeatingGoals();
+        
+        // Check every hour for date change
+        const interval = setInterval(() => {
+            resetRepeatingGoals();
+        }, 3600000); // 1 hour
+        
+        return () => clearInterval(interval);
+    }, []);
 
     // Aura overlay state
     const [showBorderRing, setShowBorderRing] = useState(false);
@@ -231,13 +263,18 @@ export const HomeScreen: React.FC = () => {
     const isScrolling = useRef(false);
 
     const handleTouchStart = useCallback((evt: any) => {
+        // Don't trigger aura if any overlay is open
+        if (showAddFoodSheet || showGoalsOverlay) {
+            return;
+        }
+
         const { pageX, pageY } = evt.nativeEvent;
         touchStartPosition.current = { x: pageX, y: pageY };
         isScrolling.current = false;
 
         // Start timer for border ring (only if not scrolling)
         longPressTimerRef.current = setTimeout(() => {
-            if (!isScrolling.current && touchStartPosition.current) {
+            if (!isScrolling.current && touchStartPosition.current && !showAddFoodSheet && !showGoalsOverlay) {
                 isTouchingRef.current = true;
                 setShowBorderRing(true);
 
@@ -295,6 +332,21 @@ export const HomeScreen: React.FC = () => {
         setShowBorderRing(false);
     }, []);
 
+    // Disable aura when overlays are open
+    useEffect(() => {
+        if (showAddFoodSheet || showGoalsOverlay) {
+            setShowBorderRing(false);
+            if (longPressTimerRef.current) {
+                clearTimeout(longPressTimerRef.current);
+                longPressTimerRef.current = null;
+            }
+            if (hapticIntervalRef.current) {
+                clearInterval(hapticIntervalRef.current);
+                hapticIntervalRef.current = null;
+            }
+        }
+    }, [showAddFoodSheet, showGoalsOverlay]);
+
 
     return (
         <View
@@ -308,11 +360,12 @@ export const HomeScreen: React.FC = () => {
             }}
         >
             <View
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
+                onTouchStart={showAddFoodSheet || showGoalsOverlay ? undefined : handleTouchStart}
+                onTouchMove={showAddFoodSheet || showGoalsOverlay ? undefined : handleTouchMove}
                 onTouchEnd={handleTouchEnd}
                 onTouchCancel={handleTouchEnd}
                 style={{ flex: 1 }}
+                pointerEvents={showAddFoodSheet || showGoalsOverlay ? 'none' : 'auto'}
             >
                 <ScrollView
                     contentContainerStyle={styles.scrollContent}
@@ -357,9 +410,9 @@ export const HomeScreen: React.FC = () => {
                     {/* Square Widgets Row */}
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
                         <TodaysGoalsWidget
-                            onPress={() => {
-                                Alert.alert('Today\'s Goals', 'Goals screen coming soon');
-                            }}
+                            goals={goals}
+                            onGoalsChange={setGoals}
+                            onOverlayChange={setShowGoalsOverlay}
                         />
                         <SquareWidget title="widget 2" content="content 2" />
                     </View>
