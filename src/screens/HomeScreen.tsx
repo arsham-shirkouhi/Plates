@@ -234,7 +234,7 @@ export const HomeScreen: React.FC = () => {
         );
     };
 
-    const macros = userProfile?.userSettings?.macros || userProfile?.targetMacros;
+    const macros = userProfile?.target_macros || undefined;
     const streak = userProfile?.streak || 0;
     const baseConsumed = dailyLog || { calories: 0, protein: 0, carbs: 0, fats: 0 };
     const consumed = {
