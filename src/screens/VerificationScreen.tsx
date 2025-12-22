@@ -5,6 +5,7 @@ import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navig
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { getAuthErrorMessage } from '../utils/errorHandler';
+import { isEmailVerified } from '../utils/authHelpers';
 import { Button } from '../components/Button';
 import { styles } from './VerificationScreen.styles';
 
@@ -120,7 +121,7 @@ export const VerificationScreen: React.FC = () => {
             const checkVerification = async () => {
                 if (user) {
                     const updatedUser = await reloadUser();
-                    if (updatedUser?.emailVerified) {
+                    if (isEmailVerified(updatedUser)) {
                         // Email is verified, check onboarding status
                         const onboardingCompleted = await hasCompletedOnboarding();
                         if (!onboardingCompleted) {

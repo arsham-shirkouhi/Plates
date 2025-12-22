@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendEmailVerification, reload, signInWithCredential, GoogleAuthProvider, sendPasswordResetEmail } from 'firebase/auth';
-import { auth } from '../services/firebase';
-import { getGoogleIdToken } from '../services/googleAuth';
+import { User } from '@supabase/supabase-js';
+import * as AuthSession from 'expo-auth-session';
+import { supabase } from '../services/supabase';
 import { hasCompletedOnboarding as checkOnboardingStatus, initializeUser } from '../services/userService';
 
 interface AuthContextType {
@@ -36,44 +36,93 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                await reload(user);
-                setUser(user);
-
-                // Update last login timestamp for existing users
-                try {
-                    const { getUserProfile, updateLastLogin } = await import('../services/userService');
-                    const profile = await getUserProfile(user);
-                    if (profile) {
-                        // User exists - update last login
-                        await updateLastLogin(user);
-                    }
-                    // If profile doesn't exist, it will be initialized on next signup/login
-                } catch (error) {
-                    console.error('Error updating last login:', error);
-                    // Don't block auth state change
-                }
-            } else {
-                setUser(null);
+        // Get initial session
+        supabase.auth.getSession().then(({ data: { session }, error }) => {
+            if (error) {
+                console.error('Error getting session:', error);
+                setLoading(false);
+                return;
             }
+            setUser(session?.user ?? null);
+            setLoading(false);
+
+            // Update last login for existing users
+            if (session?.user) {
+                updateLastLoginIfNeeded(session.user);
+            }
+        }).catch((error) => {
+            console.error('Error in getSession:', error);
             setLoading(false);
         });
 
-        return unsubscribe;
+        // Listen for auth changes
+        const {
+            data: { subscription },
+        } = supabase.auth.onAuthStateChange(async (event, session) => {
+            const currentUser = session?.user ?? null;
+            setUser(currentUser);
+
+            if (currentUser && event === 'SIGNED_IN') {
+                // Check if this is a new user (first time sign-in)
+                // If user document doesn't exist, initialize it
+                try {
+                    const { getUserProfile, initializeUser, updateLastLogin } = await import('../services/userService');
+                    const existingProfile = await getUserProfile(currentUser);
+                    if (!existingProfile) {
+                        // New user - initialize document
+                        await initializeUser(currentUser);
+                        console.log('New user - document initialized');
+                    } else {
+                        // Existing user - update last login
+                        await updateLastLogin(currentUser);
+                    }
+                } catch (userError) {
+                    console.error('Error checking/initializing user document:', userError);
+                    // Don't throw - this shouldn't block auth state change
+                }
+            }
+
+            setLoading(false);
+        });
+
+        return () => {
+            subscription.unsubscribe();
+        };
     }, []);
+
+    const updateLastLoginIfNeeded = async (user: User) => {
+        try {
+            const { getUserProfile, updateLastLogin } = await import('../services/userService');
+            const profile = await getUserProfile(user);
+            if (profile) {
+                // User exists - update last login
+                await updateLastLogin(user);
+            }
+            // If profile doesn't exist, it will be initialized on next signup/login
+        } catch (error) {
+            console.error('Error updating last login:', error);
+            // Don't block auth state change
+        }
+    };
 
     const login = async (email: string, password: string) => {
         try {
             console.log('Attempting login for email:', email);
-            const userCredential = await signInWithEmailAndPassword(auth, email, password);
-            console.log('Login successful, user ID:', userCredential.user.uid);
-            console.log('Email verified:', userCredential.user.emailVerified);
-            // Note: Firebase allows login even if email isn't verified
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
+
+            if (error) {
+                throw error;
+            }
+
+            console.log('Login successful, user ID:', data.user?.id);
+            console.log('Email confirmed:', data.user?.email_confirmed_at ? 'Yes' : 'No');
+            // Note: Supabase allows login even if email isn't confirmed
             // The app will handle redirecting to verification screen if needed
         } catch (error: any) {
             console.error('Login error details:', {
-                code: error.code,
                 message: error.message,
                 email: email,
             });
@@ -84,10 +133,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const signup = async (email: string, password: string) => {
         try {
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            const newUser = userCredential.user;
+            const { data, error } = await supabase.auth.signUp({
+                email,
+                password,
+                options: {
+                    emailRedirectTo: undefined, // We'll handle verification manually
+                },
+            });
 
-            // Initialize user document in Firestore
+            if (error) {
+                throw error;
+            }
+
+            const newUser = data.user;
+            if (!newUser) {
+                throw new Error('User creation failed - no user returned');
+            }
+
+            // Initialize user document in Supabase
             try {
                 await initializeUser(newUser);
                 console.log('User document initialized');
@@ -96,30 +159,37 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 // Don't throw - initialization failure shouldn't block signup
             }
 
+            // Supabase automatically sends verification email on signup
+            // Sign out the user so they need to verify email first
             try {
-                await sendEmailVerification(newUser);
+                await supabase.auth.signOut();
                 console.log('Verification email sent successfully');
-                await signOut(auth);
-            } catch (verifyError: any) {
-                console.error('Error sending verification email:', verifyError);
-                await signOut(auth);
-                throw verifyError;
+            } catch (signOutError: any) {
+                console.error('Error signing out after signup:', signOutError);
+                // Don't throw - signup was successful, signout failure is not critical
             }
         } catch (error: any) {
-            console.error('Firebase signup error:', error);
+            console.error('Supabase signup error:', error);
             throw error;
         }
     };
 
     const sendVerificationEmail = async () => {
-        if (!auth.currentUser) {
+        const currentUser = (await supabase.auth.getUser()).data.user;
+        if (!currentUser) {
             throw new Error('User not found. Please log in again.');
         }
-        if (auth.currentUser.emailVerified) {
+        if (currentUser.email_confirmed_at) {
             throw new Error('Email is already verified');
         }
         try {
-            await sendEmailVerification(auth.currentUser);
+            const { error } = await supabase.auth.resend({
+                type: 'signup',
+                email: currentUser.email!,
+            });
+            if (error) {
+                throw error;
+            }
             console.log('Verification email sent successfully');
         } catch (error: any) {
             console.error('Error sending verification email:', error);
@@ -128,60 +198,66 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     const reloadUser = async () => {
-        if (auth.currentUser) {
-            await reload(auth.currentUser);
-            const updatedUser = auth.currentUser;
-            setUser(updatedUser);
-            return updatedUser;
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (currentUser) {
+            setUser(currentUser);
+            return currentUser;
         }
         return null;
     };
 
     const loginWithGoogle = async () => {
         try {
-            const idToken = await getGoogleIdToken();
-            if (!idToken) {
-                throw new Error('Google sign-in was cancelled or failed - no ID token received');
-            }
-            const credential = GoogleAuthProvider.credential(idToken);
-            const userCredential = await signInWithCredential(auth, credential);
-            const user = userCredential.user;
+            // For React Native/Expo, we need to use a redirect URL
+            // You'll need to configure this in your Supabase project settings
+            // and set up deep linking in your app
+            const redirectUrl = AuthSession.makeRedirectUri({
+                useProxy: true,
+            });
 
-            // Check if this is a new user (first time Google sign-in)
-            // If user document doesn't exist, initialize it
-            try {
-                const { getUserProfile } = await import('../services/userService');
-                const existingProfile = await getUserProfile(user);
-                if (!existingProfile) {
-                    // New user - initialize document
-                    await initializeUser(user);
-                    console.log('New Google user - document initialized');
-                } else {
-                    // Existing user - update last login
-                    const { updateLastLogin } = await import('../services/userService');
-                    await updateLastLogin(user);
-                }
-            } catch (userError) {
-                console.error('Error checking/initializing user document:', userError);
-                // Don't throw - this shouldn't block login
+            const { data, error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: redirectUrl,
+                },
+            });
+
+            if (error) {
+                throw error;
             }
+
+            // The OAuth flow will open a browser and redirect back
+            // The auth state change listener will handle the session when it's established
+            // Note: You need to configure the redirect URL in Supabase dashboard:
+            // Authentication > URL Configuration > Redirect URLs
+            
+            // For Expo, you may need to handle the deep link callback
+            // This is typically handled automatically by expo-auth-session
         } catch (error: any) {
             console.error('Google sign-in error:', error);
             // Re-throw with more context if it's a redirect URI error
             if (error?.message?.includes('redirect_uri_mismatch') || error?.message?.includes('redirect')) {
-                throw new Error('Redirect URI mismatch. Please check the console for the redirect URI and add it to Google Cloud Console. See GOOGLE_REDIRECT_URI_FIX.md for instructions.');
+                throw new Error('Redirect URI mismatch. Please check your Supabase project settings for the correct redirect URI.');
             }
             throw error;
         }
     };
 
     const logout = async () => {
-        await signOut(auth);
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+            throw error;
+        }
     };
 
     const resetPassword = async (email: string) => {
         try {
-            await sendPasswordResetEmail(auth, email);
+            const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: undefined, // We'll handle this in the app
+            });
+            if (error) {
+                throw error;
+            }
             console.log('Password reset email sent successfully');
         } catch (error: any) {
             console.error('Error sending password reset email:', error);
@@ -211,4 +287,3 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-

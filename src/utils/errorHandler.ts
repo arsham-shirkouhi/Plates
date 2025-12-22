@@ -3,80 +3,83 @@ export const getAuthErrorMessage = (error: any): string => {
         return 'An unknown error occurred';
     }
 
-    // Extract error code from various possible formats
-    let errorCode = error.code;
-    if (!errorCode && error.message) {
-        const match = error.message.match(/auth\/([a-z-]+)/i);
-        if (match) {
-            errorCode = `auth/${match[1]}`;
-        }
-    }
-
+    // Extract error message from Supabase errors
+    let errorMessage = error.message || '';
+    
+    // Supabase error codes are typically in the message
+    // Common patterns: "Invalid login credentials", "Email not confirmed", etc.
+    
     // Log for debugging
     console.log('Error object:', error);
-    console.log('Error code:', errorCode);
-    console.log('Error message:', error.message);
+    console.log('Error message:', errorMessage);
 
-    switch (errorCode) {
-        // Login errors
-        case 'auth/user-not-found':
-            return 'wrong email/password';
-
-        case 'auth/wrong-password':
-            return 'wrong email/password';
-
-        case 'auth/invalid-email':
-            return 'invalid email';
-
-        case 'auth/user-disabled':
-            return 'account disabled';
-
-        case 'auth/invalid-credential':
-            return 'wrong email/password';
-
-        // Signup errors
-        case 'auth/email-already-in-use':
-            return 'email already exists';
-
-        case 'auth/weak-password':
-            return 'password too weak';
-
-        case 'auth/operation-not-allowed':
-            return 'operation not allowed';
-
-        // Network errors
-        case 'auth/network-request-failed':
-            return 'network error';
-
-        case 'auth/too-many-requests':
-            return 'too many requests';
-
-        // Verification errors
-        case 'auth/email-already-verified':
-            return 'email verified';
-
-        // Generic errors
-        case 'auth/internal-error':
-            return 'internal error';
-
-        case 'auth/invalid-action-code':
-            return 'invalid link';
-
-        case 'auth/expired-action-code':
-            return 'link expired';
-
-        default:
-            // Try to extract a user-friendly message from the error
-            if (error.message) {
-                // Remove Firebase error prefix if present
-                const message = error.message.replace(/^Firebase:?\s*/i, '');
-                if (message && message !== errorCode) {
-                    // Shorten default messages too
-                    return message.length > 20 ? 'error occurred' : message;
-                }
-            }
-            return 'error occurred';
+    // Supabase Auth Error Messages
+    if (errorMessage.includes('Invalid login credentials') || 
+        errorMessage.includes('Invalid credentials') ||
+        errorMessage.includes('Email or password is incorrect')) {
+        return 'wrong email/password';
     }
+
+    if (errorMessage.includes('Email not confirmed') || 
+        errorMessage.includes('email_not_confirmed')) {
+        return 'email not verified';
+    }
+
+    if (errorMessage.includes('Email already registered') || 
+        errorMessage.includes('User already registered') ||
+        errorMessage.includes('already registered')) {
+        return 'email already exists';
+    }
+
+    if (errorMessage.includes('Password should be at least') || 
+        errorMessage.includes('Password is too weak') ||
+        errorMessage.includes('weak password')) {
+        return 'password too weak';
+    }
+
+    if (errorMessage.includes('Invalid email') || 
+        errorMessage.includes('invalid email')) {
+        return 'invalid email';
+    }
+
+    if (errorMessage.includes('User not found') || 
+        errorMessage.includes('user_not_found')) {
+        return 'wrong email/password';
+    }
+
+    if (errorMessage.includes('Too many requests') || 
+        errorMessage.includes('too_many_requests')) {
+        return 'too many requests';
+    }
+
+    if (errorMessage.includes('Network') || 
+        errorMessage.includes('network') ||
+        errorMessage.includes('Failed to fetch')) {
+        return 'network error';
+    }
+
+    if (errorMessage.includes('Email already verified') || 
+        errorMessage.includes('already verified')) {
+        return 'email verified';
+    }
+
+    // Generic errors
+    if (errorMessage.includes('Internal error') || 
+        errorMessage.includes('internal_error')) {
+        return 'internal error';
+    }
+
+    // Try to extract a user-friendly message from the error
+    if (errorMessage) {
+        // Remove Supabase error prefix if present
+        const message = errorMessage.replace(/^Supabase:?\s*/i, '');
+        if (message && message.length > 0) {
+            // Shorten default messages too
+            return message.length > 30 ? 'error occurred' : message;
+        }
+    }
+    
+    return 'error occurred';
 };
 
 export const validateEmail = (email: string): { valid: boolean; message?: string } => {
@@ -103,4 +106,3 @@ export const validatePassword = (password: string): { valid: boolean; message?: 
 
     return { valid: true };
 };
-

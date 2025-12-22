@@ -184,7 +184,7 @@ export const SignupScreen: React.FC = () => {
         try {
             await loginWithGoogle();
             const updatedUser = await reloadUser();
-            console.log('Google signup successful, user verified:', updatedUser?.emailVerified);
+            console.log('Google signup successful, user verified:', updatedUser?.email_confirmed_at ? 'Yes' : 'No');
             if (updatedUser) {
                 setTimeout(() => {
                     navigation.replace('Home');

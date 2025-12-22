@@ -9,8 +9,9 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { auth } from '../services/firebase';
+// Removed Firebase import - using Supabase now
 import { getAuthErrorMessage, validateEmail } from '../utils/errorHandler';
+import { isEmailVerified } from '../utils/authHelpers';
 import { Button } from '../components/Button';
 import { TextInput } from '../components/TextInput';
 import { styles } from './LoginScreen.styles';
@@ -157,9 +158,9 @@ export const LoginScreen: React.FC = () => {
         try {
             await login(email, password);
             const updatedUser = await reloadUser();
-            console.log('Login successful, user verified:', updatedUser?.emailVerified);
+            console.log('Login successful, user verified:', isEmailVerified(updatedUser));
             if (updatedUser) {
-                if (updatedUser.emailVerified) {
+                if (isEmailVerified(updatedUser)) {
                     // Check if onboarding is completed - use updatedUser directly
                     console.log('Checking onboarding status...');
                     let onboardingCompleted = false;
@@ -212,7 +213,7 @@ export const LoginScreen: React.FC = () => {
         try {
             await loginWithGoogle();
             const updatedUser = await reloadUser();
-            console.log('Google login successful, user verified:', updatedUser?.emailVerified);
+            console.log('Google login successful, user verified:', isEmailVerified(updatedUser));
             if (updatedUser) {
                 // Google sign-in users are automatically verified, check onboarding
                 console.log('Checking onboarding status...');
