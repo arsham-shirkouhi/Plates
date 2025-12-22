@@ -488,6 +488,40 @@ export const addToDailyMacroLog = async (
 };
 
 /**
+ * Subtract macros from existing daily log (for undo functionality)
+ * @param user - Firebase user
+ * @param macros - Macro values to subtract
+ * @param date - Date string in format YYYY-MM-DD (defaults to today)
+ */
+export const subtractFromDailyMacroLog = async (
+    user: User,
+    macros: {
+        calories?: number;
+        protein?: number;
+        carbs?: number;
+        fats?: number;
+    },
+    date?: string
+): Promise<void> => {
+    try {
+        const dateStr = date || getTodayDateString();
+        const existingLog = await getDailyMacroLog(user, dateStr);
+
+        const updatedMacros = {
+            calories: Math.max(0, (existingLog?.calories || 0) - (macros.calories || 0)),
+            protein: Math.max(0, (existingLog?.protein || 0) - (macros.protein || 0)),
+            carbs: Math.max(0, (existingLog?.carbs || 0) - (macros.carbs || 0)),
+            fats: Math.max(0, (existingLog?.fats || 0) - (macros.fats || 0)),
+        };
+
+        await saveDailyMacroLog(user, updatedMacros, dateStr);
+    } catch (error) {
+        console.error('Error subtracting from daily macro log:', error);
+        throw error;
+    }
+};
+
+/**
  * Update user streak when a meal is logged
  * Streak increases if logging on a new day, resets if gap > 1 day
  * @param user - Firebase user

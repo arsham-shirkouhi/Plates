@@ -26,7 +26,7 @@ const AnimatedNumber: React.FC<{
     // Also set final value when animation completes
     useEffect(() => {
         const timer = setTimeout(() => {
-            setDisplayValue(target);
+            setDisplayValue(Math.round(target));
         }, 1000);
         return () => clearTimeout(timer);
     }, [target]);
@@ -109,9 +109,18 @@ const CalorieCircularProgress: React.FC<CalorieCircularProgressProps> = ({
             useNativeDriver: false,
         }).start();
 
+        // Check if percentage is increasing before updating
+        const wasIncreasing = percentage > previousPercentage.current;
+        const oldPercentage = previousPercentage.current;
+
         // Update previous values
         previousPercentage.current = percentage;
         previousRemaining.current = remaining;
+
+        // Reset haptic tracking to start from old value when increasing
+        if (wasIncreasing) {
+            lastHapticPercentage.current = oldPercentage;
+        }
 
         // Listen to animated value changes and update dash offset
         const listener = animatedValue.addListener(({ value }) => {
@@ -124,7 +133,8 @@ const CalorieCircularProgress: React.FC<CalorieCircularProgressProps> = ({
             const currentPercentage = value;
             const percentageDiff = currentPercentage - lastHapticPercentage.current;
             
-            // Trigger haptic every ~0.15% increase with intensity based on progress
+            // Ramping haptic feedback - trigger every ~0.15% increase with intensity based on progress
+            // Only trigger if value is increasing
             if (percentageDiff > 0 && percentageDiff >= 0.15) {
                 // Ramp up intensity based on progress: Light (< 33%), Medium (33-66%), Heavy (> 66%)
                 let hapticStyle: Haptics.ImpactFeedbackStyle;
@@ -144,9 +154,6 @@ const CalorieCircularProgress: React.FC<CalorieCircularProgressProps> = ({
                 lastHapticPercentage.current = currentPercentage;
             }
         });
-
-        // Reset haptic tracking to start from previous value (only trigger on increase)
-        lastHapticPercentage.current = previousPercentage.current;
 
         return () => {
             animatedValue.removeListener(listener);
@@ -257,6 +264,10 @@ const MacroProgressBar: React.FC<MacroProgressBarProps> = ({
         animatedWidth.setValue(previousPercentage.current);
         numberAnimation.setValue(previousCurrent.current);
 
+        // Check if percentage is increasing before updating
+        const wasIncreasing = percentage > previousPercentage.current;
+        const oldPercentage = previousPercentage.current;
+
         Animated.timing(animatedWidth, {
             toValue: percentage,
             duration: 800,
@@ -271,10 +282,6 @@ const MacroProgressBar: React.FC<MacroProgressBarProps> = ({
             easing: Easing.out(Easing.ease),
             useNativeDriver: false,
         }).start();
-
-        // Check if percentage is increasing before updating
-        const wasIncreasing = percentage > previousPercentage.current;
-        const oldPercentage = previousPercentage.current;
 
         // Update previous values
         previousPercentage.current = percentage;

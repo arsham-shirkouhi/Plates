@@ -19,7 +19,9 @@ import { GradientBackground } from '../components/GradientBackground';
 import { BottomNavBar } from '../components/BottomNavBar';
 import { AddButton, NavButtons } from '../components/NavButton';
 import { AuraOverlay } from '../components/AuraOverlay';
-import { resetOnboarding, getUserProfile, UserProfile, getDailyMacroLog, getTodayDateString, DailyMacroLog } from '../services/userService';
+import { AddFoodBottomSheet } from '../components/AddFoodBottomSheet';
+import { resetOnboarding, getUserProfile, UserProfile, getDailyMacroLog, getTodayDateString, DailyMacroLog, addToDailyMacroLog, subtractFromDailyMacroLog } from '../services/userService';
+import { getQuickAddItems, FoodItem } from '../services/foodService';
 import { styles } from './HomeScreen.styles';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
@@ -34,8 +36,7 @@ export const HomeScreen: React.FC = () => {
     const [loadingProfile, setLoadingProfile] = useState(true);
     const [dailyLog, setDailyLog] = useState<DailyMacroLog | null>(null);
     const [loadingLog, setLoadingLog] = useState(true);
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const closeMenuRef = useRef<(() => void) | null>(null);
+    const [showAddFoodSheet, setShowAddFoodSheet] = useState(false);
 
     // Aura overlay state
     const [showBorderRing, setShowBorderRing] = useState(false);
@@ -105,6 +106,48 @@ export const HomeScreen: React.FC = () => {
             setLoadingLog(false);
         }
     }, [user]);
+
+    // Handle adding food
+    const handleAddFood = useCallback(async (food: FoodItem) => {
+        if (!user) return;
+
+        try {
+            // Add to daily log
+            await addToDailyMacroLog(user, {
+                calories: food.calories,
+                protein: food.protein,
+                carbs: food.carbs,
+                fats: food.fats,
+            });
+
+            // Reload daily log to update UI
+            await loadDailyLog();
+        } catch (error) {
+            console.error('Error adding food:', error);
+            Alert.alert('Error', 'Failed to add food. Please try again.');
+        }
+    }, [user, loadDailyLog]);
+
+    // Handle removing food (for undo)
+    const handleRemoveFood = useCallback(async (food: FoodItem) => {
+        if (!user) return;
+
+        try {
+            // Subtract from daily log
+            await subtractFromDailyMacroLog(user, {
+                calories: food.calories,
+                protein: food.protein,
+                carbs: food.carbs,
+                fats: food.fats,
+            });
+
+            // Reload daily log to update UI
+            await loadDailyLog();
+        } catch (error) {
+            console.error('Error removing food:', error);
+            Alert.alert('Error', 'Failed to remove food. Please try again.');
+        }
+    }, [user, loadDailyLog]);
 
     // Load on mount
     useEffect(() => {
@@ -374,62 +417,35 @@ export const HomeScreen: React.FC = () => {
                 pointerEvents="none"
             />
 
-            {/* Transparent overlay to close menu when clicking outside */}
-            {isMenuOpen && (
-                <TouchableOpacity
-                    style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        width: Dimensions.get('window').width,
-                        height: Dimensions.get('window').height,
-                        zIndex: 98, // Above content but below nav buttons (zIndex 100)
-                    }}
-                    activeOpacity={1}
-                    onPress={() => {
-                        // Close menu by calling AddButton's close function
-                        closeMenuRef.current?.();
-                    }}
-                />
-            )}
 
             {/* Bottom Navigation Bar */}
             <BottomNavBar>
                 <NavButtons
                     onHomePress={() => {
-                        // Close menu if open
-                        if (isMenuOpen) {
-                            closeMenuRef.current?.();
-                        }
                         // Already on home screen
                     }}
                     onFoodPress={() => {
-                        // Close menu if open
-                        if (isMenuOpen) {
-                            closeMenuRef.current?.();
-                        }
                         Alert.alert('Food', 'Food screen coming soon');
                     }}
                     onFitnessPress={() => {
-                        // Close menu if open
-                        if (isMenuOpen) {
-                            closeMenuRef.current?.();
-                        }
                         Alert.alert('Fitness', 'Fitness screen coming soon');
                     }}
                 />
                 <AddButton
                     onPress={() => {
-                        Alert.alert('Add', 'Add functionality coming soon');
+                        setShowAddFoodSheet(true);
                     }}
-                    onMenuStateChange={(isOpen) => {
-                        setIsMenuOpen(isOpen);
-                    }}
-                    onCloseMenu={closeMenuRef}
                 />
             </BottomNavBar>
+
+            {/* Add Food Bottom Sheet */}
+            <AddFoodBottomSheet
+                visible={showAddFoodSheet}
+                onClose={() => setShowAddFoodSheet(false)}
+                onAddFood={handleAddFood}
+                onRemoveFood={handleRemoveFood}
+                quickAddItems={getQuickAddItems()}
+            />
         </View>
     );
 };

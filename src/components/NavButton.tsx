@@ -1,13 +1,11 @@
 import React, { useRef } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, Animated, Alert, Dimensions, Image } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Animated, Dimensions, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 interface NavButtonProps {
     onPress?: () => void;
     children?: React.ReactNode;
-    onMenuStateChange?: (isOpen: boolean) => void;
-    onCloseMenu?: React.MutableRefObject<(() => void) | null>;
 }
 
 interface NavIconButtonProps {
@@ -16,23 +14,8 @@ interface NavIconButtonProps {
     isActive?: boolean;
 }
 
-// AddButton: Single green plate that expands to show menu
-export const AddButton: React.FC<NavButtonProps> = ({ onPress, onMenuStateChange, onCloseMenu }) => {
-    const [isMenuOpen, setIsMenuOpen] = React.useState(false);
-
-    // Animation values for menu buttons - starting from green button position (0, 0)
-    const menuButton1TranslateX = useRef(new Animated.Value(0)).current;
-    const menuButton1TranslateY = useRef(new Animated.Value(0)).current;
-
-    const menuButton2TranslateX = useRef(new Animated.Value(0)).current;
-    const menuButton2TranslateY = useRef(new Animated.Value(0)).current;
-
-    const menuButton3TranslateX = useRef(new Animated.Value(0)).current;
-    const menuButton3TranslateY = useRef(new Animated.Value(0)).current;
-
-    // Rotation animation for plus icon (starts at 0deg, rotates to 135deg when opened)
-    const plusIconRotation = useRef(new Animated.Value(0)).current;
-
+// AddButton: Single green plate that opens bottom sheet
+export const AddButton: React.FC<NavButtonProps> = ({ onPress }) => {
     // Press-down animation for green button
     const greenButtonTranslateY = useRef(new Animated.Value(0)).current;
 
@@ -59,173 +42,14 @@ export const AddButton: React.FC<NavButtonProps> = ({ onPress, onMenuStateChange
     const handlePress = () => {
         // Haptic feedback when plus button is pressed
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        
-        if (isMenuOpen) {
-            // Close menu - slide back to green button position (reverse order: 3, 2, 1)
-            Animated.parallel([
-                Animated.timing(plusIconRotation, { toValue: 0, duration: 200, useNativeDriver: true }), // Rotate back to 0
-                Animated.stagger(50, [
-                    Animated.parallel([
-                        Animated.timing(menuButton3TranslateX, { toValue: 0, duration: 200, useNativeDriver: true }),
-                        Animated.timing(menuButton3TranslateY, { toValue: 0, duration: 200, useNativeDriver: true }),
-                    ]),
-                    Animated.parallel([
-                        Animated.timing(menuButton2TranslateX, { toValue: 0, duration: 200, useNativeDriver: true }),
-                        Animated.timing(menuButton2TranslateY, { toValue: 0, duration: 200, useNativeDriver: true }),
-                    ]),
-                    Animated.parallel([
-                        Animated.timing(menuButton1TranslateX, { toValue: 0, duration: 200, useNativeDriver: true }),
-                        Animated.timing(menuButton1TranslateY, { toValue: 0, duration: 200, useNativeDriver: true }),
-                    ]),
-                ]),
-            ]).start(() => {
-                setIsMenuOpen(false);
-                onMenuStateChange?.(false);
+        // Directly call onPress to open bottom sheet
                 onPress?.();
-            });
-        } else {
-            // Open menu - slide out from green button position
-            setIsMenuOpen(true);
-            onMenuStateChange?.(true);
-            
-            // Haptic feedback for button 1 as it starts animating
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            
-            Animated.parallel([
-                Animated.timing(plusIconRotation, { toValue: 135, duration: 200, useNativeDriver: true }), // Rotate to 135 degrees (90+45)
-                Animated.stagger(50, [
-                    Animated.parallel([
-                        Animated.spring(menuButton1TranslateX, { toValue: -80, useNativeDriver: true, tension: 50, friction: 7 }),
-                        Animated.spring(menuButton1TranslateY, { toValue: -80, useNativeDriver: true, tension: 50, friction: 7 }),
-                    ]),
-                    Animated.parallel([
-                        Animated.spring(menuButton2TranslateX, { toValue: 0, useNativeDriver: true, tension: 50, friction: 7 }),
-                        Animated.spring(menuButton2TranslateY, { toValue: -80, useNativeDriver: true, tension: 50, friction: 7 }),
-                    ]),
-                    Animated.parallel([
-                        Animated.spring(menuButton3TranslateX, { toValue: -80, useNativeDriver: true, tension: 50, friction: 7 }),
-                        Animated.spring(menuButton3TranslateY, { toValue: 0, useNativeDriver: true, tension: 50, friction: 7 }),
-                    ]),
-                ]),
-            ]).start();
-            
-            // Haptic feedback for button 2 (50ms delay to match stagger)
-            setTimeout(() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            }, 50);
-            
-            // Haptic feedback for button 3 (100ms delay to match stagger)
-            setTimeout(() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            }, 100);
-        }
     };
 
-    // Expose close function to parent
-    React.useEffect(() => {
-        if (onCloseMenu) {
-            onCloseMenu.current = handlePress;
-        }
-    }, [isMenuOpen, onCloseMenu]);
-
-    const screenDimensions = Dimensions.get('window');
 
     return (
         <View style={styles.addButtonWrapper}>
-            {/* Menu Button 1: Top Left */}
-            <Animated.View
-                style={[
-                    styles.menuButton,
-                    {
-                        transform: [
-                            { translateX: menuButton1TranslateX },
-                            { translateY: menuButton1TranslateY },
-                        ],
-                    },
-                ]}
-                pointerEvents={isMenuOpen ? 'auto' : 'none'}
-            >
-                <TouchableOpacity
-                    onPress={() => {
-                        // Haptic feedback for menu button 1
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                        handlePress();
-                        Alert.alert('Menu 1', 'Menu option 1');
-                    }}
-                    style={styles.menuButtonTouchable}
-                >
-                    <View style={styles.singleCircleContainer}>
-                        <View style={[styles.circle, styles.menuCircle1]}>
-                            <Ionicons name="add" size={24} color="#252525" />
-                        </View>
-                        <View style={[styles.circle, styles.menuCircle1Shadow]} />
-                    </View>
-                </TouchableOpacity>
-            </Animated.View>
-
-            {/* Menu Button 2: Above Green */}
-            <Animated.View
-                style={[
-                    styles.menuButton,
-                    {
-                        transform: [
-                            { translateX: menuButton2TranslateX },
-                            { translateY: menuButton2TranslateY },
-                        ],
-                    },
-                ]}
-                pointerEvents={isMenuOpen ? 'auto' : 'none'}
-            >
-                <TouchableOpacity
-                    onPress={() => {
-                        // Haptic feedback for menu button 2
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                        handlePress();
-                        Alert.alert('Menu 2', 'Menu option 2');
-                    }}
-                    style={styles.menuButtonTouchable}
-                >
-                    <View style={styles.singleCircleContainer}>
-                        <View style={[styles.circle, styles.menuCircle2]}>
-                            <Ionicons name="add" size={24} color="#252525" />
-                        </View>
-                        <View style={[styles.circle, styles.menuCircle2Shadow]} />
-                    </View>
-                </TouchableOpacity>
-            </Animated.View>
-
-            {/* Menu Button 3: Left of Green */}
-            <Animated.View
-                style={[
-                    styles.menuButton,
-                    {
-                        transform: [
-                            { translateX: menuButton3TranslateX },
-                            { translateY: menuButton3TranslateY },
-                        ],
-                    },
-                ]}
-                pointerEvents={isMenuOpen ? 'auto' : 'none'}
-            >
-                <TouchableOpacity
-                    onPress={() => {
-                        // Haptic feedback for menu button 3
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                        handlePress();
-                        Alert.alert('Menu 3', 'Menu option 3');
-                    }}
-                    style={styles.menuButtonTouchable}
-                >
-                    <View style={styles.singleCircleContainer}>
-                        <View style={[styles.circle, styles.menuCircle3]}>
-                            <Ionicons name="add" size={24} color="#252525" />
-                        </View>
-                        <View style={[styles.circle, styles.menuCircle3Shadow]} />
-                    </View>
-                </TouchableOpacity>
-            </Animated.View>
-
-            {/* Main Green Button - aligned with left buttons */}
+            {/* Main Green Button */}
             <TouchableOpacity
                 onPress={handlePress}
                 onPressIn={handlePressIn}
@@ -244,21 +68,9 @@ export const AddButton: React.FC<NavButtonProps> = ({ onPress, onMenuStateChange
                             }
                         ]}
                     >
-                        <Animated.Image
+                        <Image
                             source={require('../../assets/images/icons/plus_icon.png')}
-                            style={[
-                                styles.plusIcon,
-                                {
-                                    transform: [
-                                        {
-                                            rotate: plusIconRotation.interpolate({
-                                                inputRange: [0, 135],
-                                                outputRange: ['0deg', '135deg'],
-                                            }),
-                                        },
-                                    ],
-                                },
-                            ]}
+                            style={styles.plusIcon}
                             resizeMode="contain"
                         />
                     </Animated.View>
@@ -308,7 +120,7 @@ const styles = StyleSheet.create({
         width: 60,
         height: 60,
         borderRadius: 30,
-        borderWidth: 2.5,
+        borderWidth: 2,
         borderColor: '#252525',
         position: 'absolute',
         justifyContent: 'center',
@@ -364,47 +176,6 @@ const styles = StyleSheet.create({
     circleGreenShadowSingle: {
         backgroundColor: '#19C456', // Darker green shadow
         top: 8, // Offset below the normal circle
-        zIndex: 1,
-    },
-    // Menu buttons - positioned at green button location, will slide out (behind green button)
-    menuButton: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        zIndex: 1,
-    },
-    menuButtonTouchable: {
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    menuCircle1: {
-        backgroundColor: '#4463F7', // Blue
-        top: 0,
-        zIndex: 2,
-    },
-    menuCircle1Shadow: {
-        backgroundColor: '#3850CE', // Darker blue shadow
-        top: 8,
-        zIndex: 1,
-    },
-    menuCircle2: {
-        backgroundColor: '#FF4444', // Red
-        top: 0,
-        zIndex: 2,
-    },
-    menuCircle2Shadow: {
-        backgroundColor: '#CA2E2E', // Darker red shadow
-        top: 8,
-        zIndex: 1,
-    },
-    menuCircle3: {
-        backgroundColor: '#FFB800', // Yellow/Orange
-        top: 0,
-        zIndex: 2,
-    },
-    menuCircle3Shadow: {
-        backgroundColor: '#E6A500', // Darker yellow shadow
-        top: 8,
         zIndex: 1,
     },
 });
@@ -522,7 +293,7 @@ const iconButtonStyles = StyleSheet.create({
         width: 60,
         height: 60,
         borderRadius: 30,
-        borderWidth: 2.5,
+        borderWidth: 2,
         borderColor: '#252525',
         position: 'absolute',
         justifyContent: 'center',

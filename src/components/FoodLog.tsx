@@ -50,7 +50,7 @@ export const FoodLog: React.FC<FoodLogProps> = ({
                     >
                         <Text style={styles.itemName}>{item.name}</Text>
                         <View style={styles.itemRight}>
-                            <Text style={styles.itemCalories}>{item.calories}kcal</Text>
+                            <Text style={styles.itemCalories}>{item.calories} kcal</Text>
                             <Image
                                 source={require('../../assets/images/icons/fire.png')}
                                 style={styles.flameIcon}
