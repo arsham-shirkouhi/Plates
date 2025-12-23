@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { View, StyleSheet, TouchableOpacity, Animated, Dimensions, Image } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Animated, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
@@ -68,11 +68,7 @@ export const AddButton: React.FC<NavButtonProps> = ({ onPress }) => {
                             }
                         ]}
                     >
-                        <Image
-                            source={require('../../assets/images/icons/plus_icon.png')}
-                            style={styles.plusIcon}
-                            resizeMode="contain"
-                        />
+                        <Ionicons name="add" size={28} color="#252525" />
                     </Animated.View>
                     {/* Green shadow below */}
                     <View style={[styles.circle, styles.circleGreenShadowSingle]} />
@@ -163,10 +159,6 @@ const styles = StyleSheet.create({
         top: 28, // Offset below the normal circle (20 + 8)
         zIndex: 1,
     },
-    plusIcon: {
-        width: 24,
-        height: 24,
-    },
     // Single green button (aligned with left buttons)
     circleGreenSingle: {
         backgroundColor: '#26F170', // Normal green
@@ -241,26 +233,34 @@ export const NavIconButton: React.FC<NavIconButtonProps> = ({ onPress, icon, isA
 };
 
 // Container for the three nav buttons
-export const NavButtons: React.FC<{ onHomePress?: () => void; onFoodPress?: () => void; onFitnessPress?: () => void }> = ({
+export const NavButtons: React.FC<{ 
+    onHomePress?: () => void; 
+    onFoodPress?: () => void; 
+    onFitnessPress?: () => void;
+    activeScreen?: 'home' | 'food' | 'fitness';
+}> = ({
     onHomePress,
     onFoodPress,
-    onFitnessPress
+    onFitnessPress,
+    activeScreen = 'home',
 }) => {
     return (
         <View style={navButtonStyles.container}>
             <NavIconButton
                 icon="home-outline"
-                isActive={true}
+                isActive={activeScreen === 'home'}
                 onPress={onHomePress}
             />
             <View style={navButtonStyles.spacer} />
             <NavIconButton
                 icon="restaurant-outline"
+                isActive={activeScreen === 'food'}
                 onPress={onFoodPress}
             />
             <View style={navButtonStyles.spacer} />
             <NavIconButton
                 icon="fitness-outline"
+                isActive={activeScreen === 'fitness'}
                 onPress={onFitnessPress}
             />
         </View>

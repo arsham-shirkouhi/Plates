@@ -1,7 +1,9 @@
 import React, { useEffect, useState, Component, ErrorInfo, ReactNode } from 'react';
 import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
 import { useFonts } from 'expo-font';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { AddFoodProvider } from './src/context/AddFoodContext';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import 'react-native-gesture-handler';
 
@@ -77,9 +79,13 @@ export default function App() {
 
     return (
         <ErrorBoundary>
-            <AuthProvider>
-                <AppContent />
-            </AuthProvider>
+            <SafeAreaProvider>
+                <AuthProvider>
+                    <AddFoodProvider>
+                        <AppContent />
+                    </AddFoodProvider>
+                </AuthProvider>
+            </SafeAreaProvider>
         </ErrorBoundary>
     );
 }
