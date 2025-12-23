@@ -21,7 +21,7 @@ import { AddFoodBottomSheet } from '../components/AddFoodBottomSheet';
 import { resetOnboarding, getUserProfile, UserProfile, getDailyMacroLog, getTodayDateString, DailyMacroLog, addToDailyMacroLog, subtractFromDailyMacroLog } from '../services/userService';
 import { getQuickAddItems, FoodItem } from '../services/foodService';
 import { useAddFood } from '../context/AddFoodContext';
-import { getDailyTasks, createDailyTask, updateDailyTask, deleteDailyTask, generateDailySummary, DailyTask } from '../services/taskService';
+import { getDailyTasks, createDailyTask, updateDailyTask, deleteDailyTask, generateDailySummary, copyDailyTasksFromYesterday, DailyTask } from '../services/taskService';
 import { styles } from './HomeScreen.styles';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
@@ -122,6 +122,9 @@ export const HomeScreen: React.FC = () => {
 
         try {
             setLoadingTasks(true);
+            // First, copy daily tasks from yesterday to today (if any)
+            await copyDailyTasksFromYesterday(user);
+            // Then load today's tasks
             const today = getTodayDateString();
             const dailyTasks = await getDailyTasks(user, today);
             setTasks(dailyTasks);
@@ -189,12 +192,13 @@ export const HomeScreen: React.FC = () => {
         text: task.title,
         completed: task.is_completed,
         createdAt: task.created_at,
-        isRepeating: false, // Can be enhanced later
+        isRepeating: task.is_daily, // Map is_daily to isRepeating for widget
         order: index,
+        id: task.id, // Include id for updates
     }));
 
     // Handle task changes from widget
-    const handleGoalsChange = useCallback(async (newGoals: Array<{ text: string; completed: boolean; createdAt?: string; isRepeating?: boolean; order?: number }>) => {
+    const handleGoalsChange = useCallback(async (newGoals: Array<{ text: string; completed: boolean; createdAt?: string; isRepeating?: boolean; order?: number; id?: string }>) => {
         if (!user) return;
 
         try {
@@ -211,18 +215,24 @@ export const HomeScreen: React.FC = () => {
             for (const goal of newGoals) {
                 if (!goal.text.trim()) continue;
                 
-                const existingTask = tasks.find(t => t.title === goal.text);
+                const existingTask = tasks.find(t => t.title === goal.text || t.id === goal.id);
                 
                 if (existingTask) {
-                    // Update existing task if completion status changed
+                    // Update existing task if completion status or daily status changed
+                    const updates: any = {};
                     if (existingTask.is_completed !== goal.completed) {
-                        await updateDailyTask(user, existingTask.id, {
-                            is_completed: goal.completed,
-                        });
+                        updates.is_completed = goal.completed;
+                    }
+                    if (existingTask.is_daily !== goal.isRepeating) {
+                        updates.is_daily = goal.isRepeating || false;
+                    }
+                    
+                    if (Object.keys(updates).length > 0) {
+                        await updateDailyTask(user, existingTask.id, updates);
                     }
                 } else {
                     // Create new task
-                    await createDailyTask(user, goal.text);
+                    await createDailyTask(user, goal.text, goal.isRepeating || false);
                 }
             }
 

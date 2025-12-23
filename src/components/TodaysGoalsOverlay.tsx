@@ -25,6 +25,7 @@ interface Goal {
     createdAt?: string; // ISO timestamp
     isRepeating?: boolean; // Daily repeating goal
     order?: number; // For dashboard ordering
+    id?: string; // Task ID from database
 }
 
 interface TodaysGoalsOverlayProps {
@@ -313,21 +314,41 @@ export const TodaysGoalsOverlay: React.FC<TodaysGoalsOverlayProps> = ({
         });
     };
 
+    const handleDeleteGoal = (index: number) => {
+        const updatedGoals = goals.filter((_, i) => i !== index);
+        onGoalsChange(updatedGoals);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    };
+
     const completedCount = goals.filter(g => g.completed).length;
     const totalCount = goals.length;
     const completionPercentage = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
-    // Sort all goals: daily tasks first, then by order (completed items stay in place)
-    const sortedGoals = [...goals].sort((a, b) => {
+    // Sort all goals: incomplete first, then completed, both sorted by daily tasks first, then by order
+    const incompleteGoals = goals.filter(g => !g.completed);
+    const completedGoals = goals.filter(g => g.completed);
+    
+    const sortedIncomplete = [...incompleteGoals].sort((a, b) => {
         // Daily tasks always come first
         if (a.isRepeating && !b.isRepeating) return -1;
         if (!a.isRepeating && b.isRepeating) return 1;
-
         // Within same type, sort by order
         const orderA = a.order ?? Infinity;
         const orderB = b.order ?? Infinity;
         return orderA - orderB;
     });
+    
+    const sortedCompleted = [...completedGoals].sort((a, b) => {
+        // Daily tasks always come first
+        if (a.isRepeating && !b.isRepeating) return -1;
+        if (!a.isRepeating && b.isRepeating) return 1;
+        // Within same type, sort by order
+        const orderA = a.order ?? Infinity;
+        const orderB = b.order ?? Infinity;
+        return orderA - orderB;
+    });
+    
+    const sortedGoals = [...sortedIncomplete, ...sortedCompleted];
 
     // Format time helper - show actual time
     const formatTime = (isoString?: string) => {
@@ -452,6 +473,7 @@ export const TodaysGoalsOverlay: React.FC<TodaysGoalsOverlayProps> = ({
                                                         sectionExpanded={true}
                                                         totalItems={sortedGoals.length}
                                                         onLongPress={(originX, originY) => handleGoalPress(originalIndex, originX, originY)}
+                                                        onDelete={() => handleDeleteGoal(originalIndex)}
                                                         formatTime={formatTime}
                                                     />
                                                 );
@@ -498,19 +520,24 @@ interface GoalItemProps {
     sectionExpanded?: boolean;
     totalItems?: number;
     onLongPress: (originX: number, originY: number) => void;
+    onDelete: () => void;
     formatTime: (isoString?: string) => string;
 }
 
-const GoalItem: React.FC<GoalItemProps> = ({ goal, index, displayIndex, isRemoving, isDragging, isNewlyAdded = false, sectionExpanded = true, totalItems = 1, onLongPress, formatTime }) => {
+const GoalItem: React.FC<GoalItemProps> = ({ goal, index, displayIndex, isRemoving, isDragging, isNewlyAdded = false, sectionExpanded = true, totalItems = 1, onLongPress, onDelete, formatTime }) => {
     const strikethroughWidth = useRef(new Animated.Value(0)).current;
     const opacity = useRef(new Animated.Value(0)).current;
     // Start visible if section is already expanded, otherwise start hidden for staggered animation
     const itemOpacity = useRef(new Animated.Value(isNewlyAdded ? 0 : 1)).current;
     const itemTranslateY = useRef(new Animated.Value(isNewlyAdded ? 20 : 0)).current;
     const itemHeight = useRef(new Animated.Value(1)).current;
+    const swipeTranslateX = useRef(new Animated.Value(0)).current;
+    const deleteButtonOpacity = useRef(new Animated.Value(0)).current;
     const goalItemRef = useRef<TouchableOpacity>(null);
     const textRef = useRef<Text>(null);
     const [textWidth, setTextWidth] = React.useState(0);
+    const [isSwipeOpen, setIsSwipeOpen] = React.useState(false);
+    const DELETE_BUTTON_WIDTH = 80;
 
     React.useEffect(() => {
         if (goal.completed && textWidth > 0) {
@@ -554,6 +581,116 @@ const GoalItem: React.FC<GoalItemProps> = ({ goal, index, displayIndex, isRemovi
         }
     }, [isNewlyAdded]);
 
+    // PanResponder for swipe-to-delete (only for incomplete tasks)
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => !goal.completed && !isRemoving,
+            onMoveShouldSetPanResponder: (_, gestureState) => {
+                if (goal.completed || isRemoving) return false;
+                // Only respond to horizontal swipes - lower threshold for easier swiping
+                return Math.abs(gestureState.dx) > 5 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 0.8;
+            },
+            onPanResponderGrant: () => {
+                if (goal.completed || isRemoving) return;
+                swipeTranslateX.setOffset(swipeTranslateX._value);
+                swipeTranslateX.setValue(0);
+            },
+            onPanResponderMove: (_, gestureState) => {
+                if (goal.completed || isRemoving) return;
+                // Calculate new value from the starting offset position
+                const startValue = swipeTranslateX._offset;
+                const newValue = startValue + gestureState.dx;
+                // Clamp to prevent swiping too far right (beyond 0) or too far left
+                const clampedValue = Math.max(-DELETE_BUTTON_WIDTH, Math.min(0, newValue));
+                swipeTranslateX.setValue(clampedValue);
+                
+                // Show delete button when swiped left enough - lower threshold for easier swiping
+                const shouldShowDelete = Math.abs(clampedValue) > DELETE_BUTTON_WIDTH / 3;
+                if (shouldShowDelete !== isSwipeOpen) {
+                    setIsSwipeOpen(shouldShowDelete);
+                    Animated.timing(deleteButtonOpacity, {
+                        toValue: shouldShowDelete ? 1 : 0,
+                        duration: 200,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: false,
+                    }).start();
+                }
+            },
+            onPanResponderRelease: (_, gestureState) => {
+                if (goal.completed || isRemoving) return;
+                swipeTranslateX.flattenOffset();
+                const currentValue = swipeTranslateX._value;
+                
+                // If swiping right (positive dx) or already at 0, close it
+                if (gestureState.dx > 0 || currentValue >= 0) {
+                    Animated.spring(swipeTranslateX, {
+                        toValue: 0,
+                        useNativeDriver: false,
+                        tension: 100,
+                        friction: 8,
+                    }).start();
+                    setIsSwipeOpen(false);
+                    Animated.timing(deleteButtonOpacity, {
+                        toValue: 0,
+                        duration: 200,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: false,
+                    }).start();
+                } else if (Math.abs(currentValue) > DELETE_BUTTON_WIDTH / 3) {
+                    // Swiped left enough, keep it open
+                    Animated.spring(swipeTranslateX, {
+                        toValue: -DELETE_BUTTON_WIDTH,
+                        useNativeDriver: false,
+                        tension: 100,
+                        friction: 8,
+                    }).start();
+                } else {
+                    // Didn't swipe enough, snap back
+                    Animated.spring(swipeTranslateX, {
+                        toValue: 0,
+                        useNativeDriver: false,
+                        tension: 100,
+                        friction: 8,
+                    }).start();
+                    setIsSwipeOpen(false);
+                    Animated.timing(deleteButtonOpacity, {
+                        toValue: 0,
+                        duration: 200,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: false,
+                    }).start();
+                }
+            },
+            onPanResponderTerminate: () => {
+                if (goal.completed || isRemoving) return;
+                swipeTranslateX.flattenOffset();
+                const currentValue = swipeTranslateX._value;
+                // If swiped open, keep it open; otherwise close
+                if (Math.abs(currentValue) > DELETE_BUTTON_WIDTH / 3) {
+                    Animated.spring(swipeTranslateX, {
+                        toValue: -DELETE_BUTTON_WIDTH,
+                        useNativeDriver: false,
+                        tension: 100,
+                        friction: 8,
+                    }).start();
+                } else {
+                    Animated.spring(swipeTranslateX, {
+                        toValue: 0,
+                        useNativeDriver: false,
+                        tension: 100,
+                        friction: 8,
+                    }).start();
+                    setIsSwipeOpen(false);
+                    Animated.timing(deleteButtonOpacity, {
+                        toValue: 0,
+                        duration: 200,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: false,
+                    }).start();
+                }
+            },
+        })
+    ).current;
 
     const handleLongPress = (event: any) => {
         if (goal.completed) return;
@@ -564,78 +701,124 @@ const GoalItem: React.FC<GoalItemProps> = ({ goal, index, displayIndex, isRemovi
     };
 
     return (
-        <Animated.View
-            style={[
-                styles.goalItemWrapper,
-                {
-                    opacity: itemOpacity,
-                    transform: [{ translateY: itemTranslateY }],
-                    maxHeight: itemHeight.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, 40],
-                    }),
-                    marginBottom: 20,
-                },
-            ]}
-        >
-            <View style={styles.goalItemRow}>
-                <TouchableOpacity
-                    ref={goalItemRef}
-                    style={[styles.goalItem, isDragging && styles.goalItemDragging]}
-                    onLongPress={handleLongPress}
-                    activeOpacity={0.7}
-                    disabled={false}
-                    delayLongPress={300}
+        <View style={styles.goalItemContainer} {...panResponder.panHandlers}>
+            {/* Delete button behind */}
+            {!goal.completed && (
+                <Animated.View
+                    style={[
+                        styles.deleteButtonContainer,
+                        {
+                            opacity: deleteButtonOpacity,
+                        },
+                    ]}
                 >
-                    <View style={styles.goalItemContent}>
-                        <View style={styles.goalTextContainer}>
-                            <View
-                                onLayout={(e) => {
-                                    const { width } = e.nativeEvent.layout;
-                                    if (width > 0 && width !== textWidth) {
-                                        setTextWidth(width);
-                                    }
-                                }}
-                                style={styles.goalTextWrapper}
-                            >
-                                <Text
-                                    ref={textRef}
-                                    style={[
-                                        styles.goalText,
-                                        goal.completed && styles.goalTextCompleted
-                                    ]}
-                                    numberOfLines={1}
-                                    ellipsizeMode="tail"
-                                >
-                                    {goal.text}
-                                </Text>
-                            </View>
-                            {goal.completed && textWidth > 0 && (
-                                <Animated.View
-                                    style={[
-                                        styles.strikethrough,
-                                        {
-                                            width: strikethroughWidth,
-                                            opacity,
-                                        },
-                                    ]}
-                                />
-                            )}
-                        </View>
-                        <View style={styles.goalRight}>
-                            {goal.isRepeating && (
-                                <Text style={styles.repeatIndicator}>daily</Text>
-                            )}
-                            {!goal.isRepeating && goal.createdAt && (
-                                <Text style={styles.goalTime}>
-                                    {formatTime(goal.createdAt)}
-                                </Text>
-                            )}
-                        </View>
+                    <TouchableOpacity
+                        style={styles.deleteButton}
+                        onPress={() => {
+                            // Delete instantly
+                            onDelete();
+                            // Reset animation immediately
+                            swipeTranslateX.setValue(0);
+                            setIsSwipeOpen(false);
+                            deleteButtonOpacity.setValue(0);
+                        }}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                        <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+                    </TouchableOpacity>
+                </Animated.View>
+            )}
+            
+            {/* Swipeable background that moves - includes timestamp */}
+            <Animated.View
+                style={[
+                    styles.swipeableBackground,
+                    {
+                        transform: [{ translateX: swipeTranslateX }],
+                    },
+                ]}
+            >
+                <View style={styles.swipeableContent}>
+                    <View style={styles.goalRight}>
+                        {goal.isRepeating && (
+                            <Text style={styles.repeatIndicator}>daily</Text>
+                        )}
+                        {!goal.isRepeating && goal.createdAt && (
+                            <Text style={styles.goalTime}>
+                                {formatTime(goal.createdAt)}
+                            </Text>
+                        )}
                     </View>
-                </TouchableOpacity>
-            </View>
-        </Animated.View>
+                </View>
+            </Animated.View>
+            
+            {/* Goal item - text stays fixed */}
+            <Animated.View
+                style={[
+                    styles.goalItemWrapper,
+                    {
+                        opacity: itemOpacity,
+                        transform: [
+                            { translateY: itemTranslateY },
+                        ],
+                        maxHeight: itemHeight.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0, 40],
+                        }),
+                        marginBottom: 20,
+                    },
+                ]}
+            >
+                <View style={styles.goalItemRow}>
+                    <TouchableOpacity
+                        ref={goalItemRef}
+                        style={[styles.goalItem, isDragging && styles.goalItemDragging]}
+                        onLongPress={handleLongPress}
+                        activeOpacity={0.7}
+                        disabled={false}
+                        delayLongPress={300}
+                    >
+                        <View style={styles.goalItemContent}>
+                            <View style={styles.goalTextContainer}>
+                                <View
+                                    onLayout={(e) => {
+                                        const { width } = e.nativeEvent.layout;
+                                        if (width > 0 && width !== textWidth) {
+                                            setTextWidth(width);
+                                        }
+                                    }}
+                                    style={styles.goalTextWrapper}
+                                >
+                                    <Text
+                                        ref={textRef}
+                                        style={[
+                                            styles.goalText,
+                                            goal.completed && styles.goalTextCompleted
+                                        ]}
+                                        numberOfLines={1}
+                                        ellipsizeMode="tail"
+                                    >
+                                        {goal.text}
+                                    </Text>
+                                </View>
+                                {goal.completed && textWidth > 0 && (
+                                    <Animated.View
+                                        style={[
+                                            styles.strikethrough,
+                                            {
+                                                width: strikethroughWidth,
+                                                opacity,
+                                            },
+                                        ]}
+                                    />
+                                )}
+                            </View>
+                        </View>
+                    </TouchableOpacity>
+                </View>
+            </Animated.View>
+        </View>
     );
 };
 
@@ -847,14 +1030,57 @@ const styles = StyleSheet.create({
         color: '#CCCCCC',
         textTransform: 'lowercase',
     },
+    goalItemContainer: {
+        position: 'relative',
+        overflow: 'visible',
+    },
+    swipeableBackground: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 20,
+        backgroundColor: '#fff',
+        zIndex: 1,
+    },
+    swipeableContent: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        paddingRight: 0,
+    },
     goalItemWrapper: {
         overflow: 'hidden',
         marginBottom: 24,
+        position: 'relative',
+        zIndex: 2,
+        backgroundColor: 'transparent',
     },
     goalItemRow: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingLeft: 0,
+    },
+    deleteButtonContainer: {
+        position: 'absolute',
+        right: 0,
+        top: 0,
+        bottom: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        width: 80,
+        zIndex: 3,
+    },
+    deleteButton: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: '#fff',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minWidth: 50,
+        minHeight: 50,
     },
     goalItem: {
         flex: 1,
@@ -865,13 +1091,13 @@ const styles = StyleSheet.create({
     goalItemContent: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
         minHeight: 24,
     },
     goalTextContainer: {
-        flex: 1,
         position: 'relative',
         alignSelf: 'flex-start',
+        flexShrink: 1,
+        maxWidth: '75%',
     },
     goalRight: {
         flexDirection: 'row',

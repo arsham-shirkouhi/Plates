@@ -16,6 +16,7 @@ export interface DailyTask {
     log_date: string; // Format: YYYY-MM-DD
     title: string;
     is_completed: boolean;
+    is_daily: boolean; // If true, task repeats daily
     completed_at: string | null;
     created_at: string;
 }
@@ -34,6 +35,19 @@ export interface DailySummary {
     notes: string | null;
     generated_at: string;
 }
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Get yesterday's date string in YYYY-MM-DD format
+ */
+const getYesterdayDateString = (): string => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    return yesterday.toISOString().split('T')[0];
+};
 
 // ============================================================================
 // DAILY TASKS FUNCTIONS
@@ -66,14 +80,84 @@ export const getDailyTasks = async (user: User, date?: string): Promise<DailyTas
 };
 
 /**
+ * Copy yesterday's daily tasks to today
+ * This function should be called when the app loads or when the date changes
+ * @param user - Supabase user
+ */
+export const copyDailyTasksFromYesterday = async (user: User): Promise<void> => {
+    try {
+        const today = getTodayDateString();
+        const yesterday = getYesterdayDateString();
+
+        // Get yesterday's daily tasks
+        const { data: yesterdayTasks, error: fetchError } = await supabase
+            .from('daily_tasks')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('log_date', yesterday)
+            .eq('is_daily', true);
+
+        if (fetchError) {
+            throw fetchError;
+        }
+
+        if (!yesterdayTasks || yesterdayTasks.length === 0) {
+            return; // No daily tasks to copy
+        }
+
+        // Get today's existing tasks to avoid duplicates
+        const { data: todayTasks, error: todayError } = await supabase
+            .from('daily_tasks')
+            .select('title')
+            .eq('user_id', user.id)
+            .eq('log_date', today);
+
+        if (todayError) {
+            throw todayError;
+        }
+
+        const existingTitles = new Set((todayTasks || []).map(t => t.title));
+
+        // Copy daily tasks from yesterday to today (only if they don't already exist today)
+        const tasksToInsert = yesterdayTasks
+            .filter(task => !existingTitles.has(task.title))
+            .map(task => ({
+                user_id: user.id,
+                log_date: today,
+                title: task.title,
+                is_completed: false, // Reset completion status for new day
+                is_daily: true,
+                completed_at: null,
+            }));
+
+        if (tasksToInsert.length > 0) {
+            const { error: insertError } = await supabase
+                .from('daily_tasks')
+                .insert(tasksToInsert);
+
+            if (insertError) {
+                throw insertError;
+            }
+
+            console.log(`Copied ${tasksToInsert.length} daily task(s) from yesterday to today`);
+        }
+    } catch (error) {
+        console.error('Error copying daily tasks from yesterday:', error);
+        // Don't throw - this is a background operation that shouldn't block the app
+    }
+};
+
+/**
  * Create a new task
  * @param user - Supabase user
  * @param title - Task title
+ * @param isDaily - Whether this task should repeat daily (default: false)
  * @param date - Date string in format YYYY-MM-DD (defaults to today)
  */
 export const createDailyTask = async (
     user: User,
     title: string,
+    isDaily: boolean = false,
     date?: string
 ): Promise<DailyTask | null> => {
     try {
@@ -101,6 +185,7 @@ export const createDailyTask = async (
                 log_date: dateStr,
                 title: trimmedTitle,
                 is_completed: false,
+                is_daily: isDaily,
             })
             .select()
             .single();
@@ -131,7 +216,7 @@ export const createDailyTask = async (
 };
 
 /**
- * Update a task (mark as completed/uncompleted)
+ * Update a task (mark as completed/uncompleted, change daily status, etc.)
  * @param user - Supabase user
  * @param taskId - Task ID
  * @param updates - Updates to apply
@@ -141,6 +226,7 @@ export const updateDailyTask = async (
     taskId: string,
     updates: {
         is_completed?: boolean;
+        is_daily?: boolean;
         title?: string;
     }
 ): Promise<DailyTask | null> => {
