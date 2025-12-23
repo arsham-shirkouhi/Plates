@@ -21,6 +21,7 @@ import { AddFoodBottomSheet } from '../components/AddFoodBottomSheet';
 import { resetOnboarding, getUserProfile, UserProfile, getDailyMacroLog, getTodayDateString, DailyMacroLog, addToDailyMacroLog, subtractFromDailyMacroLog } from '../services/userService';
 import { getQuickAddItems, FoodItem } from '../services/foodService';
 import { useAddFood } from '../context/AddFoodContext';
+import { getDailyTasks, createDailyTask, updateDailyTask, deleteDailyTask, generateDailySummary, DailyTask } from '../services/taskService';
 import { styles } from './HomeScreen.styles';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
@@ -39,36 +40,9 @@ export const HomeScreen: React.FC = () => {
     const [showAddFoodSheet, setShowAddFoodSheet] = useState(false);
     const [showGoalsOverlay, setShowGoalsOverlay] = useState(false);
     
-    // Goals state - reset daily
-    const [goals, setGoals] = useState([
-        { text: 'hit protein goal', completed: false, isRepeating: true, order: 0 },
-        { text: 'workout', completed: false, isRepeating: true, order: 1 },
-        { text: 'reach water goal', completed: false, isRepeating: true, order: 2 },
-        { text: 'Log meals', completed: false, isRepeating: true, order: 3 },
-        { text: 'take vitamins', completed: false, isRepeating: true, order: 4 },
-        { text: 'meditate', completed: false, isRepeating: true, order: 5 },
-        { text: 'get 8 hours sleep', completed: false, isRepeating: true, order: 6 },
-    ]);
-
-    // Reset repeating goals daily (check on mount and when date changes)
-    useEffect(() => {
-        const resetRepeatingGoals = () => {
-            setGoals(prev => prev.map(g => ({
-                ...g,
-                completed: g.isRepeating ? false : g.completed,
-            })));
-        };
-        
-        // Reset on mount
-        resetRepeatingGoals();
-        
-        // Check every hour for date change
-        const interval = setInterval(() => {
-            resetRepeatingGoals();
-        }, 3600000); // 1 hour
-        
-        return () => clearInterval(interval);
-    }, []);
+    // Tasks state (loaded from database)
+    const [tasks, setTasks] = useState<DailyTask[]>([]);
+    const [loadingTasks, setLoadingTasks] = useState(true);
 
     // Aura overlay state
     const [showBorderRing, setShowBorderRing] = useState(false);
@@ -139,6 +113,25 @@ export const HomeScreen: React.FC = () => {
         }
     }, [user]);
 
+    // Load today's tasks
+    const loadDailyTasks = useCallback(async () => {
+        if (!user) {
+            setLoadingTasks(false);
+            return;
+        }
+
+        try {
+            setLoadingTasks(true);
+            const today = getTodayDateString();
+            const dailyTasks = await getDailyTasks(user, today);
+            setTasks(dailyTasks);
+        } catch (error) {
+            console.error('Error loading daily tasks:', error);
+        } finally {
+            setLoadingTasks(false);
+        }
+    }, [user]);
+
     // Handle adding food
     const handleAddFood = useCallback(async (food: FoodItem) => {
         if (!user) return;
@@ -191,18 +184,72 @@ export const HomeScreen: React.FC = () => {
         };
     }, [handleAddFood, registerHandler, unregisterHandler, registerSheetState, unregisterSheetState]);
 
+    // Convert tasks to goals format for widget - only from database, no placeholders
+    const goals = (tasks || []).map((task, index) => ({
+        text: task.title,
+        completed: task.is_completed,
+        createdAt: task.created_at,
+        isRepeating: false, // Can be enhanced later
+        order: index,
+    }));
+
+    // Handle task changes from widget
+    const handleGoalsChange = useCallback(async (newGoals: Array<{ text: string; completed: boolean; createdAt?: string; isRepeating?: boolean; order?: number }>) => {
+        if (!user) return;
+
+        try {
+            const today = getTodayDateString();
+            const newGoalTexts = new Set(newGoals.map(g => g.text.trim()).filter(Boolean));
+            
+            // Find tasks that were deleted (exist in DB but not in new goals)
+            const tasksToDelete = tasks.filter(t => !newGoalTexts.has(t.title));
+            for (const task of tasksToDelete) {
+                await deleteDailyTask(user, task.id);
+            }
+
+            // Update or create tasks
+            for (const goal of newGoals) {
+                if (!goal.text.trim()) continue;
+                
+                const existingTask = tasks.find(t => t.title === goal.text);
+                
+                if (existingTask) {
+                    // Update existing task if completion status changed
+                    if (existingTask.is_completed !== goal.completed) {
+                        await updateDailyTask(user, existingTask.id, {
+                            is_completed: goal.completed,
+                        });
+                    }
+                } else {
+                    // Create new task
+                    await createDailyTask(user, goal.text);
+                }
+            }
+
+            // Reload tasks
+            await loadDailyTasks();
+            
+            // Generate summary after tasks change
+            await generateDailySummary(user);
+        } catch (error) {
+            console.error('Error updating tasks:', error);
+        }
+    }, [user, tasks, loadDailyTasks]);
+
     // Load on mount
     useEffect(() => {
         loadUserProfile();
         loadDailyLog();
-    }, [loadUserProfile, loadDailyLog]);
+        loadDailyTasks();
+    }, [loadUserProfile, loadDailyLog, loadDailyTasks]);
 
     // Reload when screen comes into focus (e.g., after completing onboarding)
     useFocusEffect(
         useCallback(() => {
             loadUserProfile();
             loadDailyLog();
-        }, [loadUserProfile, loadDailyLog])
+            loadDailyTasks();
+        }, [loadUserProfile, loadDailyLog, loadDailyTasks])
     );
 
     const handleResetOnboarding = async () => {
@@ -421,7 +468,7 @@ export const HomeScreen: React.FC = () => {
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
                         <TodaysGoalsWidget
                             goals={goals}
-                            onGoalsChange={setGoals}
+                            onGoalsChange={handleGoalsChange}
                             onOverlayChange={setShowGoalsOverlay}
                         />
                         <SquareWidget title="widget 2" content="content 2" />
