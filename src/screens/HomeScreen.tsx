@@ -16,12 +16,11 @@ import { TodaysGoalsWidget } from '../components/TodaysGoalsWidget';
 import { SquareWidget } from '../components/SquareWidget';
 import { TestControls } from '../components/TestControls';
 import { GradientBackground } from '../components/GradientBackground';
-import { BottomNavBar } from '../components/BottomNavBar';
-import { AddButton, NavButtons } from '../components/NavButton';
 import { AuraOverlay } from '../components/AuraOverlay';
 import { AddFoodBottomSheet } from '../components/AddFoodBottomSheet';
 import { resetOnboarding, getUserProfile, UserProfile, getDailyMacroLog, getTodayDateString, DailyMacroLog, addToDailyMacroLog, subtractFromDailyMacroLog } from '../services/userService';
 import { getQuickAddItems, FoodItem } from '../services/foodService';
+import { useAddFood } from '../context/AddFoodContext';
 import { styles } from './HomeScreen.styles';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
@@ -30,6 +29,7 @@ export const HomeScreen: React.FC = () => {
     const { user, logout } = useAuth();
     const navigation = useNavigation<HomeScreenNavigationProp>();
     const insets = useSafeAreaInsets();
+    const { registerHandler, unregisterHandler, registerSheetState, unregisterSheetState } = useAddFood();
     const [loggingOut, setLoggingOut] = useState(false);
     const [resettingOnboarding, setResettingOnboarding] = useState(false);
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -180,6 +180,16 @@ export const HomeScreen: React.FC = () => {
             Alert.alert('Error', 'Failed to remove food. Please try again.');
         }
     }, [user, loadDailyLog]);
+
+    // Register add food handler with context
+    useEffect(() => {
+        registerHandler(handleAddFood);
+        registerSheetState(setShowAddFoodSheet);
+        return () => {
+            unregisterHandler();
+            unregisterSheetState();
+        };
+    }, [handleAddFood, registerHandler, unregisterHandler, registerSheetState, unregisterSheetState]);
 
     // Load on mount
     useEffect(() => {
@@ -402,7 +412,7 @@ export const HomeScreen: React.FC = () => {
                     )}
 
                     {/* Food Log */}
-                    <FoodLog />
+                    <FoodLog onPress={() => navigation.navigate('FoodLog')} />
 
                     {/* AI Widget */}
                     <AIWidget />
@@ -470,26 +480,6 @@ export const HomeScreen: React.FC = () => {
                 pointerEvents="none"
             />
 
-
-            {/* Bottom Navigation Bar */}
-            <BottomNavBar>
-                <NavButtons
-                    onHomePress={() => {
-                        // Already on home screen
-                    }}
-                    onFoodPress={() => {
-                        Alert.alert('Food', 'Food screen coming soon');
-                    }}
-                    onFitnessPress={() => {
-                        Alert.alert('Fitness', 'Fitness screen coming soon');
-                    }}
-                />
-                <AddButton
-                    onPress={() => {
-                        setShowAddFoodSheet(true);
-                    }}
-                />
-            </BottomNavBar>
 
             {/* Add Food Bottom Sheet */}
             <AddFoodBottomSheet

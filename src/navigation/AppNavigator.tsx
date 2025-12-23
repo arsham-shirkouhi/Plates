@@ -9,6 +9,8 @@ import { VerificationScreen } from '../screens/VerificationScreen';
 import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { MacroResultsScreen } from '../screens/MacroResultsScreen';
+import { FoodLogScreen } from '../screens/FoodLogScreen';
+import { UniversalNavBar } from '../components/UniversalNavBar';
 
 export type RootStackParamList = {
     Login: undefined;
@@ -28,6 +30,7 @@ export type RootStackParamList = {
         goal: 'lose' | 'maintain' | 'build';
         goalIntensity: 'mild' | 'moderate' | 'aggressive';
     };
+    FoodLog: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -36,9 +39,9 @@ interface AppNavigatorProps {
     user: User | null;
 }
 
-export const AppNavigator: React.FC<AppNavigatorProps> = ({ user }) => {
+const NavigatorWithNavBar: React.FC = () => {
     return (
-        <NavigationContainer>
+        <>
             <Stack.Navigator
                 screenOptions={{
                     headerShown: false,
@@ -78,7 +81,25 @@ export const AppNavigator: React.FC<AppNavigatorProps> = ({ user }) => {
                     }}
                 />
                 <Stack.Screen name="Home" component={HomeScreen} />
+                <Stack.Screen
+                    name="FoodLog"
+                    component={FoodLogScreen}
+                    options={{
+                        animation: 'slide_from_right',
+                        animationDuration: 300,
+                    }}
+                />
             </Stack.Navigator>
+            {/* Universal NavBar - overlays all main app screens */}
+            <UniversalNavBar />
+        </>
+    );
+};
+
+export const AppNavigator: React.FC<AppNavigatorProps> = ({ user }) => {
+    return (
+        <NavigationContainer>
+            <NavigatorWithNavBar />
         </NavigationContainer>
     );
 };
