@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { fonts } from "../constants/fonts";
+import * as Haptics from "expo-haptics";
 
 const screenWidth = Dimensions.get("window").width;
 const containerPadding = 25 * 2;
@@ -17,9 +18,12 @@ const widgetSpacing = 16;
 const availableWidth = screenWidth - containerPadding - widgetSpacing;
 const widgetSize = availableWidth / 2;
 
-// ✅ Min/Max constraints
+// Min/Max constraints
 const MIN_TIME_SECONDS = 0;
 const MAX_TIME_SECONDS = 5 * 60; // 5 minutes
+
+// Bar animation timing (keep this in sync with Animated.timing duration below)
+const BAR_ANIM_MS = 350;
 
 interface TimerWidgetProps {
   initialMinutes?: number;
@@ -51,7 +55,7 @@ export const TimerWidget: React.FC<TimerWidgetProps> = ({
   const dragStartY = useRef(0);
   const dragStartTime = useRef(0);
 
-  // ✅ IMPORTANT: keep latest totalSeconds available to PanResponder
+  // keep latest totalSeconds available to PanResponder closures
   const totalSecondsRef = useRef(totalSeconds);
   useEffect(() => {
     totalSecondsRef.current = totalSeconds;
@@ -75,7 +79,7 @@ export const TimerWidget: React.FC<TimerWidgetProps> = ({
     return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
   };
 
-  // ✅ Fixed-scale progress: 0..5min
+  // Fixed-scale progress: 0..5min
   const remainingRatio = Math.max(0, Math.min(1, totalSeconds / MAX_TIME_SECONDS));
   const progress = remainingRatio * 100;
 
@@ -85,7 +89,7 @@ export const TimerWidget: React.FC<TimerWidgetProps> = ({
     } else {
       Animated.timing(progressAnim, {
         toValue: progress,
-        duration: 350,
+        duration: BAR_ANIM_MS,
         useNativeDriver: false,
       }).start();
     }
@@ -116,14 +120,98 @@ export const TimerWidget: React.FC<TimerWidgetProps> = ({
     };
   }, [isRunning, totalSeconds, onComplete]);
 
+  // --- HAPTICS HELPERS ---
+  const safeHaptic = async (type: "light" | "medium" | "heavy") => {
+    try {
+      if (type === "light") await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (type === "medium") await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      if (type === "heavy") await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    } catch {
+      // ignore if haptics not available
+    }
+  };
+
+  // Drag haptics: step-based
+  const HAPTIC_STEP_SECONDS = 1;
+
+  const maybeHapticOnChange = (newTime: number, prevTime: number) => {
+    const prevStep = Math.floor(prevTime / HAPTIC_STEP_SECONDS);
+    const nextStep = Math.floor(newTime / HAPTIC_STEP_SECONDS);
+    if (prevStep === nextStep) return;
+
+    if (newTime === MIN_TIME_SECONDS || newTime === MAX_TIME_SECONDS) {
+      void safeHaptic("heavy");
+    } else {
+      void safeHaptic("light");
+    }
+  };
+
+  // ✅ Button spam haptics ONLY while the bar animation is moving
+  const spamHapticIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const spamHapticStopTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const stopButtonHapticSpam = () => {
+    if (spamHapticIntervalRef.current) {
+      clearInterval(spamHapticIntervalRef.current);
+      spamHapticIntervalRef.current = null;
+    }
+    if (spamHapticStopTimeoutRef.current) {
+      clearTimeout(spamHapticStopTimeoutRef.current);
+      spamHapticStopTimeoutRef.current = null;
+    }
+  };
+
+  const startButtonHapticSpamFor = (type: "medium" | "heavy", durationMs: number) => {
+    stopButtonHapticSpam();
+
+    // fire immediately
+    void safeHaptic(type);
+
+    // spam while animating
+    spamHapticIntervalRef.current = setInterval(() => {
+      void safeHaptic(type);
+    }, 90); // spam rate (50–90)
+
+    // stop when animation should be done
+    spamHapticStopTimeoutRef.current = setTimeout(() => {
+      stopButtonHapticSpam();
+    }, durationMs);
+  };
+
+  useEffect(() => {
+    return () => {
+      stopButtonHapticSpam();
+    };
+  }, []);
+
   const handleAdd = () => {
     if (isRunning) return;
-    setTotalSeconds((prev) => Math.min(MAX_TIME_SECONDS, prev + 60));
+
+    setTotalSeconds((prev) => {
+      const next = Math.min(MAX_TIME_SECONDS, prev + 60);
+
+      if (next !== prev) {
+        const hType: "medium" | "heavy" = next === MAX_TIME_SECONDS ? "heavy" : "medium";
+        startButtonHapticSpamFor(hType, BAR_ANIM_MS + 50);
+      }
+
+      return next;
+    });
   };
 
   const handleSubtract = () => {
     if (isRunning) return;
-    setTotalSeconds((prev) => Math.max(MIN_TIME_SECONDS, prev - 60));
+
+    setTotalSeconds((prev) => {
+      const next = Math.max(MIN_TIME_SECONDS, prev - 60);
+
+      if (next !== prev) {
+        const hType: "medium" | "heavy" = next === MIN_TIME_SECONDS ? "heavy" : "medium";
+        startButtonHapticSpamFor(hType, BAR_ANIM_MS + 50);
+      }
+
+      return next;
+    });
   };
 
   const handlePlayPause = () => {
@@ -144,12 +232,13 @@ export const TimerWidget: React.FC<TimerWidgetProps> = ({
       onPanResponderGrant: (evt) => {
         if (isRunning) return;
 
+        // if user drags while button spam is running, stop it
+        stopButtonHapticSpam();
+
         setIsDragging(true);
         onInteractionChange?.(true);
 
         dragStartY.current = evt.nativeEvent.pageY;
-
-        // ✅ use ref so it doesn't reset to 300
         dragStartTime.current = totalSecondsRef.current;
 
         // pause while adjusting
@@ -174,6 +263,11 @@ export const TimerWidget: React.FC<TimerWidgetProps> = ({
             MAX_TIME_SECONDS,
             Math.max(MIN_TIME_SECONDS, dragStartTime.current + timeChange)
           );
+
+          maybeHapticOnChange(newTime, totalSecondsRef.current);
+
+          // update ref immediately so comparisons are correct next frame
+          totalSecondsRef.current = newTime;
 
           setTotalSeconds(newTime);
         }
