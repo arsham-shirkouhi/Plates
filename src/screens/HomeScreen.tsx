@@ -26,6 +26,18 @@ import { styles } from './HomeScreen.styles';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 
+// In-memory cache for instant data access
+const dataCache = {
+    profile: null as UserProfile | null,
+    dailyLog: null as DailyMacroLog | null,
+    tasks: [] as DailyTask[],
+    lastUpdate: {
+        profile: 0,
+        dailyLog: 0,
+        tasks: 0,
+    },
+};
+
 export const HomeScreen: React.FC = () => {
     const { user, logout } = useAuth();
     const navigation = useNavigation<HomeScreenNavigationProp>();
@@ -33,16 +45,18 @@ export const HomeScreen: React.FC = () => {
     const { registerHandler, unregisterHandler, registerSheetState, unregisterSheetState } = useAddFood();
     const [loggingOut, setLoggingOut] = useState(false);
     const [resettingOnboarding, setResettingOnboarding] = useState(false);
-    const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-    const [loadingProfile, setLoadingProfile] = useState(true);
-    const [dailyLog, setDailyLog] = useState<DailyMacroLog | null>(null);
-    const [loadingLog, setLoadingLog] = useState(true);
+    
+    // Initialize with cached data for instant display
+    const [userProfile, setUserProfile] = useState<UserProfile | null>(dataCache.profile);
+    const [loadingProfile, setLoadingProfile] = useState(!dataCache.profile);
+    const [dailyLog, setDailyLog] = useState<DailyMacroLog | null>(dataCache.dailyLog);
+    const [loadingLog, setLoadingLog] = useState(!dataCache.dailyLog);
     const [showAddFoodSheet, setShowAddFoodSheet] = useState(false);
     const [showGoalsOverlay, setShowGoalsOverlay] = useState(false);
     
     // Tasks state (loaded from database)
-    const [tasks, setTasks] = useState<DailyTask[]>([]);
-    const [loadingTasks, setLoadingTasks] = useState(true);
+    const [tasks, setTasks] = useState<DailyTask[]>(dataCache.tasks);
+    const [loadingTasks, setLoadingTasks] = useState(dataCache.tasks.length === 0);
 
     // Aura overlay state
     const [showBorderRing, setShowBorderRing] = useState(false);
@@ -63,6 +77,12 @@ export const HomeScreen: React.FC = () => {
         setLoggingOut(true);
         try {
             console.log('Logging out...');
+            // Clear cache on logout
+            dataCache.profile = null;
+            dataCache.dailyLog = null;
+            dataCache.tasks = [];
+            dataCache.lastUpdate = { profile: 0, dailyLog: 0, tasks: 0 };
+            
             await logout();
             console.log('Logout successful, navigating to Login...');
             setTimeout(() => {
@@ -84,9 +104,21 @@ export const HomeScreen: React.FC = () => {
         }
 
         try {
-            setLoadingProfile(true);
+            // Show cached data instantly
+            if (dataCache.profile) {
+                setUserProfile(dataCache.profile);
+                setLoadingProfile(false);
+            } else {
+                setLoadingProfile(true);
+            }
+
+            // Fetch fresh data in background
             const profile = await getUserProfile(user);
-            setUserProfile(profile);
+            if (profile) {
+                dataCache.profile = profile;
+                dataCache.lastUpdate.profile = Date.now();
+                setUserProfile(profile);
+            }
         } catch (error) {
             console.error('Error loading user profile:', error);
         } finally {
@@ -102,9 +134,19 @@ export const HomeScreen: React.FC = () => {
         }
 
         try {
-            setLoadingLog(true);
+            // Show cached data instantly
+            if (dataCache.dailyLog) {
+                setDailyLog(dataCache.dailyLog);
+                setLoadingLog(false);
+            } else {
+                setLoadingLog(true);
+            }
+
+            // Fetch fresh data in background
             const today = getTodayDateString();
             const log = await getDailyMacroLog(user, today);
+            dataCache.dailyLog = log;
+            dataCache.lastUpdate.dailyLog = Date.now();
             setDailyLog(log);
         } catch (error) {
             console.error('Error loading daily log:', error);
@@ -121,16 +163,86 @@ export const HomeScreen: React.FC = () => {
         }
 
         try {
-            setLoadingTasks(true);
+            // Show cached data instantly
+            if (dataCache.tasks.length > 0) {
+                setTasks(dataCache.tasks);
+                setLoadingTasks(false);
+            } else {
+                setLoadingTasks(true);
+            }
+
+            // Fetch fresh data in background
             // First, copy daily tasks from yesterday to today (if any)
             await copyDailyTasksFromYesterday(user);
             // Then load today's tasks
             const today = getTodayDateString();
             const dailyTasks = await getDailyTasks(user, today);
+            dataCache.tasks = dailyTasks;
+            dataCache.lastUpdate.tasks = Date.now();
             setTasks(dailyTasks);
         } catch (error) {
             console.error('Error loading daily tasks:', error);
         } finally {
+            setLoadingTasks(false);
+        }
+    }, [user]);
+
+    // Load all data in parallel for faster loading with instant cache
+    const loadAllData = useCallback(async () => {
+        if (!user) {
+            setLoadingProfile(false);
+            setLoadingLog(false);
+            setLoadingTasks(false);
+            return;
+        }
+
+        try {
+            // Show cached data instantly - no loading states if cache exists
+            const hasCache = dataCache.profile || dataCache.dailyLog || dataCache.tasks.length > 0;
+            
+            // Only show loading if no cache exists
+            if (!dataCache.profile) setLoadingProfile(true);
+            if (!dataCache.dailyLog) setLoadingLog(true);
+            if (dataCache.tasks.length === 0) setLoadingTasks(true);
+
+            // Load all data in parallel (runs in background)
+            const today = getTodayDateString();
+            const [profile, log] = await Promise.all([
+                getUserProfile(user),
+                getDailyMacroLog(user, today),
+            ]);
+
+            // Update cache and state immediately
+            if (profile) {
+                dataCache.profile = profile;
+                dataCache.lastUpdate.profile = Date.now();
+                setUserProfile(profile);
+            }
+            
+            dataCache.dailyLog = log;
+            dataCache.lastUpdate.dailyLog = Date.now();
+            setDailyLog(log);
+
+            // Load tasks (copy from yesterday first, then get today's)
+            try {
+                await copyDailyTasksFromYesterday(user);
+                const dailyTasks = await getDailyTasks(user, today);
+                dataCache.tasks = dailyTasks;
+                dataCache.lastUpdate.tasks = Date.now();
+                setTasks(dailyTasks);
+            } catch (taskError) {
+                console.error('Error loading tasks:', taskError);
+                // Still try to get tasks even if copy fails
+                const dailyTasks = await getDailyTasks(user, today);
+                dataCache.tasks = dailyTasks;
+                dataCache.lastUpdate.tasks = Date.now();
+                setTasks(dailyTasks);
+            }
+        } catch (error) {
+            console.error('Error loading data:', error);
+        } finally {
+            setLoadingProfile(false);
+            setLoadingLog(false);
             setLoadingTasks(false);
         }
     }, [user]);
@@ -140,7 +252,19 @@ export const HomeScreen: React.FC = () => {
         if (!user) return;
 
         try {
-            // Add to daily log
+            // Optimistically update UI immediately
+            const currentLog = dailyLog || { calories: 0, protein: 0, carbs: 0, fats: 0 };
+            const optimisticLog = {
+                ...currentLog,
+                calories: (currentLog.calories || 0) + food.calories,
+                protein: (currentLog.protein || 0) + food.protein,
+                carbs: (currentLog.carbs || 0) + food.carbs,
+                fats: (currentLog.fats || 0) + food.fats,
+            };
+            setDailyLog(optimisticLog as DailyMacroLog);
+            dataCache.dailyLog = optimisticLog as DailyMacroLog;
+
+            // Add to daily log in background
             await addToDailyMacroLog(user, {
                 calories: food.calories,
                 protein: food.protein,
@@ -148,20 +272,38 @@ export const HomeScreen: React.FC = () => {
                 fats: food.fats,
             });
 
-            // Reload daily log to update UI
-            await loadDailyLog();
+            // Reload to get accurate data
+            const today = getTodayDateString();
+            const log = await getDailyMacroLog(user, today);
+            dataCache.dailyLog = log;
+            dataCache.lastUpdate.dailyLog = Date.now();
+            setDailyLog(log);
         } catch (error) {
             console.error('Error adding food:', error);
             Alert.alert('Error', 'Failed to add food. Please try again.');
+            // Revert optimistic update on error
+            await loadDailyLog();
         }
-    }, [user, loadDailyLog]);
+    }, [user, dailyLog, loadDailyLog]);
 
     // Handle removing food (for undo)
     const handleRemoveFood = useCallback(async (food: FoodItem) => {
         if (!user) return;
 
         try {
-            // Subtract from daily log
+            // Optimistically update UI immediately
+            const currentLog = dailyLog || { calories: 0, protein: 0, carbs: 0, fats: 0 };
+            const optimisticLog = {
+                ...currentLog,
+                calories: Math.max(0, (currentLog.calories || 0) - food.calories),
+                protein: Math.max(0, (currentLog.protein || 0) - food.protein),
+                carbs: Math.max(0, (currentLog.carbs || 0) - food.carbs),
+                fats: Math.max(0, (currentLog.fats || 0) - food.fats),
+            };
+            setDailyLog(optimisticLog as DailyMacroLog);
+            dataCache.dailyLog = optimisticLog as DailyMacroLog;
+
+            // Subtract from daily log in background
             await subtractFromDailyMacroLog(user, {
                 calories: food.calories,
                 protein: food.protein,
@@ -169,13 +311,19 @@ export const HomeScreen: React.FC = () => {
                 fats: food.fats,
             });
 
-            // Reload daily log to update UI
-            await loadDailyLog();
+            // Reload to get accurate data
+            const today = getTodayDateString();
+            const log = await getDailyMacroLog(user, today);
+            dataCache.dailyLog = log;
+            dataCache.lastUpdate.dailyLog = Date.now();
+            setDailyLog(log);
         } catch (error) {
             console.error('Error removing food:', error);
             Alert.alert('Error', 'Failed to remove food. Please try again.');
+            // Revert optimistic update on error
+            await loadDailyLog();
         }
-    }, [user, loadDailyLog]);
+    }, [user, dailyLog, loadDailyLog]);
 
     // Register add food handler with context
     useEffect(() => {
@@ -197,7 +345,7 @@ export const HomeScreen: React.FC = () => {
         id: task.id, // Include id for updates
     }));
 
-    // Handle task changes from widget
+    // Handle task changes from widget - update cache immediately
     const handleGoalsChange = useCallback(async (newGoals: Array<{ text: string; completed: boolean; createdAt?: string; isRepeating?: boolean; order?: number; id?: string }>) => {
         if (!user) return;
 
@@ -236,8 +384,12 @@ export const HomeScreen: React.FC = () => {
                 }
             }
 
-            // Reload tasks
-            await loadDailyTasks();
+            // Reload tasks and update cache
+            const today = getTodayDateString();
+            const updatedTasks = await getDailyTasks(user, today);
+            dataCache.tasks = updatedTasks;
+            dataCache.lastUpdate.tasks = Date.now();
+            setTasks(updatedTasks);
             
             // Generate summary after tasks change
             await generateDailySummary(user);
@@ -247,19 +399,17 @@ export const HomeScreen: React.FC = () => {
     }, [user, tasks, loadDailyTasks]);
 
     // Load on mount
+    // Initial load - use parallel loading
     useEffect(() => {
-        loadUserProfile();
-        loadDailyLog();
-        loadDailyTasks();
-    }, [loadUserProfile, loadDailyLog, loadDailyTasks]);
+        loadAllData();
+    }, [loadAllData]);
 
     // Reload when screen comes into focus (e.g., after completing onboarding)
+    // Use parallel loading for faster refresh
     useFocusEffect(
         useCallback(() => {
-            loadUserProfile();
-            loadDailyLog();
-            loadDailyTasks();
-        }, [loadUserProfile, loadDailyLog, loadDailyTasks])
+            loadAllData();
+        }, [loadAllData])
     );
 
     const handleResetOnboarding = async () => {

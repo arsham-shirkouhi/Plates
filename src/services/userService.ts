@@ -304,12 +304,28 @@ export const saveOnboardingData = async (user: User, onboardingData: OnboardingD
  */
 export const getUserProfile = async (user: User): Promise<UserProfile | null> => {
     try {
-        // Get user data
-        const { data: userData, error: userError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', user.id)
-            .single();
+        // Load all data in parallel for faster performance
+        const [userResult, onboardingResult, macrosResult] = await Promise.all([
+            supabase
+                .from('users')
+                .select('*')
+                .eq('id', user.id)
+                .single(),
+            supabase
+                .from('onboarding_data')
+                .select('*')
+                .eq('user_id', user.id)
+                .single(),
+            supabase
+                .from('target_macros')
+                .select('*')
+                .eq('user_id', user.id)
+                .single(),
+        ]);
+
+        const { data: userData, error: userError } = userResult;
+        const { data: onboardingData } = onboardingResult;
+        const { data: targetMacros } = macrosResult;
 
         if (userError) {
             if (userError.code === 'PGRST116') {
@@ -318,20 +334,6 @@ export const getUserProfile = async (user: User): Promise<UserProfile | null> =>
             }
             throw userError;
         }
-
-        // Get onboarding data
-        const { data: onboardingData } = await supabase
-            .from('onboarding_data')
-            .select('*')
-            .eq('user_id', user.id)
-            .single();
-
-        // Get target macros
-        const { data: targetMacros } = await supabase
-            .from('target_macros')
-            .select('*')
-            .eq('user_id', user.id)
-            .single();
 
         // Convert database format to TypeScript interface format
         const profile: UserProfile = {
