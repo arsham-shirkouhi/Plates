@@ -326,6 +326,8 @@ const GoalItem: React.FC<GoalItemProps> = ({ goal, index, isRemoving, isNewlyApp
     const textRef = useRef<Text>(null);
     const hasAnimatedIn = useRef(false);
     const [textWidth, setTextWidth] = React.useState(0);
+    const lastTapTime = useRef<number>(0);
+    const doubleTapTimer = useRef<NodeJS.Timeout | null>(null);
 
     React.useEffect(() => {
         // Only set initial values once, don't animate in
@@ -352,22 +354,29 @@ const GoalItem: React.FC<GoalItemProps> = ({ goal, index, isRemoving, isNewlyApp
 
     React.useEffect(() => {
         if (goal.completed && textWidth > 0) {
-            // Animate strikethrough appearing - use text width in pixels
-            Animated.parallel([
-                Animated.timing(strikethroughWidth, {
-                    toValue: textWidth,
-                    duration: 400,
-                    easing: Easing.out(Easing.ease),
-                    useNativeDriver: false,
-                }),
-                Animated.timing(opacity, {
-                    toValue: 1,
-                    duration: 300,
-                    easing: Easing.out(Easing.ease),
-                    useNativeDriver: false,
-                }),
-            ]).start();
-        } else {
+            // Reset animation values to start from beginning
+            strikethroughWidth.setValue(0);
+            opacity.setValue(0);
+            
+            // Use requestAnimationFrame to ensure reset is applied before animation starts
+            requestAnimationFrame(() => {
+                // Animate strikethrough appearing - use text width in pixels
+                Animated.parallel([
+                    Animated.timing(strikethroughWidth, {
+                        toValue: textWidth,
+                        duration: 400,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                    Animated.timing(opacity, {
+                        toValue: 1,
+                        duration: 300,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                ]).start();
+            });
+        } else if (!goal.completed) {
             // Reset if goal becomes uncompleted
             strikethroughWidth.setValue(0);
             opacity.setValue(0);
@@ -401,17 +410,42 @@ const GoalItem: React.FC<GoalItemProps> = ({ goal, index, isRemoving, isNewlyApp
         }
     }, [isRemoving]);
 
-    const handleLongPress = (event: any) => {
-        if (goal.completed) return;
+    // Cleanup timer on unmount
+    React.useEffect(() => {
+        return () => {
+            if (doubleTapTimer.current) {
+                clearTimeout(doubleTapTimer.current);
+            }
+        };
+    }, []);
 
-        // Get the touch coordinates from the press event
-        const { pageX, pageY } = event.nativeEvent;
+    const handlePress = (event: any) => {
+        if (goal.completed || isRemoving) return;
 
-        // Measure the goal item position to calculate relative coordinates
-        goalItemRef.current?.measureInWindow((x, y) => {
-            // Use the exact touch coordinates
-            onLongPress(pageX, pageY);
-        });
+        const now = Date.now();
+        const timeSinceLastTap = now - lastTapTime.current;
+
+        // Clear any existing timer
+        if (doubleTapTimer.current) {
+            clearTimeout(doubleTapTimer.current);
+            doubleTapTimer.current = null;
+        }
+
+        // If taps are within 300ms, it's a double tap
+        if (timeSinceLastTap < 300) {
+            // Double tap detected
+            const { pageX, pageY } = event.nativeEvent;
+            goalItemRef.current?.measureInWindow((x, y) => {
+                onLongPress(pageX, pageY);
+            });
+            lastTapTime.current = 0; // Reset to prevent triple tap
+        } else {
+            // First tap - wait for potential second tap
+            lastTapTime.current = now;
+            doubleTapTimer.current = setTimeout(() => {
+                lastTapTime.current = 0; // Reset after timeout
+            }, 300);
+        }
     };
 
     return (
@@ -431,10 +465,9 @@ const GoalItem: React.FC<GoalItemProps> = ({ goal, index, isRemoving, isNewlyApp
             <TouchableOpacity
                 ref={goalItemRef}
                 style={styles.goalItem}
-                onLongPress={handleLongPress}
+                onPress={handlePress}
                 activeOpacity={0.7}
                 disabled={goal.completed || isRemoving}
-                delayLongPress={300} // 300ms hold to trigger
             >
                 <View style={styles.goalTextContainer}>
                     <View
