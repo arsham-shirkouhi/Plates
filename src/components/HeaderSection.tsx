@@ -47,7 +47,7 @@ export const HeaderSection: React.FC<HeaderSectionProps> = ({ streak, topInset =
     };
 
     return (
-        <View style={[styles.container, { paddingTop: 12 }]}>
+        <View style={[styles.container, { paddingTop: (10) }]}>
             {/* Streak and date row */}
             <View style={styles.topRow}>
                 <View style={styles.streakSection}>

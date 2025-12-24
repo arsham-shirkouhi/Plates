@@ -308,3 +308,54 @@ export const getDailySummariesRange = async (
     }
 };
 
+/**
+ * Copy incomplete tasks from yesterday to today if today has no tasks
+ * @param user - Supabase user
+ */
+export const copyDailyTasksFromYesterday = async (user: User): Promise<void> => {
+    try {
+        const today = getTodayDateString();
+        
+        // Check if today already has tasks
+        const todayTasks = await getDailyTasks(user, today);
+        if (todayTasks.length > 0) {
+            // Today already has tasks, don't copy
+            return;
+        }
+
+        // Get yesterday's date
+        const todayDate = new Date(today);
+        todayDate.setDate(todayDate.getDate() - 1);
+        const yesterday = todayDate.toISOString().split('T')[0];
+
+        // Get yesterday's incomplete tasks
+        const yesterdayTasks = await getDailyTasks(user, yesterday);
+        const incompleteTasks = yesterdayTasks.filter(task => !task.is_completed);
+
+        if (incompleteTasks.length === 0) {
+            // No incomplete tasks to copy
+            return;
+        }
+
+        // Copy incomplete tasks to today (reset completion status)
+        const tasksToInsert = incompleteTasks.map(task => ({
+            user_id: user.id,
+            log_date: today,
+            title: task.title,
+            is_completed: false,
+            completed_at: null,
+        }));
+
+        const { error } = await supabase
+            .from('daily_tasks')
+            .insert(tasksToInsert);
+
+        if (error) {
+            throw error;
+        }
+    } catch (error) {
+        console.error('Error copying daily tasks from yesterday:', error);
+        // Don't throw - allow the app to continue even if copy fails
+    }
+};
+

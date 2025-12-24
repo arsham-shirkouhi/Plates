@@ -458,7 +458,7 @@ export const TodaysGoalsOverlay: React.FC<TodaysGoalsOverlayProps> = ({
                                             })
                                         ) : (
                                             <View style={styles.emptyIncompleteContainer}>
-                                                <Text style={styles.emptyIncompleteText}>hold the screen to add a todo</Text>
+                                                <Text style={styles.emptyIncompleteText}>hold to add, double tap to remove</Text>
                                             </View>
                                         )}
                                     </View>
@@ -842,10 +842,18 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     emptyIncompleteText: {
-        fontSize: 14,
+        fontSize: 12,
+        fontFamily: fonts.regular,
+        color: '#E0E0E0',
+        textTransform: 'lowercase',
+        textAlign: 'center',
+    },
+    emptyIncompleteSubtext: {
+        fontSize: 12,
         fontFamily: fonts.regular,
         color: '#CCCCCC',
         textTransform: 'lowercase',
+        marginTop: 4,
     },
     goalItemWrapper: {
         overflow: 'hidden',

@@ -571,15 +571,13 @@ export const HomeScreen: React.FC = () => {
         >
           <GradientBackground />
 
-          {!loadingProfile && (
-            <HeaderSection
-              streak={streak}
-              topInset={insets.top}
-              onProfilePress={() => Alert.alert('Profile', 'Profile screen coming soon')}
-            />
-          )}
+          <HeaderSection
+            streak={streak}
+            topInset={insets.top}
+            onProfilePress={() => Alert.alert('Profile', 'Profile screen coming soon')}
+          />
 
-          {!loadingProfile && macros && <MacrosCard macros={macros} consumed={consumed} />}
+          <MacrosCard macros={macros} consumed={consumed} loading={loadingProfile} />
 
           <FoodLog onPress={() => navigation.navigate('FoodLog')} />
 

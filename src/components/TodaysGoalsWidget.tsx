@@ -230,7 +230,7 @@ export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
                     onLongPress={handleAddTodo}
                     activeOpacity={0.7}
                 >
-                    <Text style={styles.emptyText}>hold to add a todo</Text>
+                    <Text style={styles.emptyText}>hold to add, double tap to remove</Text>
                 </TouchableOpacity>
             ) : (
                 <TouchableOpacity
@@ -615,10 +615,18 @@ const styles = StyleSheet.create({
         paddingVertical: 20,
     },
     emptyText: {
-        fontSize: 16,
+        fontSize: 14,
         fontFamily: fonts.regular,
-        color: '#9E9E9E',
+        color: '#CCCCCC',
         textTransform: 'lowercase',
+        textAlign: 'center',
+    },
+    emptySubtext: {
+        fontSize: 14,
+        fontFamily: fonts.regular,
+        color: '#CCCCCC',
+        textTransform: 'lowercase',
+        marginTop: 4,
     },
     goalItemWrapper: {
         overflow: 'hidden',

@@ -51,6 +51,8 @@ export const TimerWidget: React.FC<TimerWidgetProps> = ({
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const progressAnim = useRef(new Animated.Value(0)).current;
+  const completionHapticRef = useRef<NodeJS.Timeout | null>(null);
+  const isInitialLoad = useRef(true);
 
   const dragStartY = useRef(0);
   const dragStartTime = useRef(0);
@@ -87,11 +89,19 @@ export const TimerWidget: React.FC<TimerWidgetProps> = ({
     if (isDragging) {
       progressAnim.setValue(progress);
     } else {
+      // Use longer duration for initial load animation
+      const animationDuration = isInitialLoad.current ? 1200 : BAR_ANIM_MS;
+      
       Animated.timing(progressAnim, {
         toValue: progress,
-        duration: BAR_ANIM_MS,
+        duration: animationDuration,
         useNativeDriver: false,
-      }).start();
+      }).start(() => {
+        // Mark initial load as complete after first animation
+        if (isInitialLoad.current) {
+          isInitialLoad.current = false;
+        }
+      });
     }
   }, [progress, isDragging, progressAnim]);
 
@@ -105,6 +115,12 @@ export const TimerWidget: React.FC<TimerWidgetProps> = ({
             onComplete?.();
             return 0;
           }
+          
+          // Haptic feedback for last 5 seconds
+          if (prev <= 5 && prev > 1) {
+            void safeHaptic("medium");
+          }
+          
           return prev - 1;
         });
       }, 1000);
@@ -120,12 +136,67 @@ export const TimerWidget: React.FC<TimerWidgetProps> = ({
     };
   }, [isRunning, totalSeconds, onComplete]);
 
+  // Completion haptic pattern - long continuous buzz and reset to 2:30
+  useEffect(() => {
+    if (totalSeconds === 0 && !isRunning) {
+      // Start long continuous buzz (5 seconds)
+      // Use notification haptic for initial longer buzz, then chain heavy haptics quickly
+      void safeNotificationHaptic();
+      
+      let hapticCount = 0;
+      const maxHaptics = 25; // 25 haptics over 5 seconds (every 200ms for continuous feel)
+      
+      completionHapticRef.current = setInterval(() => {
+        void safeHaptic("heavy");
+        hapticCount++;
+        if (hapticCount >= maxHaptics) {
+          if (completionHapticRef.current) {
+            clearInterval(completionHapticRef.current);
+            completionHapticRef.current = null;
+          }
+        }
+      }, 200); // Faster interval for continuous buzz effect
+      
+      // Reset to 2:30 (150 seconds) with animation after haptic pattern completes (5 seconds)
+      const resetDelay = setTimeout(() => {
+        const resetSeconds = 150; // 2:30
+        const resetProgress = (resetSeconds / MAX_TIME_SECONDS) * 100;
+        
+        // Animate the progress bar
+        Animated.timing(progressAnim, {
+          toValue: resetProgress,
+          duration: 500,
+          useNativeDriver: false,
+        }).start();
+        
+        // Update the state
+        setTotalSeconds(resetSeconds);
+      }, 5000); // Wait for 5 seconds of haptics to complete
+      
+      return () => {
+        if (completionHapticRef.current) {
+          clearInterval(completionHapticRef.current);
+          completionHapticRef.current = null;
+        }
+        clearTimeout(resetDelay);
+      };
+    }
+  }, [totalSeconds, isRunning, progressAnim]);
+
   // --- HAPTICS HELPERS ---
   const safeHaptic = async (type: "light" | "medium" | "heavy") => {
     try {
       if (type === "light") await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       if (type === "medium") await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       if (type === "heavy") await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    } catch {
+      // ignore if haptics not available
+    }
+  };
+
+  const safeNotificationHaptic = async () => {
+    try {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } catch {
       // ignore if haptics not available
     }
@@ -188,7 +259,7 @@ export const TimerWidget: React.FC<TimerWidgetProps> = ({
     if (isRunning) return;
 
     setTotalSeconds((prev) => {
-      const next = Math.min(MAX_TIME_SECONDS, prev + 60);
+      const next = Math.min(MAX_TIME_SECONDS, prev + 15);
 
       if (next !== prev) {
         const hType: "medium" | "heavy" = next === MAX_TIME_SECONDS ? "heavy" : "medium";
@@ -203,7 +274,7 @@ export const TimerWidget: React.FC<TimerWidgetProps> = ({
     if (isRunning) return;
 
     setTotalSeconds((prev) => {
-      const next = Math.max(MIN_TIME_SECONDS, prev - 60);
+      const next = Math.max(MIN_TIME_SECONDS, prev - 15);
 
       if (next !== prev) {
         const hType: "medium" | "heavy" = next === MIN_TIME_SECONDS ? "heavy" : "medium";
@@ -216,7 +287,13 @@ export const TimerWidget: React.FC<TimerWidgetProps> = ({
 
   const handlePlayPause = () => {
     if (totalSeconds <= MIN_TIME_SECONDS) return;
-    setIsRunning((v) => !v);
+    setIsRunning((v) => {
+      if (v) {
+        // Timer is being stopped/paused
+        void safeHaptic("medium");
+      }
+      return !v;
+    });
   };
 
   const panResponder = useRef(
@@ -306,7 +383,7 @@ export const TimerWidget: React.FC<TimerWidgetProps> = ({
           pointerEvents="auto"
         >
           <Animated.View style={[styles.progressFill, { height: progressHeightPercent }]} />
-
+          <View style={styles.dragIndicator} />
           <View style={styles.timeContainer}>
             <Text style={styles.timeText}>{formatTime(totalSeconds)}</Text>
           </View>
@@ -354,6 +431,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   displayContainer: { flex: 2, marginRight: 10 },
+  dragIndicator: {
+    width: 40,
+    height: 2,
+    backgroundColor: "#000000",
+    alignSelf: "center",
+    marginTop: 8,
+    marginBottom: 4,
+  },
   progressContainer: {
     width: "100%",
     borderRadius: 10,
@@ -383,7 +468,7 @@ const styles = StyleSheet.create({
     minHeight: 40,
   },
   timeText: {
-    fontSize: 25,
+    fontSize: 20,
     fontFamily: fonts.bold,
     color: "#252525",
     fontWeight: "bold",
