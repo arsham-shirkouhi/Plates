@@ -20,9 +20,11 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../constants/fonts';
 import { AddFoodBottomSheet } from '../components/AddFoodBottomSheet';
+import { MacroStatusCompact, MacroStatusCompactRef } from '../components/MacroStatusCompact';
 import { FoodItem, getQuickAddItems, searchFoods } from '../services/foodService';
-import { getDailyMacroLog, addToDailyMacroLog, subtractFromDailyMacroLog, getTodayDateString } from '../services/userService';
+import { getDailyMacroLog, addToDailyMacroLog, subtractFromDailyMacroLog, getTodayDateString, getUserProfile } from '../services/userService';
 import { useAddFood } from '../context/AddFoodContext';
+import { useAuth } from '../context/AuthContext';
 
 type FoodLogScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'FoodLog'>;
 
@@ -38,18 +40,44 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 export const FoodLogScreen: React.FC = () => {
     const navigation = useNavigation<FoodLogScreenNavigationProp>();
     const insets = useSafeAreaInsets();
+    const { user } = useAuth();
     const { registerHandler, unregisterHandler, registerSheetState, unregisterSheetState } = useAddFood();
     const [loggedFoods, setLoggedFoods] = useState<LoggedFoodEntry[]>([]);
     const [showAddSheet, setShowAddSheet] = useState(false);
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [swipingId, setSwipingId] = useState<string | null>(null);
+    const [targetMacros, setTargetMacros] = useState<{ calories?: number; protein?: number; carbs?: number; fats?: number } | null>(null);
     const swipeAnimations = useRef<Map<string, Animated.Value>>(new Map()).current;
+    const scrollViewRef = useRef<ScrollView>(null);
+    const macroStatusRef = useRef<MacroStatusCompactRef>(null);
 
     // Load today's logged foods (in a real app, this would come from storage/API)
     useEffect(() => {
         // For now, we'll start with an empty list
         // In production, load from AsyncStorage or API
     }, []);
+
+    // Load target macros
+    useEffect(() => {
+        const loadTargetMacros = async () => {
+            if (user) {
+                try {
+                    const profile = await getUserProfile(user);
+                    if (profile?.target_macros) {
+                        setTargetMacros({
+                            calories: profile.target_macros.calories,
+                            protein: profile.target_macros.protein,
+                            carbs: profile.target_macros.carbs,
+                            fats: profile.target_macros.fats,
+                        });
+                    }
+                } catch (error) {
+                    console.error('Error loading target macros:', error);
+                }
+            }
+        };
+        loadTargetMacros();
+    }, [user]);
 
     const handleAddFood = (food: FoodItem) => {
         const newEntry: LoggedFoodEntry = {
@@ -61,7 +89,7 @@ export const FoodLogScreen: React.FC = () => {
         setLoggedFoods(prev => [newEntry, ...prev].sort((a, b) => b.loggedAt.getTime() - a.loggedAt.getTime()));
         setShowAddSheet(false);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        
+
         // Add entrance animation for new entry
         const animKey = newEntry.id;
         if (!swipeAnimations.has(animKey)) {
@@ -104,7 +132,7 @@ export const FoodLogScreen: React.FC = () => {
         const now = new Date();
         const diffMs = now.getTime() - date.getTime();
         const diffMins = Math.floor(diffMs / 60000);
-        
+
         if (diffMins < 1) return 'just now';
         if (diffMins === 1) return '1 minute ago';
         if (diffMins < 60) return `${diffMins} minutes ago`;
@@ -117,7 +145,7 @@ export const FoodLogScreen: React.FC = () => {
         const proteinCal = food.protein * 4;
         const carbsCal = food.carbs * 4;
         const fatsCal = food.fats * 9;
-        
+
         if (proteinCal >= carbsCal && proteinCal >= fatsCal) return 'protein';
         if (carbsCal >= fatsCal) return 'carbs';
         return 'fats';
@@ -159,22 +187,31 @@ export const FoodLogScreen: React.FC = () => {
 
     return (
         <View style={[styles.container, { paddingTop: insets.top }]}>
-            {/* Header */}
-            <View style={styles.header}>
-                <View style={styles.headerCenter}>
-                    <Text style={styles.headerTitle}>food log</Text>
-                    <Text style={styles.headerSubtext}>today's intake</Text>
-                </View>
-            </View>
-
-            {/* Divider */}
-            <View style={styles.divider} />
+            {/* Macro Status Compact - Fixed at top */}
+            <MacroStatusCompact
+                ref={macroStatusRef}
+                calories={totals.calories}
+                protein={totals.protein}
+                carbs={totals.carbs}
+                fats={totals.fats}
+                targetCalories={targetMacros?.calories}
+                targetProtein={targetMacros?.protein}
+                targetCarbs={targetMacros?.carbs}
+                targetFats={targetMacros?.fats}
+            />
 
             {/* Content */}
             <ScrollView
+                ref={scrollViewRef}
                 style={styles.scrollView}
                 contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
                 showsVerticalScrollIndicator={false}
+                onScrollBeginDrag={() => {
+                    // Collapse macro status on scroll
+                    macroStatusRef.current?.collapse();
+                    setExpandedId(null);
+                }}
+                scrollEventThrottle={16}
             >
                 {loggedFoods.length === 0 ? (
                     <View style={styles.emptyState}>
@@ -205,7 +242,7 @@ export const FoodLogScreen: React.FC = () => {
                             const dominantMacro = getDominantMacro(entry.food);
                             const macroColor = getMacroColor(dominantMacro);
                             const isExpanded = expandedId === entry.id;
-                            
+
                             return (
                                 <React.Fragment key={entry.id}>
                                     {/* Insight chip before entry if applicable */}
@@ -214,7 +251,7 @@ export const FoodLogScreen: React.FC = () => {
                                             <Text style={styles.insightText}>{insights[0]}</Text>
                                         </View>
                                     )}
-                                    
+
                                     {/* Food Card */}
                                     <FoodCard
                                         entry={entry}
@@ -644,6 +681,7 @@ const styles = StyleSheet.create({
     },
     macroInfo: {
         alignItems: 'flex-end',
+
     },
     caloriesText: {
         fontSize: 18,

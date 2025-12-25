@@ -5,7 +5,7 @@ export const GradientBackground: React.FC = () => {
     return (
         <View style={styles.container}>
             <Image
-                source={require('../../assets/images/gradient_ball_mainpage.png')}
+                source={require('../../assets/images/blue_ball.png')}
                 style={styles.image}
             />
         </View>
