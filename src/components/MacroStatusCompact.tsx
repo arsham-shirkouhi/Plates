@@ -27,12 +27,6 @@ export const MacroStatusCompact = forwardRef<MacroStatusCompactRef, MacroStatusC
     targetCarbs,
     targetFats,
 }, ref) => {
-    // Test values
-    const testCalories = 3556;
-    const testProtein = 245;
-    const testCarbs = 145;
-    const testFats = 100;
-
     const [isExpanded, setIsExpanded] = useState(false);
     const expandHeight = useRef(new Animated.Value(0)).current;
     const expandOpacity = useRef(new Animated.Value(0)).current;
@@ -94,23 +88,23 @@ export const MacroStatusCompact = forwardRef<MacroStatusCompactRef, MacroStatusC
                 <View style={styles.statusRow}>
                     <View style={styles.calorieContainer}>
                         <Text style={styles.calorieText}>
-                            {formatNumber(testCalories)} kcal
+                            {formatNumber(calories)} kcal
                         </Text>
                     </View>
                     <Text style={styles.separator}>|</Text>
                     <View style={styles.macroContainer}>
                         <View style={[styles.macroDot, styles.proteinDot]} />
-                        <Text style={styles.macroText}>P {formatNumber(testProtein)}g</Text>
+                        <Text style={styles.macroText}>P {formatNumber(protein)}g</Text>
                     </View>
                     <Text style={styles.separator}>|</Text>
-                    <View style={styles.macroContainer}>
+                    <View style={styles.macroContainerWide}>
                         <View style={[styles.macroDot, styles.carbsDot]} />
-                        <Text style={styles.macroText}>C {formatNumber(testCarbs)}g</Text>
+                        <Text style={styles.macroText}>C {formatNumber(carbs)}g</Text>
                     </View>
                     <Text style={styles.separator}>|</Text>
-                    <View style={styles.macroContainer}>
+                    <View style={styles.macroContainerWide}>
                         <View style={[styles.macroDot, styles.fatsDot]} />
-                        <Text style={styles.macroText}>F {formatNumber(testFats)}g</Text>
+                        <Text style={styles.macroText}>F {formatNumber(fats)}g</Text>
                     </View>
                 </View>
 
@@ -133,7 +127,7 @@ export const MacroStatusCompact = forwardRef<MacroStatusCompactRef, MacroStatusC
                                 <View style={styles.breakdownRow}>
                                     <Text style={styles.breakdownLabel}>Calories</Text>
                                     <Text style={styles.breakdownValue}>
-                                        {formatNumber(testCalories)} / {formatNumber(targetCalories)} kcal
+                                        {formatNumber(calories)} / {formatNumber(targetCalories)} kcal
                                     </Text>
                                 </View>
                             )}
@@ -141,7 +135,7 @@ export const MacroStatusCompact = forwardRef<MacroStatusCompactRef, MacroStatusC
                                 <View style={styles.breakdownRow}>
                                     <Text style={styles.breakdownLabel}>Protein</Text>
                                     <Text style={styles.breakdownValue}>
-                                        {formatNumber(testProtein)}g / {formatNumber(targetProtein)}g
+                                        {formatNumber(protein)}g / {formatNumber(targetProtein)}g
                                     </Text>
                                 </View>
                             )}
@@ -149,7 +143,7 @@ export const MacroStatusCompact = forwardRef<MacroStatusCompactRef, MacroStatusC
                                 <View style={styles.breakdownRow}>
                                     <Text style={styles.breakdownLabel}>Carbs</Text>
                                     <Text style={styles.breakdownValue}>
-                                        {formatNumber(testCarbs)}g / {formatNumber(targetCarbs)}g
+                                        {formatNumber(carbs)}g / {formatNumber(targetCarbs)}g
                                     </Text>
                                 </View>
                             )}
@@ -157,7 +151,7 @@ export const MacroStatusCompact = forwardRef<MacroStatusCompactRef, MacroStatusC
                                 <View style={styles.breakdownRow}>
                                     <Text style={styles.breakdownLabel}>Fat</Text>
                                     <Text style={styles.breakdownValue}>
-                                        {formatNumber(testFats)}g / {formatNumber(targetFats)}g
+                                        {formatNumber(fats)}g / {formatNumber(targetFats)}g
                                     </Text>
                                 </View>
                             )}
@@ -171,16 +165,16 @@ export const MacroStatusCompact = forwardRef<MacroStatusCompactRef, MacroStatusC
 
 const styles = StyleSheet.create({
     container: {
-        backgroundColor: '#fff',
+        backgroundColor: 'transparent',
         borderRadius: 10,
-        marginHorizontal: 25,
+        marginHorizontal: 22,
         marginTop: 0,
         marginBottom: 0,
         overflow: 'hidden',
     },
     touchableContent: {
         paddingTop: 10,
-        paddingBottom: 10,
+        paddingBottom: 4,
         paddingHorizontal: 16,
         height: '100%',
     },
@@ -197,7 +191,7 @@ const styles = StyleSheet.create({
     calorieText: {
         fontSize: 18,
         fontFamily: fonts.regular,
-        color: '#4463F7', // Dashboard accent color (blue)
+        color: '#fff',
         textTransform: 'lowercase',
         letterSpacing: -0.2,
     },
@@ -205,6 +199,13 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         width: 60,
+        justifyContent: 'center',
+        gap: 4,
+    },
+    macroContainerWide: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        width: 65,
         justifyContent: 'center',
         gap: 4,
     },
@@ -225,14 +226,13 @@ const styles = StyleSheet.create({
     macroText: {
         fontSize: 18,
         fontFamily: fonts.regular,
-        color: '#666666', // Muted dashboard text color
-        textTransform: 'lowercase',
+        color: '#fff',
         letterSpacing: -0.2,
     },
     separator: {
         fontSize: 16,
         fontFamily: fonts.regular,
-        color: '#D0D0D0',
+        color: 'rgba(255, 255, 255, 0.5)',
         marginHorizontal: 12,
     },
     expandedContainer: {
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
     breakdownLabel: {
         fontSize: 16,
         fontFamily: fonts.bold,
-        color: '#252525',
+        color: '#fff',
         textTransform: 'lowercase',
         letterSpacing: -0.1,
         minWidth: 70,
@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
     breakdownValue: {
         fontSize: 16,
         fontFamily: fonts.regular,
-        color: '#252525',
+        color: '#fff',
         textTransform: 'lowercase',
         letterSpacing: -0.1,
     },

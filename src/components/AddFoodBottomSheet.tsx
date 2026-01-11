@@ -42,6 +42,8 @@ interface AddFoodBottomSheetProps {
     onAddFood: (food: FoodItem) => void;
     onRemoveFood?: (food: FoodItem) => void;
     quickAddItems?: FoodItem[];
+    onMealChange?: (meal: 'breakfast' | 'lunch' | 'dinner' | 'snack' | null) => void;
+    initialMeal?: 'breakfast' | 'lunch' | 'dinner' | 'snack' | null;
 }
 
 export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
@@ -50,6 +52,8 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
     onAddFood,
     onRemoveFood,
     quickAddItems = [],
+    onMealChange,
+    initialMeal = null,
 }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<FoodItem[]>([]);
@@ -57,6 +61,42 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
     const [showUndoToast, setShowUndoToast] = useState(false);
     const [lastAddedFood, setLastAddedFood] = useState<FoodItem | null>(null);
     const [undoTimeout, setUndoTimeout] = useState<NodeJS.Timeout | null>(null);
+    // Function to determine meal based on time of day
+    const getMealByTime = (): 'breakfast' | 'lunch' | 'dinner' | null => {
+        const now = new Date();
+        const hour = now.getHours();
+        
+        // Breakfast: 6 AM - 11 AM
+        if (hour >= 6 && hour < 11) {
+            return 'breakfast';
+        }
+        // Lunch: 11 AM - 3 PM
+        else if (hour >= 11 && hour < 15) {
+            return 'lunch';
+        }
+        // Dinner: 5 PM - 10 PM
+        else if (hour >= 17 && hour < 22) {
+            return 'dinner';
+        }
+        // Outside meal times, return null (no auto-select)
+        return null;
+    };
+
+    const [selectedMeal, setSelectedMeal] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack' | null>(initialMeal || null);
+    
+    // Update selected meal when sheet opens or initialMeal prop changes
+    useEffect(() => {
+        if (visible) {
+            // Use initialMeal if provided, otherwise auto-select based on time
+            const mealToSelect = initialMeal !== undefined && initialMeal !== null 
+                ? initialMeal 
+                : getMealByTime();
+            setSelectedMeal(mealToSelect);
+            if (onMealChange && mealToSelect) {
+                onMealChange(mealToSelect);
+            }
+        }
+    }, [visible, initialMeal]);
 
     const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT + TOASTER_OFFSET)).current;
     const backdropOpacity = useRef(new Animated.Value(0)).current;
@@ -74,6 +114,7 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
     const scanButtonShadowHeight = useRef(new Animated.Value(4)).current;
     const photoButtonTranslateY = useRef(new Animated.Value(0)).current;
     const photoButtonShadowHeight = useRef(new Animated.Value(4)).current;
+    
 
     // Pan responder for swipe down gesture - only on top section
     const topSectionPanResponder = useRef(
@@ -217,6 +258,7 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
             setSearchQuery('');
             setSearchResults([]);
             setAddedItems(new Set()); // Reset added items when closing
+            setSelectedMeal(null); // Reset selected meal
             sheetHeightAnim.setValue(SHEET_HEIGHT);
             keyboardHeightAnim.setValue(0);
             aiSuggestionOpacity.setValue(0);
@@ -314,6 +356,7 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
             setSearchQuery('');
             setSearchResults([]);
             setAddedItems(new Set());
+            setSelectedMeal(null); // Reset selected meal
             sheetHeightAnim.setValue(SHEET_HEIGHT);
             keyboardHeightAnim.setValue(0);
             Keyboard.dismiss();
@@ -352,6 +395,18 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
         }, 3000);
         setUndoTimeout(timeout);
     };
+    
+    // Meal button press handlers
+    const handleMealPress = (meal: 'breakfast' | 'lunch' | 'dinner' | 'snack') => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        const newMeal = selectedMeal === meal ? null : meal;
+        setSelectedMeal(newMeal);
+        if (onMealChange) {
+            onMealChange(newMeal);
+        }
+    };
+
+
 
     const handleUndo = () => {
         if (lastAddedFood) {
@@ -667,6 +722,34 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
                                     </Animated.View>
                                 </View>
                             </View>
+
+                            {/* Meal Selection Pills */}
+                            <View style={styles.mealButtonsContainer}>
+                                {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map((meal) => {
+                                    const isSelected = selectedMeal === meal;
+                                    const isBreakfast = meal === 'breakfast';
+
+                                    return (
+                                        <TouchableOpacity
+                                            key={meal}
+                                            style={[
+                                                styles.mealButton,
+                                                isBreakfast && styles.mealButtonBreakfast,
+                                                isSelected && styles.mealButtonSelected,
+                                            ]}
+                                            onPress={() => handleMealPress(meal)}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Text style={[
+                                                styles.mealButtonText,
+                                                isSelected && styles.mealButtonTextSelected,
+                                            ]}>
+                                                {meal}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
                         </View>
 
                         {/* Quick Add List */}
@@ -937,6 +1020,39 @@ const styles = StyleSheet.create({
         fontFamily: fonts.bold,
         color: '#252525',
         textTransform: 'lowercase',
+    },
+    mealButtonsContainer: {
+        flexDirection: 'row',
+        gap: 8,
+        marginTop: 12,
+        paddingTop: 12,
+    },
+    mealButton: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#fff',
+        borderRadius: 18,
+        borderWidth: 2,
+        borderColor: '#252525',
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        minHeight: 28,
+    },
+    mealButtonBreakfast: {
+        flex: 1.2,
+    },
+    mealButtonSelected: {
+        backgroundColor: '#4463F7',
+    },
+    mealButtonText: {
+        fontSize: 14,
+        fontFamily: fonts.bold,
+        color: '#252525',
+        textTransform: 'lowercase',
+    },
+    mealButtonTextSelected: {
+        color: '#fff',
     },
     aiSuggestionContainer: {
         position: 'absolute',
