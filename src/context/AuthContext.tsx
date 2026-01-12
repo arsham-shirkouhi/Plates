@@ -36,10 +36,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        // Check if Supabase is configured before making network requests
+        const { isSupabaseConfigured } = require('../services/supabase');
+        if (!isSupabaseConfigured()) {
+            console.warn('⚠️ Supabase not configured - skipping session check');
+            setLoading(false);
+            return;
+        }
+
         // Get initial session
         supabase.auth.getSession().then(({ data: { session }, error }) => {
             if (error) {
-                console.error('Error getting session:', error);
+                // Handle network errors gracefully
+                if (error.message?.includes('Network request failed') || error.message?.includes('fetch')) {
+                    console.error('❌ Network error: Could not connect to Supabase. Please check:');
+                    console.error('   1. Your internet connection');
+                    console.error('   2. Your Supabase URL is correct');
+                    console.error('   3. Your device and computer are on the same network');
+                    console.error('   4. Firewall is not blocking the connection');
+                } else {
+                    console.error('Error getting session:', error);
+                }
                 setLoading(false);
                 return;
             }
@@ -51,7 +68,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 updateLastLoginIfNeeded(session.user);
             }
         }).catch((error) => {
-            console.error('Error in getSession:', error);
+            // Handle network errors gracefully
+            if (error.message?.includes('Network request failed') || error.message?.includes('fetch')) {
+                console.error('❌ Network error: Could not connect to Supabase. Please check:');
+                console.error('   1. Your internet connection');
+                console.error('   2. Your Supabase URL is correct');
+                console.error('   3. Your device and computer are on the same network');
+                console.error('   4. Firewall is not blocking the connection');
+            } else {
+                console.error('Error in getSession:', error);
+            }
             setLoading(false);
         });
 
@@ -107,6 +133,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const login = async (email: string, password: string) => {
         try {
+            // Check if Supabase is configured
+            const { isSupabaseConfigured } = require('../services/supabase');
+            if (!isSupabaseConfigured()) {
+                throw new Error('Supabase is not configured. Please check your .env file and restart the app.');
+            }
+
             console.log('Attempting login for email:', email);
             const { data, error } = await supabase.auth.signInWithPassword({
                 email,
@@ -133,6 +165,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const signup = async (email: string, password: string) => {
         try {
+            // Check if Supabase is configured
+            const { isSupabaseConfigured } = require('../services/supabase');
+            if (!isSupabaseConfigured()) {
+                throw new Error('Supabase is not configured. Please check your .env file and restart the app.');
+            }
+
             const { data, error } = await supabase.auth.signUp({
                 email,
                 password,
@@ -208,6 +246,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const loginWithGoogle = async () => {
         try {
+            // Check if Supabase is configured
+            const { isSupabaseConfigured } = require('../services/supabase');
+            if (!isSupabaseConfigured()) {
+                throw new Error('Supabase is not configured. Please check your .env file and restart the app.');
+            }
+
             // For React Native/Expo, we need to use a redirect URL
             // You'll need to configure this in your Supabase project settings
             // and set up deep linking in your app
