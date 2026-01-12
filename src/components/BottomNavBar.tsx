@@ -25,7 +25,7 @@ const styles = StyleSheet.create({
         alignItems: 'flex-end', // Align buttons at bottom
         justifyContent: 'space-between',
         paddingTop: 16,
-        zIndex: 100,
+        zIndex: 50,
     },
 });
 

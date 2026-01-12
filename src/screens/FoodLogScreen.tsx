@@ -53,7 +53,7 @@ export const FoodLogScreen: React.FC = () => {
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [swipingId, setSwipingId] = useState<string | null>(null);
     const [targetMacros, setTargetMacros] = useState<{ calories?: number; protein?: number; carbs?: number; fats?: number } | null>(null);
-    const [dailyLog, setDailyLog] = useState<{ calories: number; protein: number; carbs: number; fats: number } | null>(null);
+    const [dailyLog, setDailyLog] = useState<DailyMacroLog | null>(null);
     const [loadingLog, setLoadingLog] = useState(true);
     const swipeAnimations = useRef<Map<string, Animated.Value>>(new Map()).current;
     const scrollViewRef = useRef<ScrollView>(null);
@@ -157,7 +157,7 @@ export const FoodLogScreen: React.FC = () => {
         loadTargetMacros();
     }, [user]);
 
-    // Load today's daily log
+    // Load today's daily log - uses same logic as HomeScreen
     const loadDailyLog = useCallback(async () => {
         if (!user) {
             setLoadingLog(false);
@@ -168,30 +168,28 @@ export const FoodLogScreen: React.FC = () => {
             setLoadingLog(true);
             const today = getTodayDateString();
             const log = await getDailyMacroLog(user, today);
-            if (log) {
-                setDailyLog({
-                    calories: log.calories || 0,
-                    protein: log.protein || 0,
-                    carbs: log.carbs || 0,
-                    fats: log.fats || 0,
-                });
-            } else {
-                setDailyLog({ calories: 0, protein: 0, carbs: 0, fats: 0 });
-            }
+            // Set dailyLog exactly as HomeScreen does (can be null)
+            setDailyLog(log);
         } catch (error) {
             console.error('Error loading daily log:', error);
-            setDailyLog({ calories: 0, protein: 0, carbs: 0, fats: 0 });
+            setDailyLog(null);
         } finally {
             setLoadingLog(false);
         }
     }, [user]);
 
     // Load daily log on mount and when screen comes into focus
+    // This ensures we always read the latest values from the database (same as dashboard)
     useFocusEffect(
         useCallback(() => {
             loadDailyLog();
         }, [loadDailyLog])
     );
+
+    // Also load on initial mount
+    useEffect(() => {
+        loadDailyLog();
+    }, []);
 
     const [selectedMeal, setSelectedMeal] = useState<MealType | null>(null);
     const [showMealSelector, setShowMealSelector] = useState(false);
@@ -308,61 +306,39 @@ export const FoodLogScreen: React.FC = () => {
     };
 
 
-    // Calculate totals per meal
+    // Calculate totals per meal (calories and macros)
     const mealTotals = meals.reduce((acc, meal) => {
-        acc[meal] = foodsByMeal[meal].reduce((sum, entry) => sum + entry.food.calories, 0);
+        const mealFoods = foodsByMeal[meal];
+        acc[meal] = {
+            calories: mealFoods.reduce((sum, entry) => sum + entry.food.calories, 0),
+            protein: mealFoods.reduce((sum, entry) => sum + entry.food.protein, 0),
+            carbs: mealFoods.reduce((sum, entry) => sum + entry.food.carbs, 0),
+            fats: mealFoods.reduce((sum, entry) => sum + entry.food.fats, 0),
+        };
         return acc;
-    }, {} as Record<MealType, number>);
+    }, {} as Record<MealType, { calories: number; protein: number; carbs: number; fats: number }>);
 
     // Use daily log values from database (same as dashboard's baseConsumed)
     // This matches the dashboard MacrosCard consumed values (without testValues)
-    const totals = dailyLog || { calories: 0, protein: 0, carbs: 0, fats: 0 };
+    // Use exact same logic as HomeScreen: baseConsumed = dailyLog || { calories: 0, protein: 0, carbs: 0, fats: 0 }
+    const baseConsumed = dailyLog || { calories: 0, protein: 0, carbs: 0, fats: 0 };
+    
+    // TEST VALUES - Remove this for production
+    const totals = {
+        protein: 156,
+        carbs: 234,
+        fats: 87,
+        calories: 2434,
+    };
+    // const totals = baseConsumed; // Uncomment this for production
 
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top }]}>
-            {/* Top Gradient Background - Fixed Position */}
-            <View style={styles.gradientContainer}>
-                <Image
-                    source={require('../../assets/images/top_gradient.png')}
-                    style={[styles.gradientImage, { height: 300 + insets.top }]}
-                    resizeMode="cover"
-                />
-            </View>
-
-            {/* Header Section with Macros - At the top */}
-            <FoodLogHeaderSection
-                protein={totals.protein}
-                carbs={totals.carbs}
-                fats={totals.fats}
-                calories={totals.calories}
-                topInset={insets.top}
-                onProfilePress={() => {
-                    // TODO: Navigate to profile screen
-                    Alert.alert('Profile', 'Profile screen coming soon');
-                }}
-            />
-
-            {/* Macro Status Compact - Fixed at top */}
-            {/* <View style={styles.macroStatusWrapper}>
-                <MacroStatusCompact
-                    ref={macroStatusRef}
-                    calories={totals.calories}
-                    protein={totals.protein}
-                    carbs={totals.carbs}
-                    fats={totals.fats}
-                    targetCalories={targetMacros?.calories}
-                    targetProtein={targetMacros?.protein}
-                    targetCarbs={targetMacros?.carbs}
-                    targetFats={targetMacros?.fats}
-                />
-            </View> */}
-
-            {/* Content */}
+        <View style={styles.container}>
             <ScrollView
                 ref={scrollViewRef}
                 style={styles.scrollView}
-                contentContainerStyle={[styles.scrollContent, { paddingTop: 120, paddingBottom: insets.bottom + 80 }]}
+                contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
                 showsVerticalScrollIndicator={false}
                 onScrollBeginDrag={() => {
                     // Collapse macro status on scroll
@@ -370,7 +346,33 @@ export const FoodLogScreen: React.FC = () => {
                     setExpandedId(null);
                 }}
                 scrollEventThrottle={16}
+                nestedScrollEnabled={true}
+                keyboardShouldPersistTaps="handled"
+                removeClippedSubviews={false}
+                scrollEnabled={true}
             >
+                {/* Gradient Background - Scrolls with content, extends into status bar */}
+                <View style={[styles.gradientContainer, { height: 300 + insets.top }]}>
+                    <Image
+                        source={require('../../assets/images/top_gradient.png')}
+                        style={styles.gradientImage}
+                        resizeMode="cover"
+                    />
+                </View>
+
+                {/* Header Section with Macros - Scrolls with content, positioned over gradient */}
+                <FoodLogHeaderSection
+                    key={`${totals.protein}-${totals.carbs}-${totals.fats}-${totals.calories}`}
+                    protein={totals.protein}
+                    carbs={totals.carbs}
+                    fats={totals.fats}
+                    calories={totals.calories}
+                    topInset={insets.top}
+                    onProfilePress={() => {
+                        // TODO: Navigate to profile screen
+                        Alert.alert('Profile', 'Profile screen coming soon');
+                    }}
+                />
                 {loggedFoods.length === 0 ? (
                     <TouchableOpacity
                         activeOpacity={1}
@@ -433,45 +435,92 @@ export const FoodLogScreen: React.FC = () => {
                                     ]}
                                 >
                                     {/* Meal Card Header */}
-                                    <TouchableOpacity
-                                        style={styles.mealCardHeader}
-                                        onPress={() => handleAddFoodToMeal(meal)}
-                                        activeOpacity={0.7}
-                                    >
+                                    <View style={styles.mealCardHeader}>
                                         <View style={styles.mealCardHeaderLeft}>
-                                            <View style={[styles.mealIconContainer, { backgroundColor: `${mealInfo.color}20` }]}>
-                                                <Ionicons name={mealInfo.icon as any} size={18} color={mealInfo.color} />
-                                            </View>
                                             <Text style={styles.mealCardLabel}>{mealInfo.label}</Text>
-                                            {mealTotal > 0 && (
-                                                <Text style={styles.mealCardTotalInline}>{mealTotal} kcal</Text>
+                                            {mealTotal.calories > 0 && (
+                                                <View style={styles.mealCardMacros}>
+                                                    <Text style={styles.mealCardMacroText}>Carbs {mealTotal.carbs.toFixed(1)}g</Text>
+                                                    <Text style={styles.mealCardMacroText}>Fat {mealTotal.fats.toFixed(1)}g</Text>
+                                                    <Text style={styles.mealCardMacroText}>Protein {mealTotal.protein.toFixed(1)}g</Text>
+                                                </View>
                                             )}
                                         </View>
-                                        <View style={[styles.addMealButton, mealFoods.length === 0 && styles.addMealButtonEmpty]}>
-                                            <Ionicons name="add" size={18} color={mealFoods.length === 0 ? "#252525" : "#fff"} />
-                                        </View>
-                                    </TouchableOpacity>
+                                        {mealTotal.calories > 0 && (
+                                            <Text style={styles.mealCardCalories}>{Math.round(mealTotal.calories)}</Text>
+                                        )}
+                                    </View>
+                                    
+                                    {/* Separator line under header */}
+                                    <View style={styles.mealCardSeparator} />
 
-                                    {/* Food Items */}
-                                    {mealFoods.length > 0 && (
+                                    {/* Food Items or Empty State */}
+                                    {mealFoods.length > 0 ? (
                                         <View style={styles.mealFoodsContainer}>
-                                            {mealFoods.map((entry, index) => {
-                                                const isExpanded = expandedId === entry.id;
-                                                const timeStr = formatTime(entry.loggedAt);
+                                            {(() => {
+                                                // Group foods by time
+                                                const foodsByTime = mealFoods.reduce((acc, entry) => {
+                                                    const timeKey = formatTime(entry.loggedAt);
+                                                    if (!acc[timeKey]) {
+                                                        acc[timeKey] = [];
+                                                    }
+                                                    acc[timeKey].push(entry);
+                                                    return acc;
+                                                }, {} as Record<string, LoggedFoodEntry[]>);
 
-                                                return (
-                                                    <FoodEntryCard
-                                                        key={entry.id}
-                                                        entry={entry}
-                                                        time={timeStr}
-                                                        timeAgo={getTimeAgo(entry.loggedAt)}
-                                                        isExpanded={isExpanded}
-                                                        onToggleExpand={() => setExpandedId(isExpanded ? null : entry.id)}
-                                                        onDelete={() => handleRemoveFood(entry.id)}
-                                                        index={index}
-                                                    />
-                                                );
-                                            })}
+                                                return Object.entries(foodsByTime).map(([timeKey, timeFoods]) => (
+                                                    <View key={timeKey} style={styles.timeGroup}>
+                                                        <Text style={styles.timeGroupLabel}>{timeKey}</Text>
+                                                        {timeFoods.map((entry, index) => {
+                                                            const isExpanded = expandedId === entry.id;
+                                                            const timeStr = formatTime(entry.loggedAt);
+
+                                                            return (
+                                                                <View
+                                                                    key={entry.id}
+                                                                    style={[
+                                                                        styles.foodEntryWrapper,
+                                                                        index < timeFoods.length - 1 && styles.foodItemSpacing
+                                                                    ]}
+                                                                >
+                                                                    <FoodEntryCard
+                                                                        entry={entry}
+                                                                        time={timeStr}
+                                                                        timeAgo={getTimeAgo(entry.loggedAt)}
+                                                                        isExpanded={isExpanded}
+                                                                        onToggleExpand={() => setExpandedId(isExpanded ? null : entry.id)}
+                                                                        onDelete={() => handleRemoveFood(entry.id)}
+                                                                        index={index}
+                                                                    />
+                                                                </View>
+                                                            );
+                                                        })}
+                                                    </View>
+                                                ));
+                                            })()}
+                                            <TouchableOpacity
+                                                style={styles.addFoodButton}
+                                                onPress={() => handleAddFoodToMeal(meal)}
+                                                activeOpacity={0.7}
+                                            >
+                                                <Text style={styles.addFoodButtonText}>ADD FOOD</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    ) : (
+                                        <View style={styles.mealEmptyState}>
+                                            <Text style={styles.mealEmptyStateText}>
+                                                {meal === 'breakfast' && "start your day with something delicious"}
+                                                {meal === 'lunch' && "fuel up for the afternoon"}
+                                                {meal === 'dinner' && "what's on the menu tonight?"}
+                                                {meal === 'snack' && "time for a little treat"}
+                                            </Text>
+                                            <TouchableOpacity
+                                                style={styles.addFoodButton}
+                                                onPress={() => handleAddFoodToMeal(meal)}
+                                                activeOpacity={0.7}
+                                            >
+                                                <Text style={styles.addFoodButtonText}>ADD FOOD</Text>
+                                            </TouchableOpacity>
                                         </View>
                                     )}
                                 </Animated.View>
@@ -578,36 +627,52 @@ const FoodEntryCard: React.FC<FoodEntryCardProps> = ({
 
     const panResponder = useRef(
         PanResponder.create({
-            onStartShouldSetPanResponder: () => true,
+            onStartShouldSetPanResponder: () => false,
             onMoveShouldSetPanResponder: (_, gestureState) => {
-                return Math.abs(gestureState.dx) > 10;
+                // Only respond to horizontal swipes, not vertical scrolling
+                // Require horizontal movement to be greater than vertical movement
+                const { dx, dy } = gestureState;
+                return Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10;
             },
+            onPanResponderTerminationRequest: () => true,
             onPanResponderMove: (_, gestureState) => {
-                if (gestureState.dx < 0) {
-                    translateX.setValue(Math.max(gestureState.dx, -80));
-                } else {
-                    translateX.setValue(Math.min(gestureState.dx, 0));
+                // Only handle horizontal swipes
+                if (Math.abs(gestureState.dx) > Math.abs(gestureState.dy)) {
+                    if (gestureState.dx < 0) {
+                        translateX.setValue(Math.max(gestureState.dx, -80));
+                    } else {
+                        translateX.setValue(Math.min(gestureState.dx, 0));
+                    }
                 }
             },
             onPanResponderRelease: (_, gestureState) => {
-                if (gestureState.dx < -50) {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    Animated.parallel([
-                        Animated.timing(translateX, {
-                            toValue: -SCREEN_WIDTH,
-                            duration: 300,
-                            easing: Easing.out(Easing.cubic),
-                            useNativeDriver: true,
-                        }),
-                        Animated.timing(rowOpacity, {
+                // Only handle if it was a horizontal swipe
+                if (Math.abs(gestureState.dx) > Math.abs(gestureState.dy)) {
+                    if (gestureState.dx < -50) {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                        Animated.parallel([
+                            Animated.timing(translateX, {
+                                toValue: -SCREEN_WIDTH,
+                                duration: 300,
+                                easing: Easing.out(Easing.cubic),
+                                useNativeDriver: true,
+                            }),
+                            Animated.timing(rowOpacity, {
+                                toValue: 0,
+                                duration: 300,
+                                useNativeDriver: true,
+                            }),
+                        ]).start(() => {
+                            onDelete();
+                        });
+                    } else {
+                        Animated.spring(translateX, {
                             toValue: 0,
-                            duration: 300,
                             useNativeDriver: true,
-                        }),
-                    ]).start(() => {
-                        onDelete();
-                    });
+                        }).start();
+                    }
                 } else {
+                    // If it was a vertical gesture, reset position
                     Animated.spring(translateX, {
                         toValue: 0,
                         useNativeDriver: true,
@@ -644,23 +709,11 @@ const FoodEntryCard: React.FC<FoodEntryCardProps> = ({
                 <View style={styles.foodEntryMain}>
                     <View style={styles.foodEntryLeft}>
                         <Text style={styles.foodEntryName}>{entry.food.name}</Text>
-                        <View style={styles.foodEntryMeta}>
-                            <Text style={styles.foodEntryTime}>{time}</Text>
-                            <View style={styles.foodEntryDot} />
-                            <Text style={styles.foodEntryTimeAgo}>{timeAgo}</Text>
-                        </View>
+                        {entry.portion && (
+                            <Text style={styles.foodEntryPortion}>{entry.portion}</Text>
+                        )}
                     </View>
-                    <View style={styles.foodEntryRight}>
-                        <View style={styles.foodEntryCalories}>
-                            <Text style={styles.foodEntryCaloriesText}>{entry.food.calories}</Text>
-                            <Text style={styles.foodEntryCaloriesLabel}>kcal</Text>
-                        </View>
-                        <Image
-                            source={require('../../assets/images/icons/fire.png')}
-                            style={styles.foodEntryFireIcon}
-                            resizeMode="contain"
-                        />
-                    </View>
+                    <Text style={styles.foodEntryCalories}>{entry.food.calories}</Text>
                 </View>
 
                 {/* Expanded Macro Details */}
@@ -699,19 +752,22 @@ const FoodEntryCard: React.FC<FoodEntryCardProps> = ({
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        width: '100%',
+        height: '100%',
         backgroundColor: '#fff',
     },
     gradientContainer: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 0,
+        width: Dimensions.get('window').width,
+        marginLeft: -25,
+        marginRight: -25,
+        marginTop: 0,
         overflow: 'hidden',
+        alignSelf: 'stretch',
     },
     gradientImage: {
-        width: '100%',
+        width: Dimensions.get('window').width,
         height: '100%',
+        alignSelf: 'stretch',
     },
     macroStatusWrapper: {
         position: 'relative',
@@ -720,12 +776,13 @@ const styles = StyleSheet.create({
     },
     scrollView: {
         flex: 1,
-        position: 'relative',
-        zIndex: 1,
+        width: '100%',
+        height: '100%',
     },
     scrollContent: {
-        paddingTop: 10,
-        paddingHorizontal: 25,
+        flexGrow: 1,
+        paddingLeft: 25,
+        paddingRight: 25,
     },
     emptyStateTouchable: {
         flex: 1,
@@ -758,76 +815,114 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         borderWidth: 2.5,
         borderColor: '#252525',
-        marginBottom: 12,
+        marginBottom: 16,
         overflow: 'hidden',
     },
     mealCardHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 10,
-        paddingHorizontal: 12,
-        backgroundColor: '#F9F9F9',
+        alignItems: 'flex-start',
+        paddingTop: 16,
+        paddingBottom: 12,
+        paddingHorizontal: 20,
     },
     mealCardHeaderLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
         flex: 1,
-        gap: 10,
-    },
-    mealIconContainer: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        alignItems: 'center',
-        justifyContent: 'center',
     },
     mealCardLabel: {
-        fontSize: 16,
+        fontSize: 24,
         fontFamily: fonts.bold,
         color: '#252525',
         textTransform: 'lowercase',
+        marginBottom: 8,
     },
-    mealCardTotalInline: {
+    mealCardMacros: {
+        flexDirection: 'row',
+        gap: 12,
+        flexWrap: 'wrap',
+    },
+    mealCardMacroText: {
+        fontSize: 14,
+        fontFamily: fonts.regular,
+        color: '#252525',
+        textTransform: 'lowercase',
+    },
+    mealCardCalories: {
+        fontSize: 24,
+        fontFamily: fonts.bold,
+        color: '#252525',
+    },
+    mealCardSeparator: {
+        height: 2,
+        backgroundColor: '#E0E0E0',
+        marginHorizontal: -20,
+        marginTop: 0,
+        marginBottom: 0,
+    },
+    mealFoodsContainer: {
+        paddingHorizontal: 20,
+        paddingTop: 8,
+        paddingBottom: 16,
+        width: '100%',
+    },
+    timeGroup: {
+        marginBottom: 16,
+    },
+    timeGroupLabel: {
+        fontSize: 16,
+        fontFamily: fonts.regular,
+        color: '#4463F7',
+        marginBottom: 8,
+    },
+    foodEntryWrapper: {
+        width: '100%',
+    },
+    firstFoodItemSpacing: {
+        paddingTop: 5,
+    },
+    foodItemSpacing: {
+        marginBottom: 9,
+    },
+    mealEmptyState: {
+        padding: 28,
+        paddingHorizontal: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 100,
+    },
+    addFoodButton: {
+        marginTop: 16,
+        paddingVertical: 12,
+    },
+    addFoodButtonText: {
+        fontSize: 16,
+        fontFamily: fonts.bold,
+        color: '#4463F7',
+        textTransform: 'uppercase',
+    },
+    mealEmptyStateText: {
         fontSize: 14,
         fontFamily: fonts.regular,
         color: '#9E9E9E',
         textTransform: 'lowercase',
-        marginLeft: 8,
-    },
-    addMealButton: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        backgroundColor: '#252525',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    addMealButtonEmpty: {
-        backgroundColor: '#E0E0E0',
-    },
-    mealFoodsContainer: {
-        padding: 8,
-        gap: 6,
+        textAlign: 'center',
     },
     foodEntryCard: {
-        backgroundColor: '#fff',
-        borderRadius: 8,
-        borderWidth: 2,
-        borderColor: '#E0E0E0',
+        backgroundColor: 'transparent',
         overflow: 'hidden',
     },
     foodEntryContent: {
-        padding: 10,
+        paddingHorizontal: 0,
+        paddingVertical: 0,
     },
     foodEntryMain: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
+        alignItems: 'flex-start',
     },
     foodEntryLeft: {
         flex: 1,
-        marginRight: 10,
+        marginRight: 12,
     },
     foodEntryName: {
         fontSize: 16,
@@ -836,50 +931,38 @@ const styles = StyleSheet.create({
         textTransform: 'lowercase',
         marginBottom: 4,
     },
-    foodEntryMeta: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    },
-    foodEntryTime: {
-        fontSize: 12,
-        fontFamily: fonts.bold,
-        color: '#252525',
-    },
-    foodEntryDot: {
-        width: 3,
-        height: 3,
-        borderRadius: 1.5,
-        backgroundColor: '#9E9E9E',
-    },
-    foodEntryTimeAgo: {
-        fontSize: 12,
+    foodEntryPortion: {
+        fontSize: 14,
         fontFamily: fonts.regular,
-        color: '#9E9E9E',
+        color: '#252525',
         textTransform: 'lowercase',
     },
     foodEntryRight: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
     },
     foodEntryCalories: {
-        alignItems: 'flex-end',
-    },
-    foodEntryCaloriesText: {
         fontSize: 16,
-        fontFamily: fonts.bold,
+        fontFamily: fonts.regular,
         color: '#252525',
     },
-    foodEntryCaloriesLabel: {
-        fontSize: 10,
+    foodEntryFireIcon: {
+        width: 18,
+        height: 18,
+        marginRight: 8,
+    },
+    foodEntryVerticalSeparator: {
+        width: 1,
+        height: 16,
+        backgroundColor: '#E0E0E0',
+        marginRight: 8,
+    },
+    foodEntryTime: {
+        fontSize: 16,
         fontFamily: fonts.regular,
         color: '#9E9E9E',
-        textTransform: 'lowercase',
-    },
-    foodEntryFireIcon: {
-        width: 16,
-        height: 16,
+        minWidth: 30,
+        textAlign: 'right',
     },
     foodEntryExpanded: {
         overflow: 'hidden',

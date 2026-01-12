@@ -3,7 +3,6 @@ import {
     View,
     Text,
     StyleSheet,
-    Modal,
     TouchableOpacity,
     TextInput,
     Animated,
@@ -20,10 +19,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { fonts } from '../constants/fonts';
 import * as Haptics from 'expo-haptics';
 import { searchFoods } from '../services/foodService';
+import { FoodDetailView } from './FoodDetailView';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
-const SHEET_HEIGHT = SCREEN_HEIGHT * 0.58; // 58% of screen height
-const SHEET_HEIGHT_EXPANDED = SCREEN_HEIGHT * 0.75; // 75% when searching
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const SHEET_HEIGHT = SCREEN_HEIGHT * 0.75; // 75% of screen height (3/4)
+const SHEET_HEIGHT_EXPANDED = SCREEN_HEIGHT * 0.85; // 85% when searching
+const DETAIL_DROPDOWN_WIDTH = SCREEN_WIDTH - 40; // Screen width minus padding (20 on each side)
 const TOASTER_OFFSET = 50; // Extra offset to start from below (like toast in toaster)
 const TOP_SECTION_HEIGHT = 180; // Height of handle bar + search + buttons area
 
@@ -61,11 +63,12 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
     const [showUndoToast, setShowUndoToast] = useState(false);
     const [lastAddedFood, setLastAddedFood] = useState<FoodItem | null>(null);
     const [undoTimeout, setUndoTimeout] = useState<NodeJS.Timeout | null>(null);
+    const [selectedFoodDetail, setSelectedFoodDetail] = useState<FoodItem | null>(null);
     // Function to determine meal based on time of day
     const getMealByTime = (): 'breakfast' | 'lunch' | 'dinner' | null => {
         const now = new Date();
         const hour = now.getHours();
-        
+
         // Breakfast: 6 AM - 11 AM
         if (hour >= 6 && hour < 11) {
             return 'breakfast';
@@ -83,13 +86,13 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
     };
 
     const [selectedMeal, setSelectedMeal] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack' | null>(initialMeal || null);
-    
+
     // Update selected meal when sheet opens or initialMeal prop changes
     useEffect(() => {
         if (visible) {
             // Use initialMeal if provided, otherwise auto-select based on time
-            const mealToSelect = initialMeal !== undefined && initialMeal !== null 
-                ? initialMeal 
+            const mealToSelect = initialMeal !== undefined && initialMeal !== null
+                ? initialMeal
                 : getMealByTime();
             setSelectedMeal(mealToSelect);
             if (onMealChange && mealToSelect) {
@@ -108,13 +111,36 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
     const skeletonAnim = useRef(new Animated.Value(0)).current;
     const calIconRotate = useRef(new Animated.Value(0)).current;
     const calIconBounce = useRef(new Animated.Value(0)).current;
+    const detailAddButtonTranslateY = useRef(new Animated.Value(0)).current;
+    const detailAddButtonShadowHeight = useRef(new Animated.Value(4)).current;
+
+    // Detail overlay state
+    const [detailServingSize, setDetailServingSize] = useState('');
+    const [detailNumberOfServings, setDetailNumberOfServings] = useState('');
+    const [detailMeal, setDetailMeal] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack' | null>(null);
+    const [showUnitSelector, setShowUnitSelector] = useState(false);
+
+    // Unit options
+    const unitOptions = [
+        '1 piece',
+        '1 cup',
+        '1 g',
+        '1 oz',
+        '1 lb',
+        '1 fl oz',
+        '1 mg',
+        '1 tsp(s)',
+        '1 tbsp(s)',
+        '1 kg(s)',
+        '1 ltr(s)',
+    ];
 
     // Button press animations
     const scanButtonTranslateY = useRef(new Animated.Value(0)).current;
     const scanButtonShadowHeight = useRef(new Animated.Value(4)).current;
     const photoButtonTranslateY = useRef(new Animated.Value(0)).current;
     const photoButtonShadowHeight = useRef(new Animated.Value(4)).current;
-    
+
 
     // Pan responder for swipe down gesture - only on top section
     const topSectionPanResponder = useRef(
@@ -153,7 +179,11 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
             // Reset height to default
             sheetHeightAnim.setValue(SHEET_HEIGHT);
 
-            // Toast pop-up animation - matches closing animation
+            // Reset all animations to initial state
+            slideAnim.setValue(SCREEN_HEIGHT + TOASTER_OFFSET);
+            backdropOpacity.setValue(0);
+
+            // Toast pop-up animation
             Animated.parallel([
                 Animated.timing(slideAnim, {
                     toValue: 0,
@@ -170,95 +200,84 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
             ]).start();
 
             // AI suggestion animation - appears after sheet opens
-            setTimeout(() => {
-                Animated.parallel([
-                    Animated.timing(aiSuggestionOpacity, {
-                        toValue: 1,
-                        duration: 400,
-                        easing: Easing.out(Easing.ease),
-                        useNativeDriver: true,
-                    }),
-                    Animated.timing(aiSuggestionTranslateY, {
-                        toValue: 0,
-                        duration: 400,
-                        easing: Easing.out(Easing.ease),
-                        useNativeDriver: true,
-                    }),
-                ]).start();
+            // Commented out for now
+            // setTimeout(() => {
+            //     Animated.parallel([
+            //         Animated.timing(aiSuggestionOpacity, {
+            //             toValue: 1,
+            //             duration: 400,
+            //             easing: Easing.out(Easing.ease),
+            //             useNativeDriver: true,
+            //         }),
+            //         Animated.timing(aiSuggestionTranslateY, {
+            //             toValue: 0,
+            //             duration: 400,
+            //             easing: Easing.out(Easing.ease),
+            //             useNativeDriver: true,
+            //         }),
+            //     ]).start();
 
-                // Start skeleton loading animation
-                Animated.loop(
-                    Animated.sequence([
-                        Animated.timing(skeletonAnim, {
-                            toValue: 1,
-                            duration: 1000,
-                            easing: Easing.inOut(Easing.ease),
-                            useNativeDriver: true,
-                        }),
-                        Animated.timing(skeletonAnim, {
-                            toValue: 0,
-                            duration: 1000,
-                            easing: Easing.inOut(Easing.ease),
-                            useNativeDriver: true,
-                        }),
-                    ])
-                ).start();
+            //     // Start skeleton loading animation
+            //     Animated.loop(
+            //         Animated.sequence([
+            //             Animated.timing(skeletonAnim, {
+            //                 toValue: 1,
+            //                 duration: 1000,
+            //                 easing: Easing.inOut(Easing.ease),
+            //                 useNativeDriver: true,
+            //             }),
+            //             Animated.timing(skeletonAnim, {
+            //                 toValue: 0,
+            //                 duration: 1000,
+            //                 easing: Easing.inOut(Easing.ease),
+            //                 useNativeDriver: true,
+            //             }),
+            //         ])
+            //     ).start();
 
-                // Start cal icon subtle animation - gentle rotation and bounce
-                Animated.loop(
-                    Animated.parallel([
-                        Animated.sequence([
-                            Animated.timing(calIconRotate, {
-                                toValue: 1,
-                                duration: 2000,
-                                easing: Easing.inOut(Easing.ease),
-                                useNativeDriver: true,
-                            }),
-                            Animated.timing(calIconRotate, {
-                                toValue: 0,
-                                duration: 2000,
-                                easing: Easing.inOut(Easing.ease),
-                                useNativeDriver: true,
-                            }),
-                        ]),
-                        Animated.sequence([
-                            Animated.timing(calIconBounce, {
-                                toValue: 1,
-                                duration: 1200,
-                                easing: Easing.inOut(Easing.ease),
-                                useNativeDriver: true,
-                            }),
-                            Animated.timing(calIconBounce, {
-                                toValue: 0,
-                                duration: 1200,
-                                easing: Easing.inOut(Easing.ease),
-                                useNativeDriver: true,
-                            }),
-                        ]),
-                    ])
-                ).start();
-            }, 300);
+            //     // Start cal icon subtle animation - gentle rotation and bounce
+            //     Animated.loop(
+            //         Animated.parallel([
+            //             Animated.sequence([
+            //                 Animated.timing(calIconRotate, {
+            //                     toValue: 1,
+            //                     duration: 2000,
+            //                     easing: Easing.inOut(Easing.ease),
+            //                     useNativeDriver: true,
+            //                 }),
+            //                 Animated.timing(calIconRotate, {
+            //                     toValue: 0,
+            //                     duration: 2000,
+            //                     easing: Easing.inOut(Easing.ease),
+            //                     useNativeDriver: true,
+            //                 }),
+            //             ]),
+            //             Animated.sequence([
+            //                 Animated.timing(calIconBounce, {
+            //                     toValue: 1,
+            //                     duration: 1200,
+            //                     easing: Easing.inOut(Easing.ease),
+            //                     useNativeDriver: true,
+            //                 }),
+            //                 Animated.timing(calIconBounce, {
+            //                     toValue: 0,
+            //                     duration: 1200,
+            //                     easing: Easing.inOut(Easing.ease),
+            //                     useNativeDriver: true,
+            //                 }),
+            //             ]),
+            //         ])
+            //     ).start();
+            // }, 300);
         } else {
-            // Close animation - smooth slide out
-            Animated.parallel([
-                Animated.timing(slideAnim, {
-                    toValue: SCREEN_HEIGHT + TOASTER_OFFSET,
-                    duration: 300,
-                    easing: Easing.out(Easing.cubic), // Smooth slide out
-                    useNativeDriver: true,
-                }),
-                Animated.timing(backdropOpacity, {
-                    toValue: 0,
-                    duration: 250,
-                    easing: Easing.out(Easing.ease),
-                    useNativeDriver: true,
-                }),
-            ]).start();
-            // Reset state
+            // When closing, immediately reset state and dismiss keyboard
+            // Don't animate - just close immediately to prevent touch blocking
             setSearchQuery('');
             setSearchResults([]);
-            setAddedItems(new Set()); // Reset added items when closing
-            setSelectedMeal(null); // Reset selected meal
+            setAddedItems(new Set());
+            setSelectedMeal(null);
+            setSelectedFoodDetail(null);
+            setShowUnitSelector(false);
             sheetHeightAnim.setValue(SHEET_HEIGHT);
             keyboardHeightAnim.setValue(0);
             aiSuggestionOpacity.setValue(0);
@@ -266,6 +285,8 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
             skeletonAnim.setValue(0);
             calIconRotate.setValue(0);
             calIconBounce.setValue(0);
+            detailAddButtonTranslateY.setValue(0);
+            detailAddButtonShadowHeight.setValue(4);
             Keyboard.dismiss();
         }
     }, [visible]);
@@ -325,44 +346,27 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
     const handleClose = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-        // Animate close before calling onClose
-        Animated.parallel([
-            Animated.timing(slideAnim, {
-                toValue: SCREEN_HEIGHT + TOASTER_OFFSET,
-                duration: 300,
-                easing: Easing.out(Easing.cubic),
-                useNativeDriver: true,
-            }),
-            Animated.timing(backdropOpacity, {
-                toValue: 0,
-                duration: 250,
-                easing: Easing.out(Easing.ease),
-                useNativeDriver: true,
-            }),
-            Animated.timing(aiSuggestionOpacity, {
-                toValue: 0,
-                duration: 300,
-                easing: Easing.out(Easing.cubic),
-                useNativeDriver: true,
-            }),
-            Animated.timing(aiSuggestionTranslateY, {
-                toValue: 20,
-                duration: 300,
-                easing: Easing.out(Easing.cubic),
-                useNativeDriver: true,
-            }),
-        ]).start(() => {
-            // Reset state after animation completes
-            setSearchQuery('');
-            setSearchResults([]);
-            setAddedItems(new Set());
-            setSelectedMeal(null); // Reset selected meal
-            sheetHeightAnim.setValue(SHEET_HEIGHT);
-            keyboardHeightAnim.setValue(0);
-            Keyboard.dismiss();
-            // Call onClose after animation
-            onClose();
-        });
+        // CRITICAL: Call onClose FIRST to immediately set visible=false
+        // This removes Modal from render tree before any animations
+        onClose();
+
+        // Reset all state immediately
+        setSearchQuery('');
+        setSearchResults([]);
+        setAddedItems(new Set());
+        setSelectedMeal(null);
+        setSelectedFoodDetail(null);
+        setShowUnitSelector(false);
+        sheetHeightAnim.setValue(SHEET_HEIGHT);
+        keyboardHeightAnim.setValue(0);
+        aiSuggestionOpacity.setValue(0);
+        aiSuggestionTranslateY.setValue(20);
+        skeletonAnim.setValue(0);
+        calIconRotate.setValue(0);
+        calIconBounce.setValue(0);
+        detailAddButtonTranslateY.setValue(0);
+        detailAddButtonShadowHeight.setValue(4);
+        Keyboard.dismiss();
     };
 
     const handleAddFood = (food: FoodItem) => {
@@ -381,6 +385,15 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
         // Haptic feedback
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
+        // CRITICAL: Close modal FIRST, then add food
+        // This ensures Modal is removed from render tree before any state updates
+        // Use setTimeout to ensure close happens in next tick
+        setTimeout(() => {
+            if (onClose) {
+                onClose();
+            }
+        }, 0);
+
         // Call parent handler
         onAddFood(food);
 
@@ -395,7 +408,22 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
         }, 3000);
         setUndoTimeout(timeout);
     };
-    
+
+    const handleOpenFoodDetail = (food: FoodItem) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setSelectedFoodDetail(food);
+        setDetailServingSize('');
+        setDetailNumberOfServings('');
+        setDetailMeal(selectedMeal);
+    };
+
+    const handleCloseFoodDetail = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setShowUnitSelector(false);
+        setSelectedFoodDetail(null);
+    };
+
+
     // Meal button press handlers
     const handleMealPress = (meal: 'breakfast' | 'lunch' | 'dinner' | 'snack') => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -522,14 +550,18 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
     // Show all quick add items (users can add multiple)
     const availableQuickAdd = quickAddItems;
 
+    // CRITICAL: Don't render Modal at all when not visible
+    // React Native Modal has a bug where it can block touches even after visible={false}
+    // The only reliable fix is to completely remove it from the render tree
+    if (!visible) {
+        return null;
+    }
+
+    // Use View overlay instead of Modal to completely avoid touch blocking
+    // Modal has a known bug where it blocks touches even after unmounting
     return (
-        <Modal
-            visible={visible}
-            transparent
-            animationType="none"
-            onRequestClose={handleClose}
-        >
-            <View style={styles.container}>
+        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+            <View style={styles.container} pointerEvents="auto">
                 {/* Backdrop */}
                 <Animated.View
                     style={[
@@ -538,6 +570,7 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
                             opacity: backdropOpacity,
                         },
                     ]}
+                    pointerEvents="auto"
                 >
                     <TouchableOpacity
                         style={StyleSheet.absoluteFill}
@@ -547,7 +580,8 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
                 </Animated.View>
 
                 {/* AI Suggestion - Above the bottom sheet */}
-                <Animated.View
+                {/* Commented out for now */}
+                {/* <Animated.View
                     style={[
                         styles.aiSuggestionContainer,
                         {
@@ -555,6 +589,7 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
                             transform: [{ translateY: aiSuggestionTranslateY }],
                         },
                     ]}
+                    pointerEvents="box-none"
                 >
                     <View style={styles.aiSuggestion}>
                         <View style={styles.aiSuggestionSkeleton}>
@@ -608,7 +643,7 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
                             </Animated.View>
                         </View>
                     </View>
-                </Animated.View>
+                </Animated.View> */}
 
                 {/* Bottom Sheet */}
                 <Animated.View
@@ -622,6 +657,7 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
                             ],
                         },
                     ]}
+                    pointerEvents="auto"
                 >
                     {/* Inner animated container for height */}
                     <Animated.View
@@ -632,158 +668,241 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
                             },
                         ]}
                     >
-                        {/* Top Section - Swipeable area */}
-                        <View {...topSectionPanResponder.panHandlers} style={styles.topSection}>
-                            {/* Handle bar */}
-                            <View style={styles.handleBar} />
+                        {selectedFoodDetail ? (
+                            /* Detail View Content */
+                            <FoodDetailView
+                                food={selectedFoodDetail}
+                                onClose={handleCloseFoodDetail}
+                                onAddFood={(food) => {
+                                    handleCloseFoodDetail();
+                                    setTimeout(() => handleAddFood(food), 100);
+                                }}
+                                initialMeal={selectedMeal}
+                                unitOptions={unitOptions}
+                                onShowUnitSelector={() => setShowUnitSelector(true)}
+                                selectedServingSize={detailServingSize}
+                                onServingSizeChange={setDetailServingSize}
+                                numberOfServings={detailNumberOfServings}
+                                onNumberOfServingsChange={setDetailNumberOfServings}
+                                selectedMeal={detailMeal}
+                                onMealChange={setDetailMeal}
+                            />
+                        ) : (
+                            /* Normal View Content */
+                            <>
+                                {/* Top Section - Swipeable area */}
+                                <View
+                                    {...topSectionPanResponder.panHandlers}
+                                    style={styles.topSection}
+                                    pointerEvents="auto"
+                                >
+                                    {/* Handle bar */}
+                                    <View style={styles.handleBar} />
 
-                            {/* Search Bar */}
-                            <View style={styles.searchContainer}>
-                                <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
-                                <TextInput
-                                    ref={searchInputRef}
-                                    style={styles.searchInput}
-                                    placeholder="What's on your plate?"
-                                    placeholderTextColor="#999"
-                                    value={searchQuery}
-                                    onChangeText={handleSearch}
-                                    returnKeyType="search"
-                                    autoCorrect={false}
-                                    autoComplete="off"
-                                    spellCheck={false}
-                                    keyboardAppearance="light"
-                                />
-                            </View>
-
-                            {/* Secondary Buttons */}
-                            <View style={styles.secondaryButtonsContainer}>
-                                <View style={styles.secondaryButtonWrapper}>
-                                    {/* Shadow layer */}
-                                    <Animated.View
-                                        style={[
-                                            styles.secondaryButtonShadow,
-                                            {
-                                                opacity: scanButtonShadowHeight.interpolate({
-                                                    inputRange: [0, 4],
-                                                    outputRange: [0, 1],
-                                                }),
-                                            },
-                                        ]}
-                                    />
-                                    <Animated.View
-                                        style={[
-                                            {
-                                                transform: [{ translateY: scanButtonTranslateY }],
-                                            },
-                                        ]}
-                                    >
-                                        <TouchableOpacity
-                                            style={styles.secondaryButton}
-                                            onPress={handleScanBarcode}
-                                            onPressIn={handleScanBarcodePressIn}
-                                            onPressOut={handleScanBarcodePressOut}
-                                            activeOpacity={1}
-                                        >
-                                            <Ionicons name="barcode-outline" size={20} color="#252525" style={{ marginRight: 8 }} />
-                                            <Text style={styles.secondaryButtonText}>scan barcode</Text>
-                                        </TouchableOpacity>
-                                    </Animated.View>
-                                </View>
-                                <View style={styles.secondaryButtonWrapper}>
-                                    {/* Shadow layer */}
-                                    <Animated.View
-                                        style={[
-                                            styles.secondaryButtonShadow,
-                                            {
-                                                opacity: photoButtonShadowHeight.interpolate({
-                                                    inputRange: [0, 4],
-                                                    outputRange: [0, 1],
-                                                }),
-                                            },
-                                        ]}
-                                    />
-                                    <Animated.View
-                                        style={[
-                                            {
-                                                transform: [{ translateY: photoButtonTranslateY }],
-                                            },
-                                        ]}
-                                    >
-                                        <TouchableOpacity
-                                            style={styles.secondaryButton}
-                                            onPress={handleTakePhoto}
-                                            onPressIn={handleTakePhotoPressIn}
-                                            onPressOut={handleTakePhotoPressOut}
-                                            activeOpacity={1}
-                                        >
-                                            <Ionicons name="camera-outline" size={20} color="#252525" style={{ marginRight: 8 }} />
-                                            <Text style={styles.secondaryButtonText}>take photo</Text>
-                                        </TouchableOpacity>
-                                    </Animated.View>
-                                </View>
-                            </View>
-
-                            {/* Meal Selection Pills */}
-                            <View style={styles.mealButtonsContainer}>
-                                {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map((meal) => {
-                                    const isSelected = selectedMeal === meal;
-                                    const isBreakfast = meal === 'breakfast';
-
-                                    return (
-                                        <TouchableOpacity
-                                            key={meal}
-                                            style={[
-                                                styles.mealButton,
-                                                isBreakfast && styles.mealButtonBreakfast,
-                                                isSelected && styles.mealButtonSelected,
-                                            ]}
-                                            onPress={() => handleMealPress(meal)}
-                                            activeOpacity={0.7}
-                                        >
-                                            <Text style={[
-                                                styles.mealButtonText,
-                                                isSelected && styles.mealButtonTextSelected,
-                                            ]}>
-                                                {meal}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    );
-                                })}
-                            </View>
-                        </View>
-
-                        {/* Quick Add List */}
-                        <ScrollView
-                            style={styles.quickAddContainer}
-                            contentContainerStyle={styles.quickAddContent}
-                            showsVerticalScrollIndicator={false}
-                        >
-                            {(searchQuery.trim() === ''
-                                ? availableQuickAdd
-                                : searchResults
-                            )
-                                .slice(0, 8) // Show up to 8 items
-                                .map((item) => (
-                                    <QuickAddItem
-                                        key={item.id}
-                                        item={item}
-                                        onAdd={() => handleAddFood(item)}
-                                        isAdded={addedItems.has(item.id)}
-                                    />
-                                ))}
-                            {searchQuery.trim() !== '' &&
-                                searchResults.length === 0 && (
-                                    <View style={styles.noResultsContainer}>
-                                        <Text style={styles.noResultsText}>no results found</Text>
+                                    {/* Search Bar */}
+                                    <View style={styles.searchContainer}>
+                                        <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+                                        <TextInput
+                                            ref={searchInputRef}
+                                            style={styles.searchInput}
+                                            placeholder="What's on your plate?"
+                                            placeholderTextColor="#999"
+                                            value={searchQuery}
+                                            onChangeText={handleSearch}
+                                            returnKeyType="search"
+                                            autoCorrect={false}
+                                            autoComplete="off"
+                                            spellCheck={false}
+                                            keyboardAppearance="light"
+                                        />
                                     </View>
-                                )}
-                        </ScrollView>
+
+                                    {/* Secondary Buttons */}
+                                    <View style={styles.secondaryButtonsContainer}>
+                                        <View style={styles.secondaryButtonWrapper}>
+                                            {/* Shadow layer */}
+                                            <Animated.View
+                                                style={[
+                                                    styles.secondaryButtonShadow,
+                                                    {
+                                                        opacity: scanButtonShadowHeight.interpolate({
+                                                            inputRange: [0, 4],
+                                                            outputRange: [0, 1],
+                                                        }),
+                                                    },
+                                                ]}
+                                            />
+                                            <Animated.View
+                                                style={[
+                                                    {
+                                                        transform: [{ translateY: scanButtonTranslateY }],
+                                                    },
+                                                ]}
+                                            >
+                                                <TouchableOpacity
+                                                    style={styles.secondaryButton}
+                                                    onPress={handleScanBarcode}
+                                                    onPressIn={handleScanBarcodePressIn}
+                                                    onPressOut={handleScanBarcodePressOut}
+                                                    activeOpacity={1}
+                                                >
+                                                    <Ionicons name="barcode-outline" size={20} color="#252525" style={{ marginRight: 8 }} />
+                                                    <Text style={styles.secondaryButtonText}>scan barcode</Text>
+                                                </TouchableOpacity>
+                                            </Animated.View>
+                                        </View>
+                                        <View style={styles.secondaryButtonWrapper}>
+                                            {/* Shadow layer */}
+                                            <Animated.View
+                                                style={[
+                                                    styles.secondaryButtonShadow,
+                                                    {
+                                                        opacity: photoButtonShadowHeight.interpolate({
+                                                            inputRange: [0, 4],
+                                                            outputRange: [0, 1],
+                                                        }),
+                                                    },
+                                                ]}
+                                            />
+                                            <Animated.View
+                                                style={[
+                                                    {
+                                                        transform: [{ translateY: photoButtonTranslateY }],
+                                                    },
+                                                ]}
+                                            >
+                                                <TouchableOpacity
+                                                    style={styles.secondaryButton}
+                                                    onPress={handleTakePhoto}
+                                                    onPressIn={handleTakePhotoPressIn}
+                                                    onPressOut={handleTakePhotoPressOut}
+                                                    activeOpacity={1}
+                                                >
+                                                    <Ionicons name="camera-outline" size={20} color="#252525" style={{ marginRight: 8 }} />
+                                                    <Text style={styles.secondaryButtonText}>take photo</Text>
+                                                </TouchableOpacity>
+                                            </Animated.View>
+                                        </View>
+                                    </View>
+
+                                    {/* Meal Selection Pills */}
+                                    <View style={styles.mealButtonsContainer}>
+                                        {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map((meal) => {
+                                            const isSelected = selectedMeal === meal;
+                                            const isBreakfast = meal === 'breakfast';
+
+                                            return (
+                                                <TouchableOpacity
+                                                    key={meal}
+                                                    style={[
+                                                        styles.mealButton,
+                                                        isBreakfast && styles.mealButtonBreakfast,
+                                                        isSelected && styles.mealButtonSelected,
+                                                    ]}
+                                                    onPress={() => handleMealPress(meal)}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <Text style={[
+                                                        styles.mealButtonText,
+                                                        isSelected && styles.mealButtonTextSelected,
+                                                    ]}>
+                                                        {meal}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </View>
+                                </View>
+
+                                {/* Quick Add List */}
+                                <ScrollView
+                                    style={styles.quickAddContainer}
+                                    contentContainerStyle={styles.quickAddContent}
+                                    showsVerticalScrollIndicator={false}
+                                >
+                                    {(searchQuery.trim() === ''
+                                        ? availableQuickAdd
+                                        : searchResults
+                                    )
+                                        .slice(0, 8) // Show up to 8 items
+                                        .map((item) => (
+                                            <QuickAddItem
+                                                key={item.id}
+                                                item={item}
+                                                onAdd={() => handleAddFood(item)}
+                                                onPress={() => handleOpenFoodDetail(item)}
+                                                isAdded={addedItems.has(item.id)}
+                                            />
+                                        ))}
+                                    {searchQuery.trim() !== '' &&
+                                        searchResults.length === 0 && (
+                                            <View style={styles.noResultsContainer}>
+                                                <Text style={styles.noResultsText}>no results found</Text>
+                                            </View>
+                                        )}
+                                </ScrollView>
+                            </>
+                        )}
                     </Animated.View>
                 </Animated.View>
 
+                {/* Unit Selector Modal */}
+                {showUnitSelector && (
+                    <View style={styles.unitSelectorOverlay} pointerEvents="auto">
+                        <View style={styles.unitSelectorContainer}>
+                            {/* Header */}
+                            <View style={styles.unitSelectorHeader}>
+                                <Text style={styles.unitSelectorTitle}>Select Unit</Text>
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                        setShowUnitSelector(false);
+                                    }}
+                                    style={styles.unitSelectorCloseButton}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name="close" size={24} color="#252525" />
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Unit List */}
+                            <ScrollView
+                                style={styles.unitSelectorList}
+                                showsVerticalScrollIndicator={true}
+                            >
+                                {unitOptions.map((unit) => (
+                                    <TouchableOpacity
+                                        key={unit}
+                                        style={[
+                                            styles.unitSelectorItem,
+                                            detailServingSize === unit && styles.unitSelectorItemSelected,
+                                        ]}
+                                        onPress={() => {
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                            setDetailServingSize(unit);
+                                            setShowUnitSelector(false);
+                                        }}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Text style={[
+                                            styles.unitSelectorItemText,
+                                            detailServingSize === unit && styles.unitSelectorItemTextSelected,
+                                        ]}>
+                                            {unit}
+                                        </Text>
+                                        {detailServingSize === unit && (
+                                            <Ionicons name="checkmark-circle" size={24} color="#4463F7" />
+                                        )}
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        </View>
+                    </View>
+                )}
+
                 {/* Undo Toast */}
                 {showUndoToast && lastAddedFood && (
-                    <View style={styles.undoToastContainer}>
+                    <View style={styles.undoToastContainer} pointerEvents="box-none">
                         <Animated.View style={styles.undoToast}>
                             <Text style={styles.undoToastText}>
                                 {lastAddedFood.name} added
@@ -795,17 +914,18 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
                     </View>
                 )}
             </View>
-        </Modal>
+        </View>
     );
 };
 
 interface QuickAddItemProps {
     item: FoodItem;
     onAdd: () => void;
+    onPress: () => void;
     isAdded: boolean;
 }
 
-const QuickAddItem: React.FC<QuickAddItemProps> = ({ item, onAdd, isAdded }) => {
+const QuickAddItem: React.FC<QuickAddItemProps> = ({ item, onAdd, onPress, isAdded }) => {
     const fadeAnim = useRef(new Animated.Value(1)).current;
     const scaleAnim = useRef(new Animated.Value(1)).current;
     const iconColorAnim = useRef(new Animated.Value(0)).current; // 0 = not added, 1 = added
@@ -871,8 +991,15 @@ const QuickAddItem: React.FC<QuickAddItemProps> = ({ item, onAdd, isAdded }) => 
                 },
             ]}
         >
-            <View style={styles.quickAddItemContent}>
-                <Text style={styles.quickAddItemName}>{item.name}</Text>
+            <TouchableOpacity
+                style={styles.quickAddItemContent}
+                onPress={onPress}
+                activeOpacity={0.7}
+            >
+                <View style={styles.quickAddItemTextContainer}>
+                    <Text style={styles.quickAddItemName}>{item.name}</Text>
+                    <Text style={styles.quickAddItemServing}>1 serving</Text>
+                </View>
                 <View style={styles.caloriesContainer}>
                     <Text style={styles.quickAddItemCalories}>{item.calories} kcal</Text>
                     <Image
@@ -881,7 +1008,7 @@ const QuickAddItem: React.FC<QuickAddItemProps> = ({ item, onAdd, isAdded }) => 
                         resizeMode="contain"
                     />
                 </View>
-            </View>
+            </TouchableOpacity>
             <TouchableOpacity
                 style={styles.addButton}
                 onPress={handleAdd}
@@ -924,6 +1051,12 @@ const QuickAddItem: React.FC<QuickAddItemProps> = ({ item, onAdd, isAdded }) => 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 1000,
     },
     backdrop: {
         ...StyleSheet.absoluteFillObject,
@@ -1032,12 +1165,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: '#fff',
-        borderRadius: 18,
+        borderRadius: 10,
         borderWidth: 2,
         borderColor: '#252525',
-        paddingVertical: 6,
+        paddingVertical: 10,
         paddingHorizontal: 12,
-        minHeight: 28,
+        minHeight: 38,
     },
     mealButtonBreakfast: {
         flex: 1.2,
@@ -1111,12 +1244,21 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
     },
+    quickAddItemTextContainer: {
+        flex: 1,
+    },
     quickAddItemName: {
         fontSize: 18,
         fontFamily: fonts.regular,
         color: '#252525',
         textTransform: 'lowercase',
-        flex: 1,
+    },
+    quickAddItemServing: {
+        fontSize: 14,
+        fontFamily: fonts.regular,
+        color: '#999',
+        textTransform: 'lowercase',
+        marginTop: 2,
     },
     caloriesContainer: {
         flexDirection: 'row',
@@ -1182,5 +1324,70 @@ const styles = StyleSheet.create({
         fontFamily: fonts.bold,
         color: '#526EFF',
         textTransform: 'lowercase',
+    },
+    unitSelectorOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.4)',
+        zIndex: 300,
+        justifyContent: 'flex-end',
+    },
+    unitSelectorContainer: {
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        borderWidth: 2,
+        borderColor: '#252525',
+        borderBottomWidth: 0,
+        maxHeight: SCREEN_HEIGHT * 0.6,
+    },
+    unitSelectorHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingTop: 20,
+        paddingBottom: 16,
+        borderBottomWidth: 2,
+        borderBottomColor: '#F0F0F0',
+    },
+    unitSelectorTitle: {
+        fontSize: 20,
+        fontFamily: fonts.bold,
+        color: '#252525',
+        textTransform: 'lowercase',
+    },
+    unitSelectorCloseButton: {
+        width: 32,
+        height: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    unitSelectorList: {
+        maxHeight: SCREEN_HEIGHT * 0.5,
+    },
+    unitSelectorItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderBottomWidth: 2,
+        borderBottomColor: '#F0F0F0',
+    },
+    unitSelectorItemSelected: {
+        backgroundColor: '#F5F5F5',
+    },
+    unitSelectorItemText: {
+        fontSize: 18,
+        fontFamily: fonts.regular,
+        color: '#252525',
+    },
+    unitSelectorItemTextSelected: {
+        fontFamily: fonts.bold,
+        color: '#4463F7',
     },
 });
