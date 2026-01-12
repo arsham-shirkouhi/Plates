@@ -55,12 +55,15 @@ export const FoodLogScreen: React.FC = () => {
     const [targetMacros, setTargetMacros] = useState<{ calories?: number; protein?: number; carbs?: number; fats?: number } | null>(null);
     const [dailyLog, setDailyLog] = useState<DailyMacroLog | null>(null);
     const [loadingLog, setLoadingLog] = useState(true);
+    const [expandedMeals, setExpandedMeals] = useState<Set<MealType>>(new Set());
+    const lastTapRef = useRef<{ time: number; meal: MealType | null }>({ time: 0, meal: null });
     const swipeAnimations = useRef<Map<string, Animated.Value>>(new Map()).current;
     const scrollViewRef = useRef<ScrollView>(null);
     const macroStatusRef = useRef<MacroStatusCompactRef>(null);
-    
+
     // Animation values for meal cards
     const mealCardAnimations = useRef<Map<MealType, Animated.Value>>(new Map()).current;
+    const macroRowOpacities = useRef<Map<MealType, Animated.Value>>(new Map()).current;
     const emptyStateOpacity = useRef(new Animated.Value(0)).current;
     const emptyStateScale = useRef(new Animated.Value(0.9)).current;
 
@@ -84,6 +87,38 @@ export const FoodLogScreen: React.FC = () => {
         });
     }, []);
 
+    // Initialize macro row animations for each meal
+    useEffect(() => {
+        meals.forEach(meal => {
+            if (!macroRowOpacities.has(meal)) {
+                macroRowOpacities.set(meal, new Animated.Value(0));
+            }
+        });
+    }, []);
+
+    // Toggle macro expansion for a meal
+    const toggleMealMacros = (meal: MealType) => {
+        const isExpanded = expandedMeals.has(meal);
+        const newExpandedMeals = new Set(expandedMeals);
+
+        if (isExpanded) {
+            newExpandedMeals.delete(meal);
+        } else {
+            newExpandedMeals.add(meal);
+        }
+
+        setExpandedMeals(newExpandedMeals);
+
+        // Animate macro row opacity (supports native driver)
+        const opacityAnim = macroRowOpacities.get(meal)!;
+
+        Animated.timing(opacityAnim, {
+            toValue: isExpanded ? 0 : 1,
+            duration: 300,
+            useNativeDriver: true,
+        }).start();
+    };
+
     // Animate meal cards on mount and when foods change
     useEffect(() => {
         const animations = meals.map((meal, index) => {
@@ -96,44 +131,12 @@ export const FoodLogScreen: React.FC = () => {
                 useNativeDriver: true,
             });
         });
-        
+
         if (animations.length > 0) {
             Animated.stagger(50, animations).start();
         }
     }, [loggedFoods.length, foodsByMeal]);
 
-    // Animate empty state
-    useEffect(() => {
-        if (loggedFoods.length === 0) {
-            Animated.parallel([
-                Animated.timing(emptyStateOpacity, {
-                    toValue: 1,
-                    duration: 500,
-                    easing: Easing.out(Easing.ease),
-                    useNativeDriver: true,
-                }),
-                Animated.spring(emptyStateScale, {
-                    toValue: 1,
-                    tension: 50,
-                    friction: 7,
-                    useNativeDriver: true,
-                }),
-            ]).start();
-        } else {
-            Animated.parallel([
-                Animated.timing(emptyStateOpacity, {
-                    toValue: 0,
-                    duration: 300,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(emptyStateScale, {
-                    toValue: 0.9,
-                    duration: 300,
-                    useNativeDriver: true,
-                }),
-            ]).start();
-        }
-    }, [loggedFoods.length]);
 
     // Load target macros and daily log
     useEffect(() => {
@@ -193,7 +196,7 @@ export const FoodLogScreen: React.FC = () => {
 
     const [selectedMeal, setSelectedMeal] = useState<MealType | null>(null);
     const [showMealSelector, setShowMealSelector] = useState(false);
-    
+
     // Double tap detection
     const lastTap = useRef<number>(0);
     const doubleTapDelay = 300;
@@ -297,12 +300,12 @@ export const FoodLogScreen: React.FC = () => {
         const diffMs = now.getTime() - date.getTime();
         const diffMins = Math.floor(diffMs / 60000);
 
-        if (diffMins < 1) return 'just now';
-        if (diffMins === 1) return '1 minute ago';
-        if (diffMins < 60) return `${diffMins} minutes ago`;
+        if (diffMins < 1) return '0m';
+        if (diffMins < 60) return `${diffMins}m`;
         const diffHours = Math.floor(diffMins / 60);
-        if (diffHours === 1) return '1 hour ago';
-        return `${diffHours} hours ago`;
+        if (diffHours < 24) return `${diffHours}h`;
+        const diffDays = Math.floor(diffHours / 24);
+        return `${diffDays}d`;
     };
 
 
@@ -322,7 +325,7 @@ export const FoodLogScreen: React.FC = () => {
     // This matches the dashboard MacrosCard consumed values (without testValues)
     // Use exact same logic as HomeScreen: baseConsumed = dailyLog || { calories: 0, protein: 0, carbs: 0, fats: 0 }
     const baseConsumed = dailyLog || { calories: 0, protein: 0, carbs: 0, fats: 0 };
-    
+
     // TEST VALUES - Remove this for production
     const totals = {
         protein: 156,
@@ -373,161 +376,183 @@ export const FoodLogScreen: React.FC = () => {
                         Alert.alert('Profile', 'Profile screen coming soon');
                     }}
                 />
-                {loggedFoods.length === 0 ? (
-                    <TouchableOpacity
-                        activeOpacity={1}
-                        onPress={() => {
-                            const now = Date.now();
-                            if (now - lastTap.current < doubleTapDelay) {
-                                // Double tap detected
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                setShowMealSelector(true);
-                            }
-                            lastTap.current = now;
-                        }}
-                        style={styles.emptyStateTouchable}
-                    >
+                {meals.map((meal, mealIndex) => {
+                    const mealFoods = foodsByMeal[meal];
+                    const mealTotal = mealTotals[meal];
+                    const mealLabels: Record<MealType, { label: string; icon: string; color: string }> = {
+                        breakfast: { label: 'breakfast', icon: 'sunny-outline', color: '#FFD700' },
+                        lunch: { label: 'lunch', icon: 'partly-sunny-outline', color: '#FF8C42' },
+                        dinner: { label: 'dinner', icon: 'moon-outline', color: '#4463F7' },
+                        snack: { label: 'snacks', icon: 'cafe-outline', color: '#26F170' },
+                    };
+                    const mealInfo = mealLabels[meal];
+                    const cardAnim = mealCardAnimations.get(meal) || new Animated.Value(0);
+
+                    return (
                         <Animated.View
+                            key={meal}
                             style={[
-                                styles.emptyState,
+                                styles.mealCard,
                                 {
-                                    opacity: emptyStateOpacity,
-                                    transform: [{ scale: emptyStateScale }],
+                                    opacity: mealFoods.length > 0 ? cardAnim : 1,
+                                    transform: [
+                                        {
+                                            translateY: mealFoods.length > 0
+                                                ? cardAnim.interpolate({
+                                                    inputRange: [0, 1],
+                                                    outputRange: [30, 0],
+                                                })
+                                                : 0,
+                                        },
+                                    ],
                                 },
                             ]}
                         >
-                            <Text style={styles.emptyStateText}>you haven't logged anything today</Text>
-                            <Text style={styles.emptyStateSubtext}>double tap the screen to log something</Text>
-                        </Animated.View>
-                    </TouchableOpacity>
-                ) : (
-                    <>
-                        {meals.map((meal, mealIndex) => {
-                            const mealFoods = foodsByMeal[meal];
-                            const mealTotal = mealTotals[meal];
-                            const mealLabels: Record<MealType, { label: string; icon: string; color: string }> = {
-                                breakfast: { label: 'breakfast', icon: 'sunny-outline', color: '#FFD700' },
-                                lunch: { label: 'lunch', icon: 'partly-sunny-outline', color: '#FF8C42' },
-                                dinner: { label: 'dinner', icon: 'moon-outline', color: '#4463F7' },
-                                snack: { label: 'snacks', icon: 'cafe-outline', color: '#26F170' },
-                            };
-                            const mealInfo = mealLabels[meal];
-                            const cardAnim = mealCardAnimations.get(meal) || new Animated.Value(0);
-
-                            return (
-                                <Animated.View
-                                    key={meal}
-                                    style={[
-                                        styles.mealCard,
-                                        {
-                                            opacity: mealFoods.length > 0 ? cardAnim : 1,
-                                            transform: [
-                                                {
-                                                    translateY: mealFoods.length > 0
-                                                        ? cardAnim.interpolate({
-                                                            inputRange: [0, 1],
-                                                            outputRange: [30, 0],
-                                                        })
-                                                        : 0,
-                                                },
-                                            ],
-                                        },
-                                    ]}
-                                >
-                                    {/* Meal Card Header */}
-                                    <View style={styles.mealCardHeader}>
-                                        <View style={styles.mealCardHeaderLeft}>
-                                            <Text style={styles.mealCardLabel}>{mealInfo.label}</Text>
-                                            {mealTotal.calories > 0 && (
-                                                <View style={styles.mealCardMacros}>
-                                                    <Text style={styles.mealCardMacroText}>Carbs {mealTotal.carbs.toFixed(1)}g</Text>
-                                                    <Text style={styles.mealCardMacroText}>Fat {mealTotal.fats.toFixed(1)}g</Text>
-                                                    <Text style={styles.mealCardMacroText}>Protein {mealTotal.protein.toFixed(1)}g</Text>
-                                                </View>
-                                            )}
+                            {/* Meal Card Header */}
+                            <View style={styles.mealCardHeader}>
+                                <View style={styles.mealCardHeaderTop}>
+                                    <TouchableOpacity
+                                        activeOpacity={0.7}
+                                        onPress={() => toggleMealMacros(meal)}
+                                    >
+                                        <Text style={styles.mealCardLabel}>{mealInfo.label}</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        activeOpacity={0.7}
+                                        onPress={() => {
+                                            // TODO: Navigate to meal detail screen
+                                            // navigation.navigate('MealDetail', { meal, mealFoods, mealTotal });
+                                        }}
+                                    >
+                                        <Ionicons name="chevron-forward" size={20} color="#252525" />
+                                    </TouchableOpacity>
+                                </View>
+                                {expandedMeals.has(meal) && (
+                                    <Animated.View
+                                        style={{
+                                            opacity: macroRowOpacities.get(meal) || 0,
+                                        }}
+                                    >
+                                        <View style={styles.mealCardSummaryRow}>
+                                            <Text style={styles.mealCardCalories}>{Math.round(mealTotal.calories)} kcal</Text>
+                                            <Text style={styles.mealCardSeparator}>|</Text>
+                                            <View style={styles.mealCardMacroItem}>
+                                                <View style={[styles.mealCardMacroDot, styles.mealCardProteinDot]} />
+                                                <Text style={styles.mealCardMacroText}>
+                                                    <Text style={styles.mealCardMacroLetter}>P</Text> {Math.round(mealTotal.protein)}g
+                                                </Text>
+                                            </View>
+                                            <Text style={styles.mealCardSeparator}>|</Text>
+                                            <View style={styles.mealCardMacroItem}>
+                                                <View style={[styles.mealCardMacroDot, styles.mealCardCarbsDot]} />
+                                                <Text style={styles.mealCardMacroText}>
+                                                    <Text style={styles.mealCardMacroLetter}>C</Text> {Math.round(mealTotal.carbs)}g
+                                                </Text>
+                                            </View>
+                                            <Text style={styles.mealCardSeparator}>|</Text>
+                                            <View style={styles.mealCardMacroItem}>
+                                                <View style={[styles.mealCardMacroDot, styles.mealCardFatsDot]} />
+                                                <Text style={styles.mealCardMacroText}>
+                                                    <Text style={styles.mealCardMacroLetter}>F</Text> {Math.round(mealTotal.fats)}g
+                                                </Text>
+                                            </View>
                                         </View>
-                                        {mealTotal.calories > 0 && (
-                                            <Text style={styles.mealCardCalories}>{Math.round(mealTotal.calories)}</Text>
-                                        )}
-                                    </View>
-                                    
-                                    {/* Separator line under header */}
-                                    <View style={styles.mealCardSeparator} />
+                                    </Animated.View>
+                                )}
+                            </View>
 
-                                    {/* Food Items or Empty State */}
-                                    {mealFoods.length > 0 ? (
-                                        <View style={styles.mealFoodsContainer}>
-                                            {(() => {
-                                                // Group foods by time
-                                                const foodsByTime = mealFoods.reduce((acc, entry) => {
-                                                    const timeKey = formatTime(entry.loggedAt);
-                                                    if (!acc[timeKey]) {
-                                                        acc[timeKey] = [];
-                                                    }
-                                                    acc[timeKey].push(entry);
-                                                    return acc;
-                                                }, {} as Record<string, LoggedFoodEntry[]>);
+                            {/* Separator line under summary - always show */}
+                            <View style={styles.mealCardDivider} />
 
-                                                return Object.entries(foodsByTime).map(([timeKey, timeFoods]) => (
-                                                    <View key={timeKey} style={styles.timeGroup}>
-                                                        <Text style={styles.timeGroupLabel}>{timeKey}</Text>
-                                                        {timeFoods.map((entry, index) => {
-                                                            const isExpanded = expandedId === entry.id;
-                                                            const timeStr = formatTime(entry.loggedAt);
+                            {/* Food Items or Empty State */}
+                            <TouchableOpacity
+                                activeOpacity={0.95}
+                                onPress={() => {
+                                    const now = Date.now();
+                                    const DOUBLE_TAP_DELAY = 300;
 
-                                                            return (
-                                                                <View
-                                                                    key={entry.id}
-                                                                    style={[
-                                                                        styles.foodEntryWrapper,
-                                                                        index < timeFoods.length - 1 && styles.foodItemSpacing
-                                                                    ]}
-                                                                >
-                                                                    <FoodEntryCard
-                                                                        entry={entry}
-                                                                        time={timeStr}
-                                                                        timeAgo={getTimeAgo(entry.loggedAt)}
-                                                                        isExpanded={isExpanded}
-                                                                        onToggleExpand={() => setExpandedId(isExpanded ? null : entry.id)}
-                                                                        onDelete={() => handleRemoveFood(entry.id)}
-                                                                        index={index}
-                                                                    />
-                                                                </View>
-                                                            );
-                                                        })}
+                                    if (
+                                        lastTapRef.current.meal === meal &&
+                                        now - lastTapRef.current.time < DOUBLE_TAP_DELAY
+                                    ) {
+                                        // Double tap detected - add food
+                                        handleAddFoodToMeal(meal);
+                                        lastTapRef.current = { time: 0, meal: null };
+                                    } else {
+                                        // First tap - navigate to detail screen
+                                        lastTapRef.current = { time: now, meal };
+                                        // TODO: Navigate to meal detail screen
+                                        // navigation.navigate('MealDetail', { meal, mealFoods, mealTotal });
+                                    }
+                                }}
+                            >
+                                {mealFoods.length > 0 ? (
+                                    <View style={styles.mealFoodsContainer}>
+                                        {(() => {
+                                            // Get 3 most recent items (already sorted by time desc)
+                                            const recentFoods = mealFoods.slice(0, 3);
+
+                                            return recentFoods.map((entry, index) => {
+                                                const timeAgo = getTimeAgo(entry.loggedAt);
+
+                                                return (
+                                                    <View
+                                                        key={entry.id}
+                                                        style={[
+                                                            styles.foodItemRow,
+                                                            index < recentFoods.length - 1 && styles.foodItemSpacing
+                                                        ]}
+                                                    >
+                                                        <Text style={styles.foodItemName}>{entry.food.name}</Text>
+                                                        <View style={styles.foodItemRight}>
+                                                            <Text style={styles.foodItemCalories}>{entry.food.calories}kcal</Text>
+                                                            <Image
+                                                                source={require('../../assets/images/icons/fire.png')}
+                                                                style={styles.foodItemFireIcon}
+                                                                resizeMode="contain"
+                                                            />
+                                                            <View style={styles.foodItemVerticalSeparator} />
+                                                            <Text style={styles.foodItemTime}>{timeAgo}</Text>
+                                                        </View>
                                                     </View>
-                                                ));
-                                            })()}
-                                            <TouchableOpacity
-                                                style={styles.addFoodButton}
-                                                onPress={() => handleAddFoodToMeal(meal)}
-                                                activeOpacity={0.7}
-                                            >
-                                                <Text style={styles.addFoodButtonText}>ADD FOOD</Text>
-                                            </TouchableOpacity>
-                                        </View>
-                                    ) : (
-                                        <View style={styles.mealEmptyState}>
-                                            <Text style={styles.mealEmptyStateText}>
-                                                {meal === 'breakfast' && "start your day with something delicious"}
-                                                {meal === 'lunch' && "fuel up for the afternoon"}
-                                                {meal === 'dinner' && "what's on the menu tonight?"}
-                                                {meal === 'snack' && "time for a little treat"}
-                                            </Text>
-                                            <TouchableOpacity
-                                                style={styles.addFoodButton}
-                                                onPress={() => handleAddFoodToMeal(meal)}
-                                                activeOpacity={0.7}
-                                            >
-                                                <Text style={styles.addFoodButtonText}>ADD FOOD</Text>
-                                            </TouchableOpacity>
-                                        </View>
-                                    )}
-                                </Animated.View>
-                            );
-                        })}
-                    </>
-                )}
+                                                );
+                                            });
+                                        })()}
+                                    </View>
+                                ) : (
+                                    <TouchableOpacity
+                                        activeOpacity={1}
+                                        onPress={() => {
+                                            const now = Date.now();
+                                            const DOUBLE_TAP_DELAY = 300;
+
+                                            if (
+                                                lastTapRef.current.meal === meal &&
+                                                now - lastTapRef.current.time < DOUBLE_TAP_DELAY
+                                            ) {
+                                                // Double tap detected
+                                                handleAddFoodToMeal(meal);
+                                                lastTapRef.current = { time: 0, meal: null };
+                                            } else {
+                                                // First tap
+                                                lastTapRef.current = { time: now, meal };
+                                            }
+                                        }}
+                                        style={styles.mealEmptyState}
+                                    >
+                                        <Text style={styles.mealEmptyStateText}>
+                                            {meal === 'breakfast' && "start your day with something delicious"}
+                                            {meal === 'lunch' && "fuel up for the afternoon"}
+                                            {meal === 'dinner' && "what's on the menu tonight?"}
+                                            {meal === 'snack' && "time for a little treat"}
+                                        </Text>
+                                        <Text style={styles.mealEmptyStateSubtext}>double tap to add food</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </TouchableOpacity>
+                        </Animated.View>
+                    );
+                })}
             </ScrollView>
 
 
@@ -713,7 +738,7 @@ const FoodEntryCard: React.FC<FoodEntryCardProps> = ({
                             <Text style={styles.foodEntryPortion}>{entry.portion}</Text>
                         )}
                     </View>
-                    <Text style={styles.foodEntryCalories}>{entry.food.calories}</Text>
+                    <Text style={styles.foodEntryCalories}>{entry.food.calories} kcal</Text>
                 </View>
 
                 {/* Expanded Macro Details */}
@@ -819,27 +844,54 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
     },
     mealCardHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        paddingTop: 16,
-        paddingBottom: 12,
-        paddingHorizontal: 20,
+        paddingTop: 6,
+        paddingBottom: 6,
+        paddingHorizontal: 15,
     },
-    mealCardHeaderLeft: {
-        flex: 1,
+    mealCardHeaderTop: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 0,
+    },
+    mealCardSummaryRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: 4,
+        width: '98%',
     },
     mealCardLabel: {
-        fontSize: 24,
+        fontSize: 18,
         fontFamily: fonts.bold,
         color: '#252525',
         textTransform: 'lowercase',
-        marginBottom: 8,
+        marginBottom: 0,
     },
     mealCardMacros: {
         flexDirection: 'row',
         gap: 12,
         flexWrap: 'wrap',
+        alignItems: 'center',
+    },
+    mealCardMacroItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    mealCardMacroDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+    },
+    mealCardProteinDot: {
+        backgroundColor: '#26F170',
+    },
+    mealCardCarbsDot: {
+        backgroundColor: '#FFD700',
+    },
+    mealCardFatsDot: {
+        backgroundColor: '#FF5151',
     },
     mealCardMacroText: {
         fontSize: 14,
@@ -847,23 +899,34 @@ const styles = StyleSheet.create({
         color: '#252525',
         textTransform: 'lowercase',
     },
+    mealCardMacroLetter: {
+        textTransform: 'uppercase',
+    },
     mealCardCalories: {
-        fontSize: 24,
-        fontFamily: fonts.bold,
+        fontSize: 14,
+        fontFamily: fonts.regular,
         color: '#252525',
+        textTransform: 'lowercase',
     },
     mealCardSeparator: {
+        fontSize: 14,
+        fontFamily: fonts.regular,
+        color: 'rgba(37, 37, 37, 0.5)',
+        marginHorizontal: 4,
+    },
+    mealCardDivider: {
         height: 2,
         backgroundColor: '#E0E0E0',
-        marginHorizontal: -20,
+        marginHorizontal: -15,
         marginTop: 0,
         marginBottom: 0,
     },
     mealFoodsContainer: {
-        paddingHorizontal: 20,
+        paddingHorizontal: 15,
         paddingTop: 8,
-        paddingBottom: 16,
+        paddingBottom: 0,
         width: '100%',
+        height: 120, // Fixed height for exactly 3 items: (8px top padding + 8px item padding) + (item height ~24px) + 9px spacing + (8px item padding + item height ~24px) + 9px spacing + (8px item padding + item height ~24px) = ~120px
     },
     timeGroup: {
         marginBottom: 16,
@@ -883,9 +946,48 @@ const styles = StyleSheet.create({
     foodItemSpacing: {
         marginBottom: 9,
     },
+    foodItemRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 8,
+    },
+    foodItemName: {
+        fontSize: 16,
+        fontFamily: fonts.regular,
+        color: '#252525',
+        textTransform: 'lowercase',
+        flex: 1,
+    },
+    foodItemRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    foodItemCalories: {
+        fontSize: 16,
+        fontFamily: fonts.regular,
+        color: '#252525',
+        textTransform: 'lowercase',
+    },
+    foodItemFireIcon: {
+        width: 18,
+        height: 18,
+    },
+    foodItemVerticalSeparator: {
+        width: 1,
+        height: 16,
+        backgroundColor: '#E0E0E0',
+    },
+    foodItemTime: {
+        fontSize: 16,
+        fontFamily: fonts.regular,
+        color: '#9E9E9E',
+        minWidth: 30,
+    },
     mealEmptyState: {
         padding: 28,
-        paddingHorizontal: 20,
+        paddingHorizontal: 15,
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: 100,
@@ -906,6 +1008,15 @@ const styles = StyleSheet.create({
         color: '#9E9E9E',
         textTransform: 'lowercase',
         textAlign: 'center',
+        marginBottom: 8,
+    },
+    mealEmptyStateSubtext: {
+        fontSize: 12,
+        fontFamily: fonts.regular,
+        color: '#9E9E9E',
+        textTransform: 'lowercase',
+        textAlign: 'center',
+        opacity: 0.7,
     },
     foodEntryCard: {
         backgroundColor: 'transparent',
