@@ -99,6 +99,48 @@ export const FoodLogScreen: React.FC = () => {
         });
     }, []);
 
+    // Automatically expand meals that have at least one item
+    useEffect(() => {
+        const newExpandedMeals = new Set(expandedMeals);
+        let hasChanges = false;
+
+        meals.forEach(meal => {
+            const mealFoods = foodsByMeal[meal];
+            const hasItems = mealFoods.length > 0;
+            const isCurrentlyExpanded = expandedMeals.has(meal);
+
+            if (hasItems && !isCurrentlyExpanded) {
+                // Meal has items but is not expanded - expand it
+                newExpandedMeals.add(meal);
+                hasChanges = true;
+
+                // Animate macro row opacity to visible
+                const opacityAnim = macroRowOpacities.get(meal)!;
+                Animated.timing(opacityAnim, {
+                    toValue: 1,
+                    duration: 300,
+                    useNativeDriver: true,
+                }).start();
+            } else if (!hasItems && isCurrentlyExpanded) {
+                // Meal has no items but is expanded - collapse it
+                newExpandedMeals.delete(meal);
+                hasChanges = true;
+
+                // Animate macro row opacity to hidden
+                const opacityAnim = macroRowOpacities.get(meal)!;
+                Animated.timing(opacityAnim, {
+                    toValue: 0,
+                    duration: 300,
+                    useNativeDriver: true,
+                }).start();
+            }
+        });
+
+        if (hasChanges) {
+            setExpandedMeals(newExpandedMeals);
+        }
+    }, [loggedFoods, expandedMeals, foodsByMeal]);
+
     // Toggle macro expansion for a meal
     const toggleMealMacros = (meal: MealType) => {
         const isExpanded = expandedMeals.has(meal);
@@ -455,12 +497,7 @@ export const FoodLogScreen: React.FC = () => {
                             {/* Meal Card Header */}
                             <View style={styles.mealCardHeader}>
                                 <View style={styles.mealCardHeaderTop}>
-                                    <TouchableOpacity
-                                        activeOpacity={0.7}
-                                        onPress={() => toggleMealMacros(meal)}
-                                    >
-                                        <Text style={styles.mealCardLabel}>{mealInfo.label}</Text>
-                                    </TouchableOpacity>
+                                    <Text style={styles.mealCardLabel}>{mealInfo.label}</Text>
                                     <TouchableOpacity
                                         activeOpacity={0.7}
                                         onPress={() => {
