@@ -14,7 +14,7 @@ interface Goal {
 }
 
 interface TodaysGoalsWidgetProps {
-    goals?: Goal[];
+    goals: Goal[]; // Required - must come from database
     moreCount?: number;
     onPress?: () => void;
     onGoalsChange?: (goals: Goal[]) => void;
@@ -28,21 +28,13 @@ const availableWidth = screenWidth - containerPadding - widgetSpacing;
 const widgetSize = availableWidth / 2; // Two widgets side by side
 
 export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
-    goals: initialGoals = [
-        { text: 'hit protein goal', completed: false, category: 'nutrition' as const, icon: 'restaurant' },
-        { text: 'workout', completed: false, category: 'fitness' as const, icon: 'fitness' },
-        { text: 'reach water goal', completed: false, category: 'nutrition' as const, icon: 'restaurant' },
-        { text: 'Log meals', completed: false, category: 'nutrition' as const, icon: 'restaurant' },
-        { text: 'take vitamins', completed: false, category: 'nutrition' as const, icon: 'restaurant' },
-        { text: 'meditate', completed: false, category: 'wellness' as const, icon: 'leaf' },
-        { text: 'get 8 hours sleep', completed: false, category: 'wellness' as const, icon: 'leaf' },
-    ],
+    goals: initialGoals,
     moreCount,
     onPress,
     onGoalsChange,
     onOverlayChange,
 }) => {
-    const [goals, setGoals] = useState(initialGoals);
+    const [goals, setGoals] = useState<Goal[]>(initialGoals || []);
     const [showOverlay, setShowOverlay] = useState(false);
 
     // Notify parent when overlay state changes
@@ -52,20 +44,12 @@ export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
         }
     }, [showOverlay, onOverlayChange]);
 
-    // Sync with external goals if provided - but only if they're different
+    // Sync with external goals from database - always use database data, never placeholders
     React.useEffect(() => {
-        if (initialGoals) {
-            setGoals(prevGoals => {
-                // Deep comparison to see if goals actually changed
-                const prevGoalsStr = JSON.stringify(prevGoals.map(g => ({ text: g.text, completed: g.completed, isRepeating: g.isRepeating, order: g.order })));
-                const newGoalsStr = JSON.stringify(initialGoals.map(g => ({ text: g.text, completed: g.completed, isRepeating: g.isRepeating, order: g.order })));
-                
-                if (prevGoalsStr !== newGoalsStr) {
-                    return initialGoals;
-                }
-                return prevGoals;
-            });
-        }
+        // Always sync with database data (initialGoals from HomeScreen)
+        // If initialGoals is undefined or null, use empty array
+        const databaseGoals = initialGoals || [];
+        setGoals(databaseGoals);
     }, [initialGoals]);
 
     const handleGoalsChange = (newGoals: Goal[]) => {
@@ -246,7 +230,7 @@ export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
                     onLongPress={handleAddTodo}
                     activeOpacity={0.7}
                 >
-                    <Text style={styles.emptyText}>hold to add a todo</Text>
+                    <Text style={styles.emptyText}>hold to add, double tap to remove</Text>
                 </TouchableOpacity>
             ) : (
                 <TouchableOpacity
@@ -631,10 +615,18 @@ const styles = StyleSheet.create({
         paddingVertical: 20,
     },
     emptyText: {
-        fontSize: 16,
+        fontSize: 14,
         fontFamily: fonts.regular,
-        color: '#9E9E9E',
+        color: '#CCCCCC',
         textTransform: 'lowercase',
+        textAlign: 'center',
+    },
+    emptySubtext: {
+        fontSize: 14,
+        fontFamily: fonts.regular,
+        color: '#CCCCCC',
+        textTransform: 'lowercase',
+        marginTop: 4,
     },
     goalItemWrapper: {
         overflow: 'hidden',
