@@ -14,6 +14,7 @@ import {
     KeyboardAvoidingView,
     Easing,
     Image,
+    Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { fonts } from '../constants/fonts';
@@ -60,9 +61,6 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<FoodItem[]>([]);
     const [addedItems, setAddedItems] = useState<Set<string>>(new Set());
-    const [showUndoToast, setShowUndoToast] = useState(false);
-    const [lastAddedFood, setLastAddedFood] = useState<FoodItem | null>(null);
-    const [undoTimeout, setUndoTimeout] = useState<NodeJS.Timeout | null>(null);
     const [selectedFoodDetail, setSelectedFoodDetail] = useState<FoodItem | null>(null);
     // Function to determine meal based on time of day
     const getMealByTime = (): 'breakfast' | 'lunch' | 'dinner' | null => {
@@ -173,15 +171,18 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
 
     useEffect(() => {
         if (visible) {
-            // Reset added items when opening so quick add items always show
-            setAddedItems(new Set());
-
             // Reset height to default
             sheetHeightAnim.setValue(SHEET_HEIGHT);
 
             // Reset all animations to initial state
             slideAnim.setValue(SCREEN_HEIGHT + TOASTER_OFFSET);
             backdropOpacity.setValue(0);
+            
+            // Reset added items when opening so quick add items always show
+            // Use setTimeout to ensure quickAddItems are rendered first
+            setTimeout(() => {
+                setAddedItems(new Set());
+            }, 0);
 
             // Toast pop-up animation
             Animated.parallel([
@@ -270,24 +271,39 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
             //     ).start();
             // }, 300);
         } else {
-            // When closing, immediately reset state and dismiss keyboard
-            // Don't animate - just close immediately to prevent touch blocking
-            setSearchQuery('');
-            setSearchResults([]);
-            setAddedItems(new Set());
-            setSelectedMeal(null);
-            setSelectedFoodDetail(null);
-            setShowUnitSelector(false);
-            sheetHeightAnim.setValue(SHEET_HEIGHT);
-            keyboardHeightAnim.setValue(0);
-            aiSuggestionOpacity.setValue(0);
-            aiSuggestionTranslateY.setValue(20);
-            skeletonAnim.setValue(0);
-            calIconRotate.setValue(0);
-            calIconBounce.setValue(0);
-            detailAddButtonTranslateY.setValue(0);
-            detailAddButtonShadowHeight.setValue(4);
-            Keyboard.dismiss();
+            // When closing, animate out first, then reset state
+            Animated.parallel([
+                Animated.timing(slideAnim, {
+                    toValue: SCREEN_HEIGHT + TOASTER_OFFSET,
+                    duration: 250,
+                    easing: Easing.in(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(backdropOpacity, {
+                    toValue: 0,
+                    duration: 200,
+                    easing: Easing.out(Easing.ease),
+                    useNativeDriver: true,
+                }),
+            ]).start(() => {
+                // Reset state after animation completes
+                setSearchQuery('');
+                setSearchResults([]);
+                setAddedItems(new Set());
+                setSelectedMeal(null);
+                setSelectedFoodDetail(null);
+                setShowUnitSelector(false);
+                sheetHeightAnim.setValue(SHEET_HEIGHT);
+                keyboardHeightAnim.setValue(0);
+                aiSuggestionOpacity.setValue(0);
+                aiSuggestionTranslateY.setValue(20);
+                skeletonAnim.setValue(0);
+                calIconRotate.setValue(0);
+                calIconBounce.setValue(0);
+                detailAddButtonTranslateY.setValue(0);
+                detailAddButtonShadowHeight.setValue(4);
+                Keyboard.dismiss();
+            });
         }
     }, [visible]);
 
@@ -396,17 +412,6 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
 
         // Call parent handler
         onAddFood(food);
-
-        // Show undo toast
-        setLastAddedFood(food);
-        setShowUndoToast(true);
-
-        // Auto-hide toast after 3 seconds
-        const timeout = setTimeout(() => {
-            setShowUndoToast(false);
-            setLastAddedFood(null);
-        }, 3000);
-        setUndoTimeout(timeout);
     };
 
     const handleOpenFoodDetail = (food: FoodItem) => {
@@ -436,26 +441,6 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
 
 
 
-    const handleUndo = () => {
-        if (lastAddedFood) {
-            // Remove from added items
-            const newAddedItems = new Set(addedItems);
-            newAddedItems.delete(lastAddedFood.id);
-            setAddedItems(newAddedItems);
-
-            // Remove from daily log
-            if (onRemoveFood) {
-                onRemoveFood(lastAddedFood);
-            }
-
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setShowUndoToast(false);
-            setLastAddedFood(null);
-            if (undoTimeout) {
-                clearTimeout(undoTimeout);
-            }
-        }
-    };
 
     const handleSearch = (query: string) => {
         setSearchQuery(query);
@@ -553,14 +538,16 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
     // CRITICAL: Don't render Modal at all when not visible
     // React Native Modal has a bug where it can block touches even after visible={false}
     // The only reliable fix is to completely remove it from the render tree
-    if (!visible) {
-        return null;
-    }
-
-    // Use View overlay instead of Modal to completely avoid touch blocking
-    // Modal has a known bug where it blocks touches even after unmounting
+    // Use Modal to ensure it appears above all other content including navbar
     return (
-        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+        <Modal
+            visible={visible}
+            transparent={true}
+            animationType="none"
+            onRequestClose={onClose}
+            statusBarTranslucent={true}
+            presentationStyle="overFullScreen"
+        >
             <View style={styles.container} pointerEvents="auto">
                 {/* Backdrop */}
                 <Animated.View
@@ -900,21 +887,8 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
                     </View>
                 )}
 
-                {/* Undo Toast */}
-                {showUndoToast && lastAddedFood && (
-                    <View style={styles.undoToastContainer} pointerEvents="box-none">
-                        <Animated.View style={styles.undoToast}>
-                            <Text style={styles.undoToastText}>
-                                {lastAddedFood.name} added
-                            </Text>
-                            <TouchableOpacity onPress={handleUndo} activeOpacity={0.7}>
-                                <Text style={styles.undoButtonText}>undo</Text>
-                            </TouchableOpacity>
-                        </Animated.View>
-                    </View>
-                )}
             </View>
-        </View>
+        </Modal>
     );
 };
 
@@ -1051,12 +1025,8 @@ const QuickAddItem: React.FC<QuickAddItemProps> = ({ item, onAdd, onPress, isAdd
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 1000,
+        width: '100%',
+        height: '100%',
     },
     backdrop: {
         ...StyleSheet.absoluteFillObject,
@@ -1288,41 +1258,6 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontFamily: fonts.regular,
         color: '#999',
-        textTransform: 'lowercase',
-    },
-    undoToastContainer: {
-        position: 'absolute',
-        bottom: -100, // Extend below screen
-        left: 0,
-        right: 0,
-        height: SHEET_HEIGHT + 150, // Taller to extend off screen
-        backgroundColor: '#fff',
-        paddingTop: SHEET_HEIGHT + 20,
-    },
-    undoToast: {
-        marginHorizontal: 20,
-        marginBottom: 20,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        backgroundColor: '#252525',
-        borderRadius: 12,
-        borderWidth: 2,
-        borderColor: '#252525',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-    },
-    undoToastText: {
-        fontSize: 16,
-        fontFamily: fonts.regular,
-        color: '#fff',
-        textTransform: 'lowercase',
-        flex: 1,
-    },
-    undoButtonText: {
-        fontSize: 16,
-        fontFamily: fonts.bold,
-        color: '#526EFF',
         textTransform: 'lowercase',
     },
     unitSelectorOverlay: {

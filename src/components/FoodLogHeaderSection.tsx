@@ -276,6 +276,7 @@ const styles = StyleSheet.create({
         paddingTop: 0,
         paddingBottom: 20,
         zIndex: 1,
+        elevation: 1, // Android elevation
         marginTop: -300,
     },
     topRow: {
