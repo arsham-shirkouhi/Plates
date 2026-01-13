@@ -24,6 +24,7 @@ import { AddFoodBottomSheet } from '../components/AddFoodBottomSheet';
 import { MacroStatusCompact, MacroStatusCompactRef } from '../components/MacroStatusCompact';
 import { FoodLogHeaderSection } from '../components/FoodLogHeaderSection';
 import { UndoToast } from '../components/UndoToast';
+import { DailyMacrosOverlay } from '../components/DailyMacrosOverlay';
 import { FoodItem, getQuickAddItems, searchFoods } from '../services/foodService';
 import { getDailyMacroLog, addToDailyMacroLog, subtractFromDailyMacroLog, getTodayDateString, getUserProfile, DailyMacroLog } from '../services/userService';
 import { useAddFood } from '../context/AddFoodContext';
@@ -59,6 +60,7 @@ export const FoodLogScreen: React.FC = () => {
     const [expandedMeals, setExpandedMeals] = useState<Set<MealType>>(new Set());
     const [showUndoToast, setShowUndoToast] = useState(false);
     const [lastAddedFood, setLastAddedFood] = useState<LoggedFoodEntry | null>(null);
+    const [showDailyMacrosOverlay, setShowDailyMacrosOverlay] = useState(false);
     const lastTapRef = useRef<{ time: number; meal: MealType | null }>({ time: 0, meal: null });
     const swipeAnimations = useRef<Map<string, Animated.Value>>(new Map()).current;
     const scrollViewRef = useRef<ScrollView>(null);
@@ -478,6 +480,9 @@ export const FoodLogScreen: React.FC = () => {
                         // TODO: Navigate to profile screen
                         Alert.alert('Profile', 'Profile screen coming soon');
                     }}
+                    onMacrosPress={() => {
+                        setShowDailyMacrosOverlay(true);
+                    }}
                 />
                 {meals.map((meal, mealIndex) => {
                     const mealFoods = foodsByMeal[meal];
@@ -495,18 +500,26 @@ export const FoodLogScreen: React.FC = () => {
                             style={styles.mealCard}
                         >
                             {/* Meal Card Header */}
-                            <View style={styles.mealCardHeader}>
+                            <TouchableOpacity
+                                activeOpacity={0.7}
+                                onPress={() => {
+                                    navigation.navigate('MealDetail', {
+                                        meal,
+                                        foods: mealFoods.map(entry => ({
+                                            id: entry.id,
+                                            food: entry.food,
+                                            loggedAt: entry.loggedAt.toISOString(),
+                                            meal: entry.meal,
+                                            portion: entry.portion,
+                                        })),
+                                        mealTotal,
+                                    });
+                                }}
+                                style={styles.mealCardHeader}
+                            >
                                 <View style={styles.mealCardHeaderTop}>
                                     <Text style={styles.mealCardLabel}>{mealInfo.label}</Text>
-                                    <TouchableOpacity
-                                        activeOpacity={0.7}
-                                        onPress={() => {
-                                            // TODO: Navigate to meal detail screen
-                                            // navigation.navigate('MealDetail', { meal, mealFoods, mealTotal });
-                                        }}
-                                    >
-                                        <Ionicons name="chevron-forward" size={20} color="#252525" />
-                                    </TouchableOpacity>
+                                    <Ionicons name="chevron-forward" size={20} color="#252525" />
                                 </View>
                                 {expandedMeals.has(meal) && (
                                     <Animated.View
@@ -540,7 +553,7 @@ export const FoodLogScreen: React.FC = () => {
                                         </View>
                                     </Animated.View>
                                 )}
-                            </View>
+                            </TouchableOpacity>
 
                             {/* Separator line under summary - always show */}
                             <View style={styles.mealCardDivider} />
@@ -736,6 +749,14 @@ export const FoodLogScreen: React.FC = () => {
                     setLastAddedFood(null);
                 }}
                 duration={3000}
+            />
+
+            {/* Daily Macros Overlay */}
+            <DailyMacrosOverlay
+                visible={showDailyMacrosOverlay}
+                onClose={() => setShowDailyMacrosOverlay(false)}
+                foods={loggedFoods}
+                totals={totals}
             />
         </View>
     );
