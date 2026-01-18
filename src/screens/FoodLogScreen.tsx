@@ -21,6 +21,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../constants/fonts';
 import { AddFoodBottomSheet } from '../components/AddFoodBottomSheet';
+import { EditFoodBottomSheet } from '../components/EditFoodBottomSheet';
 import { MacroStatusCompact, MacroStatusCompactRef } from '../components/MacroStatusCompact';
 import { FoodLogHeaderSection } from '../components/FoodLogHeaderSection';
 import { UndoToast } from '../components/UndoToast';
@@ -52,6 +53,8 @@ export const FoodLogScreen: React.FC = () => {
     const { registerHandler, unregisterHandler, registerSheetState, unregisterSheetState } = useAddFood();
     const [loggedFoods, setLoggedFoods] = useState<LoggedFoodEntry[]>([]);
     const [showAddSheet, setShowAddSheet] = useState(false);
+    const [showEditSheet, setShowEditSheet] = useState(false);
+    const [selectedEntry, setSelectedEntry] = useState<LoggedFoodEntry | null>(null);
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [swipingId, setSwipingId] = useState<string | null>(null);
     const [targetMacros, setTargetMacros] = useState<{ calories?: number; protein?: number; carbs?: number; fats?: number } | null>(null);
@@ -392,6 +395,64 @@ export const FoodLogScreen: React.FC = () => {
         setLastAddedFood(null);
     };
 
+    const handleEditFood = (entry: LoggedFoodEntry) => {
+        setSelectedEntry(entry);
+        setShowEditSheet(true);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    };
+
+    const handleUpdateFood = async (entryId: string, updatedFood: FoodItem, servingSize: string, numberOfServings: string, meal: MealType) => {
+        if (!user) return;
+
+        const entry = loggedFoods.find(e => e.id === entryId);
+        if (!entry) return;
+
+        // Calculate the difference to update daily log
+        const oldCalories = entry.food.calories;
+        const oldProtein = entry.food.protein;
+        const oldCarbs = entry.food.carbs;
+        const oldFats = entry.food.fats;
+
+        const newCalories = updatedFood.calories;
+        const newProtein = updatedFood.protein;
+        const newCarbs = updatedFood.carbs;
+        const newFats = updatedFood.fats;
+
+        // Update the entry
+        const updatedEntry: LoggedFoodEntry = {
+            ...entry,
+            food: updatedFood,
+            meal,
+            portion: `${numberOfServings} ${servingSize}`,
+        };
+
+        setLoggedFoods(prev => prev.map(e => e.id === entryId ? updatedEntry : e));
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+        // Update daily log: subtract old values, add new values
+        try {
+            // Subtract old values
+            await subtractFromDailyMacroLog(user, {
+                calories: oldCalories,
+                protein: oldProtein,
+                carbs: oldCarbs,
+                fats: oldFats,
+            });
+
+            // Add new values
+            await addToDailyMacroLog(user, {
+                calories: newCalories,
+                protein: newProtein,
+                carbs: newCarbs,
+                fats: newFats,
+            });
+
+            await loadDailyLog();
+        } catch (error) {
+            console.error('Error updating food in daily log:', error);
+        }
+    };
+
     const formatTime = (date: Date): string => {
         const hours = date.getHours();
         const minutes = date.getMinutes();
@@ -559,85 +620,100 @@ export const FoodLogScreen: React.FC = () => {
                             <View style={styles.mealCardDivider} />
 
                             {/* Food Items or Empty State */}
-                            <TouchableOpacity
-                                activeOpacity={0.95}
-                                onPress={() => {
-                                    const now = Date.now();
-                                    const DOUBLE_TAP_DELAY = 300;
+                            {mealFoods.length > 0 ? (
+                                <TouchableOpacity
+                                    activeOpacity={1}
+                                    onPress={() => {
+                                        const now = Date.now();
+                                        const DOUBLE_TAP_DELAY = 300;
 
-                                    if (
-                                        lastTapRef.current.meal === meal &&
-                                        now - lastTapRef.current.time < DOUBLE_TAP_DELAY
-                                    ) {
-                                        // Double tap detected - add food
-                                        handleAddFoodToMeal(meal);
-                                        lastTapRef.current = { time: 0, meal: null };
-                                    } else {
-                                        // First tap - navigate to detail screen
-                                        lastTapRef.current = { time: now, meal };
-                                        // TODO: Navigate to meal detail screen
-                                        // navigation.navigate('MealDetail', { meal, mealFoods, mealTotal });
-                                    }
-                                }}
-                            >
-                                {mealFoods.length > 0 ? (
-                                    <View style={styles.mealFoodsContainer}>
-                                        {(() => {
-                                            // Get 3 most recent items (already sorted by time desc)
-                                            const recentFoods = mealFoods.slice(0, 3);
-                                            const remainingCount = mealFoods.length - 3;
+                                        if (
+                                            lastTapRef.current.meal === meal &&
+                                            now - lastTapRef.current.time < DOUBLE_TAP_DELAY
+                                        ) {
+                                            // Double tap detected - add food
+                                            handleAddFoodToMeal(meal);
+                                            lastTapRef.current = { time: 0, meal: null };
+                                        } else {
+                                            // First tap - just record it
+                                            lastTapRef.current = { time: now, meal };
+                                        }
+                                    }}
+                                    style={styles.mealFoodsContainer}
+                                >
+                                    {(() => {
+                                        // Get 3 most recent items (already sorted by time desc)
+                                        const recentFoods = mealFoods.slice(0, 3);
+                                        const remainingCount = mealFoods.length - 3;
 
-                                            return (
-                                                <>
-                                                    {recentFoods.map((entry, index) => {
-                                                        const timeAgo = getTimeAgo(entry.loggedAt);
-                                                        const isNewlyAdded = newlyAddedFoodIds.has(entry.id);
+                                        return (
+                                            <>
+                                                {recentFoods.map((entry, index) => {
+                                                    const timeAgo = getTimeAgo(entry.loggedAt);
+                                                    const isNewlyAdded = newlyAddedFoodIds.has(entry.id);
 
-                                                        return (
-                                                            <FoodItemRow
-                                                                key={entry.id}
-                                                                entry={entry}
-                                                                timeAgo={timeAgo}
-                                                                index={index}
-                                                                isNewlyAdded={isNewlyAdded}
-                                                                isLast={index === recentFoods.length - 1}
-                                                            />
-                                                        );
-                                                    })}
-                                                    {remainingCount > 0 && (
+                                                    return (
+                                                        <FoodItemRow
+                                                            key={entry.id}
+                                                            entry={entry}
+                                                            timeAgo={timeAgo}
+                                                            index={index}
+                                                            isNewlyAdded={isNewlyAdded}
+                                                            isLast={index === recentFoods.length - 1}
+                                                            onEdit={() => handleEditFood(entry)}
+                                                        />
+                                                    );
+                                                })}
+                                                {remainingCount > 0 && (
+                                                    <TouchableOpacity
+                                                        activeOpacity={0.7}
+                                                        onPress={() => {
+                                                            navigation.navigate('MealDetail', {
+                                                                meal,
+                                                                foods: mealFoods.map(entry => ({
+                                                                    id: entry.id,
+                                                                    food: entry.food,
+                                                                    loggedAt: entry.loggedAt.toISOString(),
+                                                                    meal: entry.meal,
+                                                                    portion: entry.portion,
+                                                                })),
+                                                                mealTotal,
+                                                            });
+                                                        }}
+                                                    >
                                                         <Text style={styles.moreItemsText}>
                                                             +{remainingCount} more
                                                         </Text>
-                                                    )}
-                                                </>
-                                            );
-                                        })()}
-                                    </View>
-                                ) : (
-                                    <TouchableOpacity
-                                        activeOpacity={1}
-                                        onPress={() => {
-                                            const now = Date.now();
-                                            const DOUBLE_TAP_DELAY = 300;
+                                                    </TouchableOpacity>
+                                                )}
+                                            </>
+                                        );
+                                    })()}
+                                </TouchableOpacity>
+                            ) : (
+                                <TouchableOpacity
+                                    activeOpacity={1}
+                                    onPress={() => {
+                                        const now = Date.now();
+                                        const DOUBLE_TAP_DELAY = 300;
 
-                                            if (
-                                                lastTapRef.current.meal === meal &&
-                                                now - lastTapRef.current.time < DOUBLE_TAP_DELAY
-                                            ) {
-                                                // Double tap detected
-                                                handleAddFoodToMeal(meal);
-                                                lastTapRef.current = { time: 0, meal: null };
-                                            } else {
-                                                // First tap
-                                                lastTapRef.current = { time: now, meal };
-                                            }
-                                        }}
-                                        style={styles.mealEmptyState}
-                                    >
-                                        <Text style={styles.mealEmptyStateSubtext}>double tap to log meal</Text>
-                                    </TouchableOpacity>
-                                )}
-                            </TouchableOpacity>
+                                        if (
+                                            lastTapRef.current.meal === meal &&
+                                            now - lastTapRef.current.time < DOUBLE_TAP_DELAY
+                                        ) {
+                                            // Double tap detected
+                                            handleAddFoodToMeal(meal);
+                                            lastTapRef.current = { time: 0, meal: null };
+                                        } else {
+                                            // First tap
+                                            lastTapRef.current = { time: now, meal };
+                                        }
+                                    }}
+                                    style={styles.mealEmptyState}
+                                >
+                                    <Text style={styles.mealEmptyStateSubtext}>double tap to log meal</Text>
+                                </TouchableOpacity>
+                            )}
                         </View>
                     );
                 })}
@@ -758,6 +834,22 @@ export const FoodLogScreen: React.FC = () => {
                 foods={loggedFoods}
                 totals={totals}
             />
+
+            {/* Edit Food Sheet */}
+            <EditFoodBottomSheet
+                visible={showEditSheet}
+                onClose={() => {
+                    setShowEditSheet(false);
+                    setSelectedEntry(null);
+                }}
+                entry={selectedEntry}
+                onUpdateFood={handleUpdateFood}
+                onDelete={selectedEntry ? () => {
+                    handleRemoveFood(selectedEntry.id);
+                    setShowEditSheet(false);
+                    setSelectedEntry(null);
+                } : undefined}
+            />
         </View>
     );
 };
@@ -768,9 +860,10 @@ interface FoodItemRowProps {
     index: number;
     isNewlyAdded: boolean;
     isLast: boolean;
+    onEdit: () => void;
 }
 
-const FoodItemRow: React.FC<FoodItemRowProps> = ({ entry, timeAgo, index, isNewlyAdded, isLast }) => {
+const FoodItemRow: React.FC<FoodItemRowProps> = ({ entry, timeAgo, index, isNewlyAdded, isLast, onEdit }) => {
     const itemOpacity = useRef(new Animated.Value(isNewlyAdded ? 0 : 1)).current;
     const itemTranslateY = useRef(new Animated.Value(isNewlyAdded ? 20 : 0)).current;
 
@@ -806,17 +899,23 @@ const FoodItemRow: React.FC<FoodItemRowProps> = ({ entry, timeAgo, index, isNewl
                 },
             ]}
         >
-            <Text style={styles.foodItemName}>{entry.food.name}</Text>
-            <View style={styles.foodItemRight}>
-                <Text style={styles.foodItemCalories}>{entry.food.calories}kcal</Text>
-                <Image
-                    source={require('../../assets/images/icons/fire.png')}
-                    style={styles.foodItemFireIcon}
-                    resizeMode="contain"
-                />
-                <View style={styles.foodItemVerticalSeparator} />
-                <Text style={styles.foodItemTime}>{timeAgo}</Text>
-            </View>
+            <TouchableOpacity
+                style={styles.foodItemRowContent}
+                onPress={onEdit}
+                activeOpacity={0.7}
+            >
+                <Text style={styles.foodItemName}>{entry.food.name}</Text>
+                <View style={styles.foodItemRight}>
+                    <Text style={styles.foodItemCalories}>{entry.food.calories}kcal</Text>
+                    <Image
+                        source={require('../../assets/images/icons/fire.png')}
+                        style={styles.foodItemFireIcon}
+                        resizeMode="contain"
+                    />
+                    <View style={styles.foodItemVerticalSeparator} />
+                    <Text style={styles.foodItemTime}>{timeAgo}</Text>
+                </View>
+            </TouchableOpacity>
         </Animated.View>
     );
 };
@@ -1165,6 +1264,12 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+    },
+    foodItemRowContent: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flex: 1,
     },
     foodItemName: {
         fontSize: 16,

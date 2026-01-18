@@ -279,10 +279,15 @@ export const Button: React.FC<ButtonProps> = ({
     // Link variant returns early above, so we know variant is not 'link' here
     if (variant === 'primary' || variant === 'google' || variant === 'secondary') {
         const buttonStyle = getButtonStyle();
+        
+        // Allow width override from containerStyle (supports both number and string like '100%')
+        const containerWidth = containerStyle?.width;
+        const effectiveWidth = containerWidth !== undefined ? containerWidth : buttonStyle.width;
+        const buttonWidth = containerWidth !== undefined ? containerWidth : buttonStyle.width;
 
         // Extract dimensions for shadow (without margins)
         const shadowStyle: ViewStyle = {
-            width: buttonStyle.width,
+            width: typeof effectiveWidth === 'number' ? effectiveWidth : '100%',
             height: buttonStyle.height,
             borderRadius: buttonStyle.borderRadius || 12,
             backgroundColor: '#252525',
@@ -330,6 +335,7 @@ export const Button: React.FC<ButtonProps> = ({
                             {
                                 transform: [{ translateY }],
                                 overflow: 'hidden',
+                                width: buttonWidth,
                             },
                         ]}
                     >

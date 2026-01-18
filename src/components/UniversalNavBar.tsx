@@ -23,14 +23,14 @@ export const UniversalNavBar: React.FC = () => {
     // Determine active screen based on route name
     const getActiveScreen = (): 'home' | 'food' | 'fitness' => {
         if (routeName === 'FoodLog') return 'food';
-        if (routeName === 'Fitness') return 'fitness';
+        if (routeName === 'Workout') return 'fitness';
         return 'home';
     };
 
     const activeScreen = getActiveScreen();
 
     // Only show navbar on main app screens
-    const showNavBar = routeName && ['Home', 'FoodLog', 'Fitness'].includes(routeName);
+    const showNavBar = routeName && ['Home', 'FoodLog', 'Workout'].includes(routeName);
 
     if (!showNavBar) {
         return null;
@@ -51,7 +51,9 @@ export const UniversalNavBar: React.FC = () => {
                     }
                 }}
                 onFitnessPress={() => {
-                    Alert.alert('Fitness', 'Fitness screen coming soon');
+                    if (routeName !== 'Workout') {
+                        navigation.navigate('Workout');
+                    }
                 }}
             />
             <AddButton

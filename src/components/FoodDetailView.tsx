@@ -35,6 +35,8 @@ interface FoodDetailViewProps {
     onNumberOfServingsChange: (servings: string) => void;
     selectedMeal: 'breakfast' | 'lunch' | 'dinner' | 'snack' | null;
     onMealChange: (meal: 'breakfast' | 'lunch' | 'dinner' | 'snack' | null) => void;
+    hideButton?: boolean;
+    headerTitle?: string;
 }
 
 export const FoodDetailView: React.FC<FoodDetailViewProps> = ({
@@ -50,6 +52,8 @@ export const FoodDetailView: React.FC<FoodDetailViewProps> = ({
     onNumberOfServingsChange,
     selectedMeal,
     onMealChange,
+    hideButton = false,
+    headerTitle = 'add food',
 }) => {
     const isButtonDisabled = !selectedServingSize || !numberOfServings || !selectedMeal;
 
@@ -86,7 +90,7 @@ export const FoodDetailView: React.FC<FoodDetailViewProps> = ({
                         >
                             <Ionicons name="arrow-back" size={24} color="#252525" />
                         </TouchableOpacity>
-                        <Text style={styles.headerTitle}>add food</Text>
+                        <Text style={styles.headerTitle}>{headerTitle}</Text>
                         <View style={styles.backButton} />
                     </View>
 
@@ -197,15 +201,17 @@ export const FoodDetailView: React.FC<FoodDetailViewProps> = ({
                 </View>
 
                 {/* Add Button using Button component - Fixed at bottom */}
-                <View style={styles.addButtonWrapper}>
-                    <Button
-                        variant="primary"
-                        title="log food!"
-                        onPress={handleAddFood}
-                        disabled={isButtonDisabled}
-                        containerStyle={styles.addButtonContainer}
-                    />
-                </View>
+                {!hideButton && (
+                    <View style={styles.addButtonWrapper}>
+                        <Button
+                            variant="primary"
+                            title="log food!"
+                            onPress={handleAddFood}
+                            disabled={isButtonDisabled}
+                            containerStyle={styles.addButtonContainer}
+                        />
+                    </View>
+                )}
             </View>
         </TouchableWithoutFeedback>
     );

@@ -11,6 +11,9 @@ import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { MacroResultsScreen } from '../screens/MacroResultsScreen';
 import { FoodLogScreen } from '../screens/FoodLogScreen';
 import { MealDetailScreen } from '../screens/MealDetailScreen';
+import { WorkoutScreen } from '../screens/WorkoutScreen';
+import { StartWorkoutScreen } from '../screens/StartWorkoutScreen';
+import { ExerciseDetailScreen } from '../screens/ExerciseDetailScreen';
 import { UniversalNavBar } from '../components/UniversalNavBar';
 
 export type RootStackParamList = {
@@ -53,6 +56,43 @@ export type RootStackParamList = {
             carbs: number;
             fats: number;
         };
+    };
+    Workout: { 
+        startWorkoutType?: 'pick-as-you-go' | 'previous' | 'new' | 'schedule'; 
+        workoutId?: string;
+        updatedExerciseId?: string;
+        updatedSets?: Array<{ id: string; reps: string; weight: string; completed?: boolean }>;
+        updatedExercises?: Array<{
+            id: string;
+            name: string;
+            sets: Array<{ id: string; reps: string; weight: string; completed?: boolean }>;
+        }>;
+        newlyCompletedExerciseIds?: string[];
+    } | undefined;
+    StartWorkout: undefined;
+    ExerciseDetail: {
+        exercise: {
+            id: string;
+            name: string;
+            sets: Array<{
+                id: string;
+                reps: string;
+                weight: string;
+                completed?: boolean;
+            }>;
+        };
+        exerciseId: string;
+        allExercises?: Array<{
+            id: string;
+            name: string;
+            sets: Array<{
+                id: string;
+                reps: string;
+                weight: string;
+                completed?: boolean;
+            }>;
+        }>;
+        currentExerciseIndex?: number;
     };
 };
 
@@ -115,6 +155,30 @@ const NavigatorWithNavBar: React.FC = () => {
                 <Stack.Screen
                     name="MealDetail"
                     component={MealDetailScreen}
+                    options={{
+                        animation: 'slide_from_right',
+                        animationDuration: 300,
+                    }}
+                />
+                <Stack.Screen
+                    name="Workout"
+                    component={WorkoutScreen}
+                    options={{
+                        animation: 'slide_from_right',
+                        animationDuration: 300,
+                    }}
+                />
+                <Stack.Screen
+                    name="StartWorkout"
+                    component={StartWorkoutScreen}
+                    options={{
+                        animation: 'slide_from_right',
+                        animationDuration: 300,
+                    }}
+                />
+                <Stack.Screen
+                    name="ExerciseDetail"
+                    component={ExerciseDetailScreen}
                     options={{
                         animation: 'slide_from_right',
                         animationDuration: 300,

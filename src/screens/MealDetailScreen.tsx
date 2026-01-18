@@ -19,6 +19,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../constants/fonts';
 import { AddFoodBottomSheet } from '../components/AddFoodBottomSheet';
+import { EditFoodBottomSheet } from '../components/EditFoodBottomSheet';
 import { FoodItem, getQuickAddItems } from '../services/foodService';
 import { useAuth } from '../context/AuthContext';
 import { subtractFromDailyMacroLog, getTodayDateString, getDailyMacroLog, DailyMacroLog } from '../services/userService';
@@ -46,14 +47,24 @@ export const MealDetailScreen: React.FC = () => {
 
     const { meal, foods: initialFoods, mealTotal: initialMealTotal } = route.params;
 
-    // Convert serialized dates back to Date objects
+    // Convert serialized dates back to Date objects and ensure FoodItem has id
     const [foods, setFoods] = useState<LoggedFoodEntry[]>(
         initialFoods.map(entry => ({
             ...entry,
+            food: {
+                id: entry.id, // Use entry.id as food.id
+                name: entry.food.name,
+                calories: entry.food.calories,
+                protein: entry.food.protein,
+                carbs: entry.food.carbs,
+                fats: entry.food.fats,
+            },
             loggedAt: new Date(entry.loggedAt),
         }))
     );
     const [showAddSheet, setShowAddSheet] = useState(false);
+    const [showEditSheet, setShowEditSheet] = useState(false);
+    const [selectedEntry, setSelectedEntry] = useState<LoggedFoodEntry | null>(null);
     const [selectedMeal, setSelectedMeal] = useState<MealType>(meal);
     const [dailyLog, setDailyLog] = useState<DailyMacroLog | null>(null);
 
@@ -147,12 +158,63 @@ export const MealDetailScreen: React.FC = () => {
         }
     };
 
-    const formatTime = (date: Date): string => {
-        const hours = date.getHours();
-        const minutes = date.getMinutes();
-        const ampm = hours >= 12 ? 'pm' : 'am';
-        const displayHours = hours % 12 || 12;
-        return `${displayHours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+    const handleUpdateFood = async (entryId: string, updatedFood: FoodItem, servingSize: string, numberOfServings: string, meal: MealType) => {
+        if (!user) return;
+
+        const entry = foods.find(e => e.id === entryId);
+        if (!entry) return;
+
+        // Calculate the difference to update daily log
+        const oldCalories = entry.food.calories;
+        const oldProtein = entry.food.protein;
+        const oldCarbs = entry.food.carbs;
+        const oldFats = entry.food.fats;
+
+        const newCalories = updatedFood.calories;
+        const newProtein = updatedFood.protein;
+        const newCarbs = updatedFood.carbs;
+        const newFats = updatedFood.fats;
+
+        // Update the entry
+        const updatedEntry: LoggedFoodEntry = {
+            ...entry,
+            food: updatedFood,
+            meal,
+            portion: `${numberOfServings} ${servingSize}`,
+        };
+
+        setFoods(prev => prev.map(e => e.id === entryId ? updatedEntry : e));
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+        // Update daily log: subtract old values, add new values
+        try {
+            // Subtract old values
+            await subtractFromDailyMacroLog(user, {
+                calories: oldCalories,
+                protein: oldProtein,
+                carbs: oldCarbs,
+                fats: oldFats,
+            });
+
+            // Add new values
+            const { addToDailyMacroLog } = await import('../services/userService');
+            await addToDailyMacroLog(user, {
+                calories: newCalories,
+                protein: newProtein,
+                carbs: newCarbs,
+                fats: newFats,
+            });
+
+            await loadDailyLog();
+        } catch (error) {
+            console.error('Error updating food in daily log:', error);
+        }
+    };
+
+    const handleEditFood = (entry: LoggedFoodEntry) => {
+        setSelectedEntry(entry);
+        setShowEditSheet(true);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     };
 
     const getTimeAgo = (date: Date): string => {
@@ -173,83 +235,99 @@ export const MealDetailScreen: React.FC = () => {
 
     return (
         <View style={styles.container}>
-            <ScrollView
-                style={styles.scrollView}
-                contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
-                showsVerticalScrollIndicator={false}
-            >
-                {/* Header */}
-                <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
-                    <TouchableOpacity
-                        style={styles.backButton}
-                        onPress={() => navigation.goBack()}
-                        activeOpacity={0.7}
-                    >
-                        <Ionicons name="chevron-back" size={24} color="#252525" />
-                    </TouchableOpacity>
-                    <View style={styles.headerContent}>
-                        <View style={styles.headerTop}>
-                            <Ionicons name={mealInfo.icon as any} size={28} color={mealInfo.color} />
-                            <Text style={styles.headerTitle}>{mealInfo.label}</Text>
-                        </View>
-                        <View style={styles.headerMacros}>
-                            <Text style={styles.headerCalories}>{Math.round(mealTotal.calories)} kcal</Text>
-                            <Text style={styles.headerSeparator}>|</Text>
-                            <View style={styles.headerMacroItem}>
-                                <View style={[styles.headerMacroDot, styles.proteinDot]} />
-                                <Text style={styles.headerMacroText}>
-                                    <Text style={styles.headerMacroLetter}>P</Text> {Math.round(mealTotal.protein)}g
+            <View style={[styles.content, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+                <View style={styles.contentInner}>
+                    <View style={styles.headerContainer}>
+                        {/* Header */}
+                        <View style={styles.header}>
+                            <TouchableOpacity
+                                style={styles.backButton}
+                                onPress={() => navigation.goBack()}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons name="chevron-back" size={24} color="#526EFF" />
+                            </TouchableOpacity>
+                            <View style={styles.headerCenter}>
+                                <Text style={styles.headerTitle}>{mealInfo.label}</Text>
+                                <Text style={styles.headerStats}>
+                                    {foods.length} {foods.length === 1 ? 'item' : 'items'}
                                 </Text>
                             </View>
-                            <Text style={styles.headerSeparator}>|</Text>
-                            <View style={styles.headerMacroItem}>
-                                <View style={[styles.headerMacroDot, styles.carbsDot]} />
-                                <Text style={styles.headerMacroText}>
-                                    <Text style={styles.headerMacroLetter}>C</Text> {Math.round(mealTotal.carbs)}g
-                                </Text>
-                            </View>
-                            <Text style={styles.headerSeparator}>|</Text>
-                            <View style={styles.headerMacroItem}>
-                                <View style={[styles.headerMacroDot, styles.fatsDot]} />
-                                <Text style={styles.headerMacroText}>
-                                    <Text style={styles.headerMacroLetter}>F</Text> {Math.round(mealTotal.fats)}g
-                                </Text>
-                            </View>
+                            <TouchableOpacity
+                                style={styles.addButton}
+                                onPress={() => setShowAddSheet(true)}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons name="add" size={32} color="#526EFF" />
+                            </TouchableOpacity>
                         </View>
                     </View>
-                </View>
 
-                {/* Food Items List */}
-                <View style={styles.foodsContainer}>
-                    {sortedFoods.length > 0 ? (
-                        sortedFoods.map((entry, index) => (
-                            <FoodItemCard
-                                key={entry.id}
-                                entry={entry}
-                                time={formatTime(entry.loggedAt)}
-                                timeAgo={getTimeAgo(entry.loggedAt)}
-                                onDelete={() => handleRemoveFood(entry.id)}
-                                index={index}
-                            />
-                        ))
-                    ) : (
-                        <View style={styles.emptyState}>
-                            <Text style={styles.emptyStateText}>no foods logged yet</Text>
-                            <Text style={styles.emptyStateSubtext}>tap the button below to add food</Text>
+                    {/* Header divider - outside padded container for full width */}
+                    <View style={styles.headerDivider} />
+
+                    <View style={styles.contentInnerView}>
+                        {/* Macros Section */}
+                        <View style={styles.macrosSection}>
+                            <View style={styles.macrosRow}>
+                                <Text style={styles.macrosCalories}>{Math.round(mealTotal.calories)} kcal</Text>
+                                <Text style={styles.macrosSeparator}>|</Text>
+                                <View style={styles.macrosMacroItem}>
+                                    <View style={[styles.macrosMacroDot, styles.proteinDot]} />
+                                    <Text style={styles.macrosMacroText}>
+                                        <Text style={styles.macrosMacroLetter}>P</Text> {Math.round(mealTotal.protein)}g
+                                    </Text>
+                                </View>
+                                <Text style={styles.macrosSeparator}>|</Text>
+                                <View style={styles.macrosMacroItem}>
+                                    <View style={[styles.macrosMacroDot, styles.carbsDot]} />
+                                    <Text style={styles.macrosMacroText}>
+                                        <Text style={styles.macrosMacroLetter}>C</Text> {Math.round(mealTotal.carbs)}g
+                                    </Text>
+                                </View>
+                                <Text style={styles.macrosSeparator}>|</Text>
+                                <View style={styles.macrosMacroItem}>
+                                    <View style={[styles.macrosMacroDot, styles.fatsDot]} />
+                                    <Text style={styles.macrosMacroText}>
+                                        <Text style={styles.macrosMacroLetter}>F</Text> {Math.round(mealTotal.fats)}g
+                                    </Text>
+                                </View>
+                            </View>
                         </View>
-                    )}
-                </View>
-            </ScrollView>
 
-            {/* Add Food Button */}
-            <TouchableOpacity
-                style={[styles.addButton, { bottom: insets.bottom + 20 }]}
-                onPress={() => setShowAddSheet(true)}
-                activeOpacity={0.8}
-            >
-                <Ionicons name="add" size={24} color="#fff" />
-                <Text style={styles.addButtonText}>add food</Text>
-            </TouchableOpacity>
+                        {/* Macros divider - full width using negative margins */}
+                        <View style={styles.macrosDivider} />
+
+                        {/* Food Items List */}
+                        <ScrollView
+                            style={styles.scrollView}
+                            contentContainerStyle={styles.scrollContent}
+                            showsVerticalScrollIndicator={false}
+                        >
+                            {sortedFoods.length > 0 ? (
+                                <View style={styles.foodsContainer}>
+                                    {sortedFoods.map((entry, index) => (
+                                        <FoodItemCard
+                                            key={entry.id}
+                                            entry={entry}
+                                            timeAgo={getTimeAgo(entry.loggedAt)}
+                                            onDelete={() => handleRemoveFood(entry.id)}
+                                            onEdit={() => handleEditFood(entry)}
+                                            index={index}
+                                        />
+                                    ))}
+                                </View>
+                            ) : (
+                                <View style={styles.emptyState}>
+                                    <Text style={styles.emptyStateText}>no foods logged yet</Text>
+                                    <Text style={styles.emptyStateSubtext}>tap the + button to add food</Text>
+                                </View>
+                            )}
+                        </ScrollView>
+                    </View>
+                </View>
+            </View>
+
 
             {/* Add Food Sheet */}
             <AddFoodBottomSheet
@@ -258,7 +336,27 @@ export const MealDetailScreen: React.FC = () => {
                 onAddFood={handleAddFood}
                 quickAddItems={getQuickAddItems()}
                 initialMeal={selectedMeal}
-                onMealChange={(meal) => setSelectedMeal(meal)}
+                onMealChange={(meal) => {
+                    if (meal) {
+                        setSelectedMeal(meal);
+                    }
+                }}
+            />
+
+            {/* Edit Food Sheet */}
+            <EditFoodBottomSheet
+                visible={showEditSheet}
+                onClose={() => {
+                    setShowEditSheet(false);
+                    setSelectedEntry(null);
+                }}
+                entry={selectedEntry}
+                onUpdateFood={handleUpdateFood}
+                onDelete={selectedEntry ? () => {
+                    handleRemoveFood(selectedEntry.id);
+                    setShowEditSheet(false);
+                    setSelectedEntry(null);
+                } : undefined}
             />
         </View>
     );
@@ -266,23 +364,28 @@ export const MealDetailScreen: React.FC = () => {
 
 interface FoodItemCardProps {
     entry: LoggedFoodEntry;
-    time: string;
     timeAgo: string;
     onDelete: () => void;
+    onEdit: () => void;
     index: number;
 }
 
-const FoodItemCard: React.FC<FoodItemCardProps> = ({ entry, time, timeAgo, onDelete, index }) => {
+const FoodItemCard: React.FC<FoodItemCardProps> = ({ entry, timeAgo, onDelete, onEdit, index }) => {
     const translateX = useRef(new Animated.Value(0)).current;
     const rowOpacity = useRef(new Animated.Value(1)).current;
     const cardScale = useRef(new Animated.Value(1)).current;
+    const isSwiping = useRef(false);
 
     const panResponder = useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => false,
             onMoveShouldSetPanResponder: (_, gestureState) => {
                 const { dx, dy } = gestureState;
-                return Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10;
+                if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10) {
+                    isSwiping.current = true;
+                    return true;
+                }
+                return false;
             },
             onPanResponderTerminationRequest: () => true,
             onPanResponderMove: (_, gestureState) => {
@@ -325,9 +428,16 @@ const FoodItemCard: React.FC<FoodItemCardProps> = ({ entry, time, timeAgo, onDel
                         useNativeDriver: true,
                     }).start();
                 }
+                isSwiping.current = false;
             },
         })
     ).current;
+
+    const handlePress = () => {
+        if (!isSwiping.current) {
+            onEdit();
+        }
+    };
 
     return (
         <Animated.View
@@ -340,7 +450,11 @@ const FoodItemCard: React.FC<FoodItemCardProps> = ({ entry, time, timeAgo, onDel
             ]}
             {...panResponder.panHandlers}
         >
-            <View style={styles.foodCardContent}>
+            <TouchableOpacity
+                style={styles.foodCardContent}
+                onPress={handlePress}
+                activeOpacity={0.7}
+            >
                 <View style={styles.foodCardLeft}>
                     <Text style={styles.foodCardName}>{entry.food.name}</Text>
                     {entry.portion && (
@@ -349,26 +463,29 @@ const FoodItemCard: React.FC<FoodItemCardProps> = ({ entry, time, timeAgo, onDel
                     <View style={styles.foodCardMacros}>
                         <View style={styles.macroItem}>
                             <View style={[styles.macroDot, styles.proteinDot]} />
-                            <Text style={styles.macroText}>P {entry.food.protein}g</Text>
+                            <Text style={styles.macroText}>
+                                <Text style={styles.macroLetter}>P</Text> {entry.food.protein}g
+                            </Text>
                         </View>
                         <View style={styles.macroItem}>
                             <View style={[styles.macroDot, styles.carbsDot]} />
-                            <Text style={styles.macroText}>C {entry.food.carbs}g</Text>
+                            <Text style={styles.macroText}>
+                                <Text style={styles.macroLetter}>C</Text> {entry.food.carbs}g
+                            </Text>
                         </View>
                         <View style={styles.macroItem}>
                             <View style={[styles.macroDot, styles.fatsDot]} />
-                            <Text style={styles.macroText}>F {entry.food.fats}g</Text>
+                            <Text style={styles.macroText}>
+                                <Text style={styles.macroLetter}>F</Text> {entry.food.fats}g
+                            </Text>
                         </View>
                     </View>
                 </View>
                 <View style={styles.foodCardRight}>
                     <Text style={styles.foodCardCalories}>{entry.food.calories} kcal</Text>
-                    <View style={styles.foodCardTimeContainer}>
-                        <Text style={styles.foodCardTime}>{time}</Text>
-                        <Text style={styles.foodCardTimeAgo}>{timeAgo}</Text>
-                    </View>
+                    <Text style={styles.foodCardTimeAgo}>{timeAgo}</Text>
                 </View>
-            </View>
+            </TouchableOpacity>
         </Animated.View>
     );
 };
@@ -376,71 +493,129 @@ const FoodItemCard: React.FC<FoodItemCardProps> = ({ entry, time, timeAgo, onDel
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+    },
+    content: {
+        flex: 1,
         backgroundColor: '#fff',
+    },
+    contentInner: {
+        flex: 1,
+    },
+    contentInnerView: {
+        flex: 1,
+        paddingHorizontal: 25,
     },
     scrollView: {
         flex: 1,
     },
     scrollContent: {
+        paddingBottom: 100,
+    },
+    headerContainer: {
         paddingHorizontal: 25,
     },
     header: {
-        paddingBottom: 24,
-        borderBottomWidth: 2,
-        borderBottomColor: '#E0E0E0',
-        marginBottom: 24,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingTop: 8,
+        paddingBottom: 8,
+        minHeight: 48,
+        paddingLeft: 0,
+        paddingRight: 0,
     },
     backButton: {
-        marginBottom: 16,
+        padding: 12,
+        marginLeft: -12,
+        minWidth: 44,
+        minHeight: 44,
+        alignItems: 'flex-start',
+        justifyContent: 'center',
     },
-    headerContent: {
-        gap: 12,
-    },
-    headerTop: {
-        flexDirection: 'row',
+    headerCenter: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
         alignItems: 'center',
-        gap: 12,
+        justifyContent: 'center',
     },
     headerTitle: {
-        fontSize: 28,
+        fontSize: 18,
         fontFamily: fonts.bold,
         color: '#252525',
         textTransform: 'lowercase',
+        textAlign: 'center',
     },
-    headerMacros: {
+    headerStats: {
+        fontSize: 12,
+        fontFamily: fonts.regular,
+        color: '#666',
+        textTransform: 'lowercase',
+        textAlign: 'center',
+        marginTop: 1,
+    },
+    addButton: {
+        padding: 8,
+        marginRight: -8,
+        minWidth: 44,
+        minHeight: 44,
+        alignItems: 'flex-end',
+        justifyContent: 'center',
+    },
+    headerDivider: {
+        height: 1,
+        backgroundColor: '#E0E0E0',
+        width: '100%',
+        marginTop: 0,
+    },
+    macrosSection: {
+        paddingTop: 16,
+        paddingBottom: 16,
+    },
+    macrosDivider: {
+        height: 1,
+        backgroundColor: '#E0E0E0',
+        width: '100%',
+        marginLeft: -25,
+        marginRight: -25,
+        marginTop: 0,
+        marginBottom: 16,
+    },
+    macrosRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: 8,
+        justifyContent: 'space-between',
+        width: '98%',
     },
-    headerCalories: {
-        fontSize: 18,
-        fontFamily: fonts.bold,
+    macrosCalories: {
+        fontSize: 14,
+        fontFamily: fonts.regular,
         color: '#252525',
         textTransform: 'lowercase',
     },
-    headerSeparator: {
-        fontSize: 18,
+    macrosSeparator: {
+        fontSize: 14,
         fontFamily: fonts.regular,
         color: 'rgba(37, 37, 37, 0.5)',
+        marginHorizontal: 4,
     },
-    headerMacroItem: {
+    macrosMacroItem: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
     },
-    headerMacroDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
+    macrosMacroDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
     },
-    headerMacroText: {
-        fontSize: 18,
+    macrosMacroText: {
+        fontSize: 14,
         fontFamily: fonts.regular,
         color: '#252525',
         textTransform: 'lowercase',
     },
-    headerMacroLetter: {
+    macrosMacroLetter: {
         textTransform: 'uppercase',
     },
     foodsContainer: {
@@ -464,7 +639,7 @@ const styles = StyleSheet.create({
     },
     foodCardName: {
         fontSize: 18,
-        fontFamily: fonts.bold,
+        fontFamily: fonts.regular,
         color: '#252525',
         textTransform: 'lowercase',
         marginBottom: 4,
@@ -506,25 +681,19 @@ const styles = StyleSheet.create({
         color: '#9E9E9E',
         textTransform: 'lowercase',
     },
+    macroLetter: {
+        textTransform: 'uppercase',
+    },
     foodCardRight: {
         alignItems: 'flex-end',
         justifyContent: 'space-between',
     },
     foodCardCalories: {
         fontSize: 18,
-        fontFamily: fonts.bold,
+        fontFamily: fonts.regular,
         color: '#252525',
         textTransform: 'lowercase',
         marginBottom: 8,
-    },
-    foodCardTimeContainer: {
-        alignItems: 'flex-end',
-        gap: 2,
-    },
-    foodCardTime: {
-        fontSize: 14,
-        fontFamily: fonts.regular,
-        color: '#252525',
     },
     foodCardTimeAgo: {
         fontSize: 12,
@@ -548,26 +717,6 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontFamily: fonts.regular,
         color: '#9E9E9E',
-        textTransform: 'lowercase',
-    },
-    addButton: {
-        position: 'absolute',
-        left: 25,
-        right: 25,
-        height: 56,
-        backgroundColor: '#252525',
-        borderRadius: 12,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        borderWidth: 2.5,
-        borderColor: '#252525',
-    },
-    addButtonText: {
-        fontSize: 18,
-        fontFamily: fonts.bold,
-        color: '#fff',
         textTransform: 'lowercase',
     },
 });
