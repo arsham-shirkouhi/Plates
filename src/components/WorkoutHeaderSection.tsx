@@ -18,6 +18,7 @@ interface WorkoutHeaderSectionProps {
     totalSets?: number; // Total sets across all exercises
     totalReps?: number; // Total reps across all sets
     workoutDuration?: number; // in seconds for timer
+    hasNeverLoggedWorkout?: boolean; // True if user has never logged a workout
 }
 
 export const WorkoutHeaderSection: React.FC<WorkoutHeaderSectionProps> = ({
@@ -33,6 +34,7 @@ export const WorkoutHeaderSection: React.FC<WorkoutHeaderSectionProps> = ({
     totalSets = 0,
     totalReps = 0,
     workoutDuration = 0,
+    hasNeverLoggedWorkout = false,
 }) => {
     // Animation values for circle positions
     const profileCircleLeft = useRef(new Animated.Value(0)).current;
@@ -226,8 +228,17 @@ export const WorkoutHeaderSection: React.FC<WorkoutHeaderSectionProps> = ({
                 <View style={styles.statsSection}>
                     {isEmpty ? (
                         <View style={styles.emptyStateTextContainer}>
-                            <Text style={styles.emptyStateTextSmall}>no workout yet</Text>
-                            <Text style={styles.emptyStateTextLarge}>today!</Text>
+                            {hasNeverLoggedWorkout ? (
+                                <>
+                                    <Text style={styles.emptyStateTextSmall}>ready to start?</Text>
+                                    <Text style={styles.emptyStateTextLarge}>let's begin!</Text>
+                                </>
+                            ) : (
+                                <>
+                                    <Text style={styles.emptyStateTextSmall}>no workout yet</Text>
+                                    <Text style={styles.emptyStateTextLarge}>today!</Text>
+                                </>
+                            )}
                         </View>
                     ) : isActive ? (
                         <>

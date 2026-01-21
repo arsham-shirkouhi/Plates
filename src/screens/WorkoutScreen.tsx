@@ -48,11 +48,18 @@ export const WorkoutScreen: React.FC = () => {
     const navigation = useNavigation<WorkoutScreenNavigationProp>();
     const route = useRoute<RouteProp<RootStackParamList, 'Workout'>>();
     const insets = useSafeAreaInsets();
+    const [hasCompletedWorkout, setHasCompletedWorkout] = useState(false);
     const screenHeight = Dimensions.get('window').height;
     const headerHeight = 200; // Header section height (gradient + header)
     const finishButtonHeight = 60; // Finish workout button height + margin
     const navigationBarHeight = 80; // Navigation bar height + bottom inset + padding
     const workoutBoxHeight = screenHeight - insets.top - headerHeight - finishButtonHeight - 50; // Minimal padding
+    
+    // Calculate available height for dashed box (accounting for navbar and browse button)
+    const browseButtonHeight = !hasCompletedWorkout ? 70 : 0; // Browse workouts button height + margin
+    const headerActualHeight = 120; // Actual header section height (gradient overlaps, so smaller)
+    const bottomSpacing = 10; // Minimal spacing to prevent going behind navbar
+    const availableHeight = screenHeight - insets.top - headerActualHeight - navigationBarHeight - browseButtonHeight - bottomSpacing;
     const [activeWorkout, setActiveWorkout] = useState<ActiveWorkout | null>(null);
     const scrollViewRef = useRef<ScrollView>(null);
     const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -350,7 +357,13 @@ export const WorkoutScreen: React.FC = () => {
 
         // TODO: Save workout to database
         setActiveWorkout(null);
+        setHasCompletedWorkout(true);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    };
+
+    const handleBrowseWorkouts = () => {
+        navigation.navigate('BrowseWorkouts');
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     };
 
     const formatTime = (minutes: number): string => {
@@ -395,13 +408,30 @@ export const WorkoutScreen: React.FC = () => {
                     totalSets={totalSets}
                     totalReps={totalReps}
                     workoutDuration={workoutTimer}
+                    hasNeverLoggedWorkout={!hasCompletedWorkout && !activeWorkout}
                 />
 
                 {/* Empty State or Active Workout */}
                 {!activeWorkout ? (
                     <View style={styles.emptyStateContainer}>
+                        {/* First-time user: Browse Workouts Button */}
+                        {!hasCompletedWorkout && (
+                            <View style={styles.browseWorkoutsButtonContainer}>
+                                <Button
+                                    variant="primary"
+                                    title="browse workouts"
+                                    onPress={handleBrowseWorkouts}
+                                    containerStyle={styles.browseWorkoutsButton}
+                                />
+                            </View>
+                        )}
+                        
                         <TouchableOpacity
-                            style={styles.startWorkoutCard}
+                            style={[
+                                styles.startWorkoutCard,
+                                !hasCompletedWorkout && styles.startWorkoutCardWithButton,
+                                { height: availableHeight }
+                            ]}
                             onPress={() => {
                                 navigation.navigate('StartWorkout');
                                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -591,9 +621,9 @@ const styles = StyleSheet.create({
         flex: 1,
         width: '100%',
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
         paddingTop: 0,
-        paddingBottom: 20,
+        paddingBottom: 0,
     },
     startWorkoutCard: {
         backgroundColor: 'rgba(255, 255, 255, 0.5)',
@@ -606,8 +636,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         width: '100%',
-        flex: 1,
-        minHeight: Dimensions.get('window').height * 0.7,
+        marginBottom: 0,
+    },
+    startWorkoutCardWithButton: {
+        marginTop: 20,
     },
     startWorkoutTextLarge: {
         fontSize: 20,
@@ -623,6 +655,14 @@ const styles = StyleSheet.create({
         color: '#252525',
         textTransform: 'lowercase',
         textAlign: 'center',
+    },
+    browseWorkoutsButtonContainer: {
+        width: '100%',
+        marginTop: 0,
+        paddingHorizontal: 0,
+    },
+    browseWorkoutsButton: {
+        width: '100%',
     },
 
     workoutBox: {

@@ -13,6 +13,7 @@ import { FoodLogScreen } from '../screens/FoodLogScreen';
 import { MealDetailScreen } from '../screens/MealDetailScreen';
 import { WorkoutScreen } from '../screens/WorkoutScreen';
 import { StartWorkoutScreen } from '../screens/StartWorkoutScreen';
+import { BrowseWorkoutsScreen } from '../screens/BrowseWorkoutsScreen';
 import { ExerciseDetailScreen } from '../screens/ExerciseDetailScreen';
 import { UniversalNavBar } from '../components/UniversalNavBar';
 
@@ -69,7 +70,8 @@ export type RootStackParamList = {
         }>;
         newlyCompletedExerciseIds?: string[];
     } | undefined;
-    StartWorkout: undefined;
+    StartWorkout: { selectedWorkoutId?: string } | undefined;
+    BrowseWorkouts: undefined;
     ExerciseDetail: {
         exercise: {
             id: string;
@@ -171,6 +173,14 @@ const NavigatorWithNavBar: React.FC = () => {
                 <Stack.Screen
                     name="StartWorkout"
                     component={StartWorkoutScreen}
+                    options={{
+                        animation: 'slide_from_right',
+                        animationDuration: 300,
+                    }}
+                />
+                <Stack.Screen
+                    name="BrowseWorkouts"
+                    component={BrowseWorkoutsScreen}
                     options={{
                         animation: 'slide_from_right',
                         animationDuration: 300,

@@ -24,6 +24,9 @@ export const StartWorkoutScreen: React.FC = () => {
     const navigation = useNavigation<StartWorkoutScreenNavigationProp>();
     const route = useRoute<StartWorkoutScreenRouteProp>();
     const insets = useSafeAreaInsets();
+    
+    // Get selected workout ID if coming from BrowseWorkouts
+    const selectedWorkoutId = route.params?.selectedWorkoutId;
 
     // Mock saved workouts - in real app, this would come from database
     const savedWorkouts: Array<{
