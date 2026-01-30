@@ -4,18 +4,19 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { User } from '@supabase/supabase-js';
 import { LoginScreen } from '../screens/LoginScreen';
 import { SignupScreen } from '../screens/SignupScreen';
-import { HomeScreen } from '../screens/HomeScreen';
 import { VerificationScreen } from '../screens/VerificationScreen';
 import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { MacroResultsScreen } from '../screens/MacroResultsScreen';
-import { FoodLogScreen } from '../screens/FoodLogScreen';
 import { MealDetailScreen } from '../screens/MealDetailScreen';
-import { WorkoutScreen } from '../screens/WorkoutScreen';
+// Import preloaded screens for main navigation tabs
+import { PreloadedHomeScreen, PreloadedFoodLogScreen, PreloadedWorkoutScreen } from './PreloadedScreens';
 import { StartWorkoutScreen } from '../screens/StartWorkoutScreen';
 import { BrowseWorkoutsScreen } from '../screens/BrowseWorkoutsScreen';
 import { ExerciseDetailScreen } from '../screens/ExerciseDetailScreen';
 import { UniversalNavBar } from '../components/UniversalNavBar';
+import { SimpleNavBar } from '../components/SimpleNavBar';
+import { ScreenPreloader } from '../components/ScreenPreloader';
 
 export type RootStackParamList = {
     Login: undefined;
@@ -145,13 +146,24 @@ const NavigatorWithNavBar: React.FC = () => {
                         animationDuration: 300,
                     }}
                 />
-                <Stack.Screen name="Home" component={HomeScreen} />
+                <Stack.Screen 
+                    name="Home" 
+                    component={PreloadedHomeScreen}
+                    options={{
+                        gestureEnabled: true,
+                        animation: 'slide_from_right',
+                        animationDuration: 200,
+                        // Screen is preloaded and ready for smooth swiping
+                    }}
+                />
                 <Stack.Screen
                     name="FoodLog"
-                    component={FoodLogScreen}
+                    component={PreloadedFoodLogScreen}
                     options={{
+                        gestureEnabled: true,
                         animation: 'slide_from_right',
-                        animationDuration: 300,
+                        animationDuration: 200,
+                        // Screen is preloaded and ready for smooth swiping
                     }}
                 />
                 <Stack.Screen
@@ -164,10 +176,12 @@ const NavigatorWithNavBar: React.FC = () => {
                 />
                 <Stack.Screen
                     name="Workout"
-                    component={WorkoutScreen}
+                    component={PreloadedWorkoutScreen}
                     options={{
+                        gestureEnabled: true,
                         animation: 'slide_from_right',
-                        animationDuration: 300,
+                        animationDuration: 200,
+                        // Screen is preloaded and ready for smooth swiping
                     }}
                 />
                 <Stack.Screen
@@ -195,8 +209,12 @@ const NavigatorWithNavBar: React.FC = () => {
                     }}
                 />
             </Stack.Navigator>
-            {/* Universal NavBar - overlays all main app screens */}
+            {/* Old NavBar - hidden but component preserved */}
             <UniversalNavBar />
+            {/* New Simple NavBar */}
+            <SimpleNavBar />
+            {/* Screen Preloader - preloads main screens for instant navigation */}
+            <ScreenPreloader />
         </>
     );
 };

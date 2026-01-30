@@ -230,7 +230,7 @@ export const WorkoutHeaderSection: React.FC<WorkoutHeaderSectionProps> = ({
                         <View style={styles.emptyStateTextContainer}>
                             {hasNeverLoggedWorkout ? (
                                 <>
-                                    <Text style={styles.emptyStateTextSmall}>ready to start?</Text>
+                                    <Text style={styles.emptyStateTextSmall}>ready to workout?</Text>
                                     <Text style={styles.emptyStateTextLarge}>let's begin!</Text>
                                 </>
                             ) : (

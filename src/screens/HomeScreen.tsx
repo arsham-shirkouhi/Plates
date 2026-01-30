@@ -394,22 +394,21 @@ export const HomeScreen: React.FC = () => {
                     {/* Gradient background */}
                     <GradientBackground />
 
-                    {/* Header with streak, date, and profile */}
-                    {!loadingProfile && (
-                        <HeaderSection
-                            streak={streak}
-                            topInset={insets.top}
-                            onProfilePress={() => {
-                                // TODO: Navigate to profile screen
-                                Alert.alert('Profile', 'Profile screen coming soon');
-                            }}
-                        />
-                    )}
+                    {/* Header with streak, date, and profile - Always render for instant display */}
+                    <HeaderSection
+                        streak={streak}
+                        topInset={insets.top}
+                        onProfilePress={() => {
+                            // TODO: Navigate to profile screen
+                            Alert.alert('Profile', 'Profile screen coming soon');
+                        }}
+                    />
 
-                    {/* Main Content Card */}
-                    {!loadingProfile && macros && (
-                        <MacrosCard macros={macros} consumed={consumed} />
-                    )}
+                    {/* Main Content Card - Always render for instant display */}
+                    <MacrosCard 
+                        macros={macros || { calories: 0, protein: 0, carbs: 0, fats: 0 }} 
+                        consumed={consumed} 
+                    />
 
                     {/* Food Log */}
                     <FoodLog onPress={() => navigation.navigate('FoodLog')} />

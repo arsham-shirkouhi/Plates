@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
     View,
     Text,
@@ -6,6 +6,7 @@ import {
     ScrollView,
     TouchableOpacity,
     Dimensions,
+    Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -35,12 +36,40 @@ export const StartWorkoutScreen: React.FC = () => {
         lastCompleted: string;
         exerciseCount: number;
         duration: string;
-    }> = [
-            { id: '1', name: 'Push Day', lastCompleted: '2 days ago', exerciseCount: 6, duration: '45m' },
-            { id: '2', name: 'Pull Day', lastCompleted: '4 days ago', exerciseCount: 5, duration: '40m' },
-            { id: '3', name: 'Leg Day', lastCompleted: '1 week ago', exerciseCount: 7, duration: '60m' },
-        ];
+    }> = []; // Empty array for initial state - no saved workouts
     const hasSavedWorkouts = savedWorkouts.length > 0;
+
+    // Animation refs for option cards (like onboarding buttons)
+    const pickAsYouGoTranslateY = useRef(new Animated.Value(0)).current;
+    const pickAsYouGoShadowHeight = useRef(new Animated.Value(4)).current;
+    const [pickAsYouGoShadowHeightState, setPickAsYouGoShadowHeightState] = useState(4);
+
+    const createNewTranslateY = useRef(new Animated.Value(0)).current;
+    const createNewShadowHeight = useRef(new Animated.Value(4)).current;
+    const [createNewShadowHeightState, setCreateNewShadowHeightState] = useState(4);
+
+    const scheduleTranslateY = useRef(new Animated.Value(0)).current;
+    const scheduleShadowHeight = useRef(new Animated.Value(4)).current;
+    const [scheduleShadowHeightState, setScheduleShadowHeightState] = useState(4);
+
+    // Listen to shadow height changes for rendering
+    React.useEffect(() => {
+        const pickListenerId = pickAsYouGoShadowHeight.addListener(({ value }) => {
+            setPickAsYouGoShadowHeightState(value);
+        });
+        const createListenerId = createNewShadowHeight.addListener(({ value }) => {
+            setCreateNewShadowHeightState(value);
+        });
+        const scheduleListenerId = scheduleShadowHeight.addListener(({ value }) => {
+            setScheduleShadowHeightState(value);
+        });
+
+        return () => {
+            pickAsYouGoShadowHeight.removeListener(pickListenerId);
+            createNewShadowHeight.removeListener(createListenerId);
+            scheduleShadowHeight.removeListener(scheduleListenerId);
+        };
+    }, []);
 
     const handleOptionPress = (type: 'pick-as-you-go' | 'previous' | 'new' | 'schedule', workoutId?: string) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -139,32 +168,249 @@ export const StartWorkoutScreen: React.FC = () => {
                                 </View>
                             )}
 
-                            {/* Options Section */}
-                            <View style={styles.optionsContainer}>
-                                {/* Option 1: Pick as you go */}
-                                <Button
-                                    variant="secondary"
-                                    title="pick as you go"
-                                    onPress={() => handleOptionPress('pick-as-you-go')}
-                                    containerStyle={styles.optionButton}
-                                />
+                            {/* Options Section - Big Button Cards when no saved workouts */}
+                            {!hasSavedWorkouts && (
+                                <View style={styles.optionsContainer}>
+                                    {/* Option 1: Pick as you go */}
+                                    <View style={styles.optionButtonWrapper}>
+                                        {/* Shadow layer */}
+                                        <Animated.View
+                                            style={[
+                                                styles.optionButtonShadow,
+                                                {
+                                                    opacity: pickAsYouGoShadowHeight.interpolate({
+                                                        inputRange: [0, 4],
+                                                        outputRange: [0, 1],
+                                                    }),
+                                                },
+                                            ]}
+                                            pointerEvents="none"
+                                        />
+                                        <TouchableOpacity
+                                            onPress={() => handleOptionPress('pick-as-you-go')}
+                                            onPressIn={() => {
+                                                Animated.parallel([
+                                                    Animated.timing(pickAsYouGoTranslateY, {
+                                                        toValue: 4,
+                                                        duration: 120,
+                                                        useNativeDriver: true,
+                                                    }),
+                                                    Animated.timing(pickAsYouGoShadowHeight, {
+                                                        toValue: 0,
+                                                        duration: 120,
+                                                        useNativeDriver: false,
+                                                    }),
+                                                ]).start();
+                                            }}
+                                            onPressOut={() => {
+                                                Animated.parallel([
+                                                    Animated.timing(pickAsYouGoTranslateY, {
+                                                        toValue: 0,
+                                                        duration: 120,
+                                                        useNativeDriver: true,
+                                                    }),
+                                                    Animated.timing(pickAsYouGoShadowHeight, {
+                                                        toValue: 4,
+                                                        duration: 120,
+                                                        useNativeDriver: false,
+                                                    }),
+                                                ]).start();
+                                            }}
+                                            activeOpacity={1}
+                                            style={styles.optionButtonTouchable}
+                                        >
+                                            <Animated.View
+                                                style={[
+                                                    styles.optionButton,
+                                                    {
+                                                        transform: [{ translateY: pickAsYouGoTranslateY }],
+                                                    },
+                                                ]}
+                                            >
+                                                <View style={styles.optionButtonContent}>
+                                                    <View style={styles.optionButtonLeft}>
+                                                        <Ionicons name="flash" size={24} color="#252525" />
+                                                        <View style={styles.optionButtonTextContainer}>
+                                                            <Text style={styles.optionButtonTitle}>pick as you go</Text>
+                                                            <Text style={styles.optionButtonSubtitle}>start a workout and add exercises as you go</Text>
+                                                        </View>
+                                                    </View>
+                                                    <Ionicons name="chevron-forward" size={20} color="#252525" />
+                                                </View>
+                                            </Animated.View>
+                                        </TouchableOpacity>
+                                    </View>
 
-                                {/* Option 2: Create new workout */}
-                                <Button
-                                    variant="secondary"
-                                    title="create new workout"
-                                    onPress={() => handleOptionPress('new')}
-                                    containerStyle={styles.optionButton}
-                                />
+                                    {/* Option 2: Create new workout */}
+                                    <View style={styles.optionButtonWrapper}>
+                                        {/* Shadow layer */}
+                                        <Animated.View
+                                            style={[
+                                                styles.optionButtonShadow,
+                                                {
+                                                    opacity: createNewShadowHeight.interpolate({
+                                                        inputRange: [0, 4],
+                                                        outputRange: [0, 1],
+                                                    }),
+                                                },
+                                            ]}
+                                            pointerEvents="none"
+                                        />
+                                        <TouchableOpacity
+                                            onPress={() => handleOptionPress('new')}
+                                            onPressIn={() => {
+                                                Animated.parallel([
+                                                    Animated.timing(createNewTranslateY, {
+                                                        toValue: 4,
+                                                        duration: 120,
+                                                        useNativeDriver: true,
+                                                    }),
+                                                    Animated.timing(createNewShadowHeight, {
+                                                        toValue: 0,
+                                                        duration: 120,
+                                                        useNativeDriver: false,
+                                                    }),
+                                                ]).start();
+                                            }}
+                                            onPressOut={() => {
+                                                Animated.parallel([
+                                                    Animated.timing(createNewTranslateY, {
+                                                        toValue: 0,
+                                                        duration: 120,
+                                                        useNativeDriver: true,
+                                                    }),
+                                                    Animated.timing(createNewShadowHeight, {
+                                                        toValue: 4,
+                                                        duration: 120,
+                                                        useNativeDriver: false,
+                                                    }),
+                                                ]).start();
+                                            }}
+                                            activeOpacity={1}
+                                            style={styles.optionButtonTouchable}
+                                        >
+                                            <Animated.View
+                                                style={[
+                                                    styles.optionButton,
+                                                    {
+                                                        transform: [{ translateY: createNewTranslateY }],
+                                                    },
+                                                ]}
+                                            >
+                                                <View style={styles.optionButtonContent}>
+                                                    <View style={styles.optionButtonLeft}>
+                                                        <Ionicons name="add-circle" size={24} color="#252525" />
+                                                        <View style={styles.optionButtonTextContainer}>
+                                                            <Text style={styles.optionButtonTitle}>create new workout</Text>
+                                                            <Text style={styles.optionButtonSubtitle}>build a custom workout from scratch</Text>
+                                                        </View>
+                                                    </View>
+                                                    <Ionicons name="chevron-forward" size={20} color="#252525" />
+                                                </View>
+                                            </Animated.View>
+                                        </TouchableOpacity>
+                                    </View>
 
-                                {/* Option 3: Schedule workout */}
-                                <Button
-                                    variant="secondary"
-                                    title="schedule workout"
-                                    onPress={() => handleOptionPress('schedule')}
-                                    containerStyle={styles.optionButton}
-                                />
-                            </View>
+                                    {/* Option 3: Schedule workout */}
+                                    <View style={styles.optionButtonWrapper}>
+                                        {/* Shadow layer */}
+                                        <Animated.View
+                                            style={[
+                                                styles.optionButtonShadow,
+                                                {
+                                                    opacity: scheduleShadowHeight.interpolate({
+                                                        inputRange: [0, 4],
+                                                        outputRange: [0, 1],
+                                                    }),
+                                                },
+                                            ]}
+                                            pointerEvents="none"
+                                        />
+                                        <TouchableOpacity
+                                            onPress={() => handleOptionPress('schedule')}
+                                            onPressIn={() => {
+                                                Animated.parallel([
+                                                    Animated.timing(scheduleTranslateY, {
+                                                        toValue: 4,
+                                                        duration: 120,
+                                                        useNativeDriver: true,
+                                                    }),
+                                                    Animated.timing(scheduleShadowHeight, {
+                                                        toValue: 0,
+                                                        duration: 120,
+                                                        useNativeDriver: false,
+                                                    }),
+                                                ]).start();
+                                            }}
+                                            onPressOut={() => {
+                                                Animated.parallel([
+                                                    Animated.timing(scheduleTranslateY, {
+                                                        toValue: 0,
+                                                        duration: 120,
+                                                        useNativeDriver: true,
+                                                    }),
+                                                    Animated.timing(scheduleShadowHeight, {
+                                                        toValue: 4,
+                                                        duration: 120,
+                                                        useNativeDriver: false,
+                                                    }),
+                                                ]).start();
+                                            }}
+                                            activeOpacity={1}
+                                            style={styles.optionButtonTouchable}
+                                        >
+                                            <Animated.View
+                                                style={[
+                                                    styles.optionButton,
+                                                    {
+                                                        transform: [{ translateY: scheduleTranslateY }],
+                                                    },
+                                                ]}
+                                            >
+                                                <View style={styles.optionButtonContent}>
+                                                    <View style={styles.optionButtonLeft}>
+                                                        <Ionicons name="calendar" size={24} color="#252525" />
+                                                        <View style={styles.optionButtonTextContainer}>
+                                                            <Text style={styles.optionButtonTitle}>schedule workout</Text>
+                                                            <Text style={styles.optionButtonSubtitle}>plan your workout for later</Text>
+                                                        </View>
+                                                    </View>
+                                                    <Ionicons name="chevron-forward" size={20} color="#252525" />
+                                                </View>
+                                            </Animated.View>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            )}
+
+                            {/* Options Section - Buttons when saved workouts exist */}
+                            {hasSavedWorkouts && (
+                                <View style={styles.optionsContainer}>
+                                    {/* Option 1: Pick as you go */}
+                                    <Button
+                                        variant="secondary"
+                                        title="pick as you go"
+                                        onPress={() => handleOptionPress('pick-as-you-go')}
+                                        containerStyle={styles.optionButton}
+                                    />
+
+                                    {/* Option 2: Create new workout */}
+                                    <Button
+                                        variant="secondary"
+                                        title="create new workout"
+                                        onPress={() => handleOptionPress('new')}
+                                        containerStyle={styles.optionButton}
+                                    />
+
+                                    {/* Option 3: Schedule workout */}
+                                    <Button
+                                        variant="secondary"
+                                        title="schedule workout"
+                                        onPress={() => handleOptionPress('schedule')}
+                                        containerStyle={styles.optionButton}
+                                    />
+                                </View>
+                            )}
                         </ScrollView>
                     </View>
                 </View>
@@ -326,9 +572,71 @@ const styles = StyleSheet.create({
     optionsContainer: {
         gap: 12,
         paddingTop: 16,
+        alignItems: 'center',
+    },
+    optionButtonWrapper: {
+        position: 'relative',
+        width: '100%',
+        maxWidth: 360,
+        height: 100,
+        marginBottom: 12,
+    },
+    optionButtonShadow: {
+        position: 'absolute',
+        width: '100%',
+        height: 100,
+        backgroundColor: '#252525',
+        borderRadius: 12,
+        top: 4,
+        left: 0,
+        zIndex: 0,
+    },
+    optionButtonTouchable: {
+        zIndex: 1,
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
     },
     optionButton: {
         width: '100%',
+        height: 100,
+        backgroundColor: '#fff',
+        borderWidth: 2,
+        borderColor: '#252525',
+        borderRadius: 12,
+        paddingHorizontal: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    optionButtonContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        width: '100%',
+    },
+    optionButtonLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+        marginRight: 12,
+    },
+    optionButtonTextContainer: {
+        flex: 1,
+        marginLeft: 16,
+    },
+    optionButtonTitle: {
+        fontSize: 18,
+        fontFamily: fonts.bold,
+        color: '#252525',
+        textTransform: 'lowercase',
+        marginBottom: 4,
+    },
+    optionButtonSubtitle: {
+        fontSize: 14,
+        fontFamily: fonts.regular,
+        color: '#9E9E9E',
+        textTransform: 'lowercase',
     },
 });
 

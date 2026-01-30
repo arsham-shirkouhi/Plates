@@ -10,6 +10,8 @@ import {
     Easing,
     Image,
     TextInput,
+    Modal,
+    Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +23,9 @@ import { fonts } from '../constants/fonts';
 import { WorkoutHeaderSection } from '../components/WorkoutHeaderSection';
 import { Button } from '../components/Button';
 import { Confetti, ConfettiParticle } from '../components/Confetti';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StartWorkoutBottomSheet } from '../components/StartWorkoutBottomSheet';
+import { AddExerciseOverlay } from '../components/AddExerciseOverlay';
 
 type WorkoutScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Workout'>;
 
@@ -34,12 +39,14 @@ interface Set {
     id: string;
     reps: string;
     weight: string;
+    completed?: boolean;
 }
 
 interface ActiveWorkout {
     id: string;
     startedAt: Date;
     exercises: Exercise[];
+    workoutName?: string;
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -54,14 +61,29 @@ export const WorkoutScreen: React.FC = () => {
     const finishButtonHeight = 60; // Finish workout button height + margin
     const navigationBarHeight = 80; // Navigation bar height + bottom inset + padding
     const workoutBoxHeight = screenHeight - insets.top - headerHeight - finishButtonHeight - 50; // Minimal padding
-    
-    // Calculate available height for dashed box (accounting for navbar and browse button)
-    const browseButtonHeight = !hasCompletedWorkout ? 70 : 0; // Browse workouts button height + margin
+
+    // Calculate available height for dashed box (accounting for navbar - browse button is commented out)
+    const browseButtonHeight = 0; // Browse workouts button is commented out, so no height needed
     const headerActualHeight = 120; // Actual header section height (gradient overlaps, so smaller)
-    const bottomSpacing = 10; // Minimal spacing to prevent going behind navbar
+    const bottomSpacing = 30; // Minimal spacing to prevent going behind navbar
     const availableHeight = screenHeight - insets.top - headerActualHeight - navigationBarHeight - browseButtonHeight - bottomSpacing;
     const [activeWorkout, setActiveWorkout] = useState<ActiveWorkout | null>(null);
+    const [showStartWorkoutSheet, setShowStartWorkoutSheet] = useState(false);
+    const [showCountdown, setShowCountdown] = useState(false);
+    const [showAddExerciseOverlay, setShowAddExerciseOverlay] = useState(false);
+    const [countdownValue, setCountdownValue] = useState(3);
+    const countdownScale = useRef(new Animated.Value(0)).current;
+    const countdownOpacity = useRef(new Animated.Value(0)).current;
+    const ring1Scale = useRef(new Animated.Value(0)).current;
+    const ring1Opacity = useRef(new Animated.Value(0)).current;
+    const ring2Scale = useRef(new Animated.Value(0)).current;
+    const ring2Opacity = useRef(new Animated.Value(0)).current;
+    const particlesOpacity = useRef(new Animated.Value(0)).current;
+    const dashedBoxScale = useRef(new Animated.Value(1)).current;
+    const dashedBoxOpacity = useRef(new Animated.Value(1)).current;
+    const workoutFadeIn = useRef(new Animated.Value(0)).current;
     const scrollViewRef = useRef<ScrollView>(null);
+    const lastTapRef = useRef<{ time: number }>({ time: 0 });
     const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const [confettiParticles, setConfettiParticles] = useState<ConfettiParticle[]>([]);
     const exerciseItemRefs = useRef<Map<string, { measureInWindow: (callback: (x: number, y: number, width: number, height: number) => void) => void; getTextWidth: () => number }>>(new Map());
@@ -176,10 +198,16 @@ export const WorkoutScreen: React.FC = () => {
 
     const handleAddExercise = () => {
         if (!activeWorkout) return;
+        // Open the add exercise overlay instead of directly adding
+        setShowAddExerciseOverlay(true);
+    };
+
+    const handleSelectExercise = (exercise: { id: string; name: string }) => {
+        if (!activeWorkout) return;
 
         const newExercise: Exercise = {
             id: Date.now().toString(),
-            name: 'new exercise',
+            name: exercise.name,
             sets: [
                 {
                     id: Date.now().toString(),
@@ -373,6 +401,228 @@ export const WorkoutScreen: React.FC = () => {
         return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
     };
 
+    // Determine if user has never logged a workout
+    const hasNeverLoggedWorkout = !hasCompletedWorkout && !activeWorkout;
+
+    // Ensure countdown is visible when Modal opens
+    useEffect(() => {
+        if (showCountdown) {
+            // Reset and ensure countdown is visible
+            countdownOpacity.setValue(1);
+            countdownScale.setValue(0);
+        }
+    }, [showCountdown]);
+
+    const handleStartWorkoutPress = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        Alert.alert(
+            'Start Workout',
+            'Do you want to start a workout?',
+            [
+                {
+                    text: 'Cancel',
+                    style: 'cancel',
+                    onPress: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
+                },
+                {
+                    text: 'Start',
+                    onPress: () => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                        setShowCountdown(true);
+                        // Small delay to ensure Modal is rendered before starting animation
+                        setTimeout(() => {
+                            startCountdown();
+                        }, 50);
+                    },
+                },
+            ],
+            { cancelable: true }
+        );
+    };
+
+    // Countdown function
+    const startCountdown = () => {
+        setCountdownValue(3);
+        countdownScale.setValue(0);
+        countdownOpacity.setValue(1);
+        ring1Scale.setValue(0);
+        ring1Opacity.setValue(0);
+        ring2Scale.setValue(0);
+        ring2Opacity.setValue(0);
+        particlesOpacity.setValue(0);
+
+        // Animate rings and particles
+        const animateRings = () => {
+            // Ring 1
+            Animated.parallel([
+                Animated.timing(ring1Scale, {
+                    toValue: 1.5,
+                    duration: 1000,
+                    easing: Easing.out(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.sequence([
+                    Animated.timing(ring1Opacity, {
+                        toValue: 0.6,
+                        duration: 300,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(ring1Opacity, {
+                        toValue: 0,
+                        duration: 700,
+                        useNativeDriver: true,
+                    }),
+                ]),
+            ]).start();
+
+            // Ring 2 (delayed)
+            setTimeout(() => {
+                Animated.parallel([
+                    Animated.timing(ring2Scale, {
+                        toValue: 1.8,
+                        duration: 1000,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                    Animated.sequence([
+                        Animated.timing(ring2Opacity, {
+                            toValue: 0.4,
+                            duration: 300,
+                            useNativeDriver: true,
+                        }),
+                        Animated.timing(ring2Opacity, {
+                            toValue: 0,
+                            duration: 700,
+                            useNativeDriver: true,
+                        }),
+                    ]),
+                ]).start();
+            }, 150);
+
+            // Particles
+            Animated.sequence([
+                Animated.timing(particlesOpacity, {
+                    toValue: 1,
+                    duration: 200,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(particlesOpacity, {
+                    toValue: 0,
+                    duration: 800,
+                    useNativeDriver: true,
+                }),
+            ]).start();
+        };
+
+        // Initial animation for "3"
+        animateRings();
+        Animated.spring(countdownScale, {
+            toValue: 1,
+            tension: 100,
+            friction: 7,
+            useNativeDriver: true,
+        }).start();
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+        // Countdown timer
+        let currentValue = 3;
+        const countdownInterval = setInterval(() => {
+            currentValue -= 1;
+
+            if (currentValue <= 0) {
+                clearInterval(countdownInterval);
+                // Show "GO!" for a moment, then start workout
+                setCountdownValue(0);
+                countdownScale.setValue(0);
+                ring1Scale.setValue(0);
+                ring1Opacity.setValue(0);
+                ring2Scale.setValue(0);
+                ring2Opacity.setValue(0);
+                particlesOpacity.setValue(0);
+
+                // Animate "GO!" with rings
+                animateRings();
+                Animated.spring(countdownScale, {
+                    toValue: 1,
+                    tension: 100,
+                    friction: 7,
+                    useNativeDriver: true,
+                }).start();
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+
+                setTimeout(() => {
+                    startWorkoutWithAnimation();
+                }, 500);
+                return;
+            }
+
+            // Animate next number
+            countdownScale.setValue(0);
+            countdownOpacity.setValue(1);
+            ring1Scale.setValue(0);
+            ring1Opacity.setValue(0);
+            ring2Scale.setValue(0);
+            ring2Opacity.setValue(0);
+            particlesOpacity.setValue(0);
+            setCountdownValue(currentValue);
+
+            animateRings();
+            Animated.spring(countdownScale, {
+                toValue: 1,
+                tension: 100,
+                friction: 7,
+                useNativeDriver: true,
+            }).start();
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        }, 1000);
+    };
+
+    // Start workout with transition animation
+    const startWorkoutWithAnimation = () => {
+        // Fade out and scale down dashed box
+        Animated.parallel([
+            Animated.timing(dashedBoxOpacity, {
+                toValue: 0,
+                duration: 400,
+                easing: Easing.out(Easing.ease),
+                useNativeDriver: true,
+            }),
+            Animated.timing(dashedBoxScale, {
+                toValue: 0.9,
+                duration: 400,
+                easing: Easing.out(Easing.ease),
+                useNativeDriver: true,
+            }),
+        ]).start(() => {
+            // Hide countdown after dashed box animation
+            setShowCountdown(false);
+
+            // Start the workout
+            const newWorkout: ActiveWorkout = {
+                id: Date.now().toString(),
+                startedAt: new Date(),
+                exercises: [],
+            };
+            setActiveWorkout(newWorkout);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+            // Reset dashed box animations for next time
+            dashedBoxScale.setValue(1);
+            dashedBoxOpacity.setValue(1);
+
+            // Fade in workout view with a slight delay for smooth transition
+            workoutFadeIn.setValue(0);
+            setTimeout(() => {
+                Animated.timing(workoutFadeIn, {
+                    toValue: 1,
+                    duration: 500,
+                    easing: Easing.out(Easing.ease),
+                    useNativeDriver: true,
+                }).start();
+            }, 100);
+        });
+    };
+
     return (
         <View style={styles.container}>
             <ScrollView
@@ -384,7 +634,11 @@ export const WorkoutScreen: React.FC = () => {
                 nestedScrollEnabled={true}
                 keyboardShouldPersistTaps="handled"
                 removeClippedSubviews={false}
-                scrollEnabled={true}
+                scrollEnabled={!hasNeverLoggedWorkout}
+                bounces={false}
+                overScrollMode="never"
+                alwaysBounceVertical={false}
+                decelerationRate="normal"
             >
                 {/* Gradient Background */}
                 <View style={[styles.gradientContainer, { height: 300 + insets.top }]}>
@@ -408,42 +662,50 @@ export const WorkoutScreen: React.FC = () => {
                     totalSets={totalSets}
                     totalReps={totalReps}
                     workoutDuration={workoutTimer}
-                    hasNeverLoggedWorkout={!hasCompletedWorkout && !activeWorkout}
+                    hasNeverLoggedWorkout={hasNeverLoggedWorkout}
                 />
 
                 {/* Empty State or Active Workout */}
                 {!activeWorkout ? (
                     <View style={styles.emptyStateContainer}>
-                        {/* First-time user: Browse Workouts Button */}
-                        {!hasCompletedWorkout && (
-                            <View style={styles.browseWorkoutsButtonContainer}>
-                                <Button
-                                    variant="primary"
-                                    title="browse workouts"
-                                    onPress={handleBrowseWorkouts}
-                                    containerStyle={styles.browseWorkoutsButton}
-                                />
-                            </View>
-                        )}
-                        
-                        <TouchableOpacity
+                        {/* Browse Workouts Button - Commented out */}
+                        {/* <View style={styles.browseWorkoutsButtonContainer}>
+                            <Button
+                                variant={!hasCompletedWorkout ? "primary" : "secondary"}
+                                title="Need inspiration?"
+                                onPress={handleBrowseWorkouts}
+                                containerStyle={styles.browseWorkoutsButton}
+                            />
+                        </View> */}
+
+                        <Animated.View
                             style={[
                                 styles.startWorkoutCard,
-                                !hasCompletedWorkout && styles.startWorkoutCardWithButton,
-                                { height: availableHeight }
+                                styles.startWorkoutCardWithButton,
+                                {
+                                    height: availableHeight - 10,
+                                    transform: [{ scale: dashedBoxScale }],
+                                    opacity: dashedBoxOpacity,
+                                }
                             ]}
-                            onPress={() => {
-                                navigation.navigate('StartWorkout');
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                            }}
-                            activeOpacity={0.7}
                         >
-                            <Text style={styles.startWorkoutTextLarge}>pick a workout or create your own!</Text>
-                            <Text style={styles.startWorkoutTextSmall}>tap to start!</Text>
-                        </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center' }]}
+                                onPress={handleStartWorkoutPress}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={styles.startWorkoutTextLarge} numberOfLines={1}>Start today's workout!</Text>
+                                <Text style={styles.startWorkoutTextSmall}>tap to start</Text>
+                            </TouchableOpacity>
+                        </Animated.View>
                     </View>
                 ) : (
-                    <View style={styles.activeWorkoutContainer}>
+                    <Animated.View
+                        style={[
+                            styles.activeWorkoutContainer,
+                            { opacity: workoutFadeIn }
+                        ]}
+                    >
                         {/* Finish Workout Button */}
                         <View style={styles.actionButtons}>
                             <Button
@@ -474,34 +736,162 @@ export const WorkoutScreen: React.FC = () => {
                             </View>
 
                             {/* Exercise List */}
-                            <ScrollView
-                                style={styles.exercisesScrollView}
-                                contentContainerStyle={styles.exercisesScrollContent}
-                                showsVerticalScrollIndicator={false}
+                            <View
+                                onStartShouldSetResponder={() => true}
+                                onResponderRelease={() => {
+                                    const now = Date.now();
+                                    const DOUBLE_TAP_DELAY = 300;
+
+                                    if (now - lastTapRef.current.time < DOUBLE_TAP_DELAY) {
+                                        // Double tap detected - open add exercise overlay
+                                        setShowAddExerciseOverlay(true);
+                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                        lastTapRef.current = { time: 0 };
+                                    } else {
+                                        // First tap - just record it
+                                        lastTapRef.current = { time: now };
+                                    }
+                                }}
+                                style={{ flex: 1 }}
                             >
-                                {activeWorkout.exercises.map((exercise, index) => {
-                                    const isComplete = exercise.sets.length > 0 && exercise.sets.every((set) => set.completed);
-                                    return (
-                                        <ExerciseItem
-                                            key={exercise.id}
-                                            exercise={exercise}
-                                            isComplete={isComplete}
-                                            hasBorder={index < activeWorkout.exercises.length - 1}
-                                            onPress={() => handleExercisePress(exercise)}
-                                            onLayout={(ref) => {
-                                                exerciseItemRefs.current.set(exercise.id, ref);
-                                            }}
-                                        />
-                                    );
-                                })}
-                            </ScrollView>
+                                <ScrollView
+                                    style={styles.exercisesScrollView}
+                                    contentContainerStyle={[
+                                        styles.exercisesScrollContent,
+                                        activeWorkout.exercises.length === 0 && styles.exercisesScrollContentEmpty
+                                    ]}
+                                    showsVerticalScrollIndicator={false}
+                                    scrollEnabled={true}
+                                >
+                                    {activeWorkout.exercises.length === 0 ? (
+                                        <View style={styles.emptyWorkoutPlaceholder}>
+                                            <Text style={styles.emptyWorkoutText}>double tap to add workout</Text>
+                                        </View>
+                                    ) : (
+                                        activeWorkout.exercises.map((exercise, index) => {
+                                            const isComplete = exercise.sets.length > 0 && exercise.sets.every((set) => set.completed);
+                                            return (
+                                                <ExerciseItem
+                                                    key={exercise.id}
+                                                    exercise={exercise}
+                                                    isComplete={isComplete}
+                                                    hasBorder={index < activeWorkout.exercises.length - 1}
+                                                    onPress={() => handleExercisePress(exercise)}
+                                                    onLayout={(ref) => {
+                                                        exerciseItemRefs.current.set(exercise.id, ref);
+                                                    }}
+                                                />
+                                            );
+                                        })
+                                    )}
+                                </ScrollView>
+                            </View>
                         </View>
-                    </View>
+                    </Animated.View>
                 )}
             </ScrollView>
 
             {/* Confetti */}
             <Confetti particles={confettiParticles} />
+
+            {/* White to transparent gradient behind buttons */}
+            <LinearGradient
+                colors={['rgba(255, 255, 255, 0)', 'rgba(255, 255, 255, 1)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
+                style={[
+                    {
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        height: 150,
+                        zIndex: 99, // Behind buttons but above content
+                    },
+                    { paddingBottom: insets.bottom }
+                ]}
+                pointerEvents="none"
+            />
+
+            {/* Start Workout Bottom Sheet */}
+            <StartWorkoutBottomSheet
+                visible={showStartWorkoutSheet}
+                onClose={() => setShowStartWorkoutSheet(false)}
+            />
+
+            {/* Add Exercise Overlay */}
+            <AddExerciseOverlay
+                visible={showAddExerciseOverlay}
+                onClose={() => setShowAddExerciseOverlay(false)}
+                onSelectExercise={handleSelectExercise}
+            />
+
+            {/* Countdown Overlay - Using Modal to ensure it's above navbar */}
+            <Modal
+                visible={showCountdown}
+                transparent={true}
+                animationType="none"
+                statusBarTranslucent={true}
+                presentationStyle="overFullScreen"
+            >
+                <View style={styles.countdownOverlay} pointerEvents="box-none">
+                    {/* Animated Rings */}
+                    <Animated.View
+                        style={[
+                            styles.countdownRing,
+                            {
+                                transform: [{ scale: ring1Scale }],
+                                opacity: ring1Opacity,
+                            },
+                        ]}
+                        pointerEvents="none"
+                    />
+                    <Animated.View
+                        style={[
+                            styles.countdownRing,
+                            styles.countdownRing2,
+                            {
+                                transform: [{ scale: ring2Scale }],
+                                opacity: ring2Opacity,
+                            },
+                        ]}
+                        pointerEvents="none"
+                    />
+
+                    {/* Subtle Particles */}
+                    <Animated.View
+                        style={[
+                            styles.countdownParticles,
+                            { opacity: particlesOpacity },
+                        ]}
+                        pointerEvents="none"
+                    >
+                        <View style={[styles.particle, styles.particle1]} />
+                        <View style={[styles.particle, styles.particle2]} />
+                        <View style={[styles.particle, styles.particle3]} />
+                        <View style={[styles.particle, styles.particle4]} />
+                        <View style={[styles.particle, styles.particle5]} />
+                        <View style={[styles.particle, styles.particle6]} />
+                    </Animated.View>
+
+                    {/* Countdown Number */}
+                    <Animated.View
+                        style={[
+                            styles.countdownContainer,
+                            {
+                                transform: [{ scale: countdownScale }],
+                                opacity: countdownOpacity,
+                            },
+                        ]}
+                    >
+                        {countdownValue > 0 ? (
+                            <Text style={styles.countdownText}>{countdownValue}</Text>
+                        ) : (
+                            <Text style={styles.countdownText}>GO!</Text>
+                        )}
+                    </Animated.View>
+                </View>
+            </Modal>
         </View>
     );
 };
@@ -643,7 +1033,7 @@ const styles = StyleSheet.create({
     },
     startWorkoutTextLarge: {
         fontSize: 20,
-        fontFamily: fonts.bold,
+        fontFamily: fonts.regular,
         color: '#252525',
         textTransform: 'lowercase',
         marginBottom: 8,
@@ -663,6 +1053,8 @@ const styles = StyleSheet.create({
     },
     browseWorkoutsButton: {
         width: '100%',
+        marginTop: 0,
+        marginBottom: 4,
     },
 
     workoutBox: {
@@ -699,6 +1091,23 @@ const styles = StyleSheet.create({
     },
     exercisesScrollContent: {
         paddingBottom: 0,
+    },
+    exercisesScrollContentEmpty: {
+        flexGrow: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    emptyWorkoutPlaceholder: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        flex: 1,
+    },
+    emptyWorkoutText: {
+        fontSize: 16,
+        fontFamily: fonts.regular,
+        color: 'rgba(37, 37, 37, 0.3)',
+        textTransform: 'lowercase',
+        textAlign: 'center',
     },
     workoutSummary: {
         flexDirection: 'row',
@@ -772,6 +1181,82 @@ const styles = StyleSheet.create({
     finishWorkoutButton: {
         width: Dimensions.get('window').width - 50, // Match workout box width (screen width - 25px padding on each side)
         alignSelf: 'stretch',
+    },
+    activeWorkoutContainer: {
+        width: '100%',
+    },
+    countdownOverlay: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    },
+    countdownContainer: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 10,
+    },
+    countdownText: {
+        fontSize: 120,
+        fontFamily: fonts.bold,
+        color: '#fff',
+        textTransform: 'uppercase',
+    },
+    countdownRing: {
+        position: 'absolute',
+        width: 200,
+        height: 200,
+        borderRadius: 100,
+        borderWidth: 2,
+        borderColor: 'rgba(255, 255, 255, 0.3)',
+    },
+    countdownRing2: {
+        width: 250,
+        height: 250,
+        borderRadius: 125,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    countdownParticles: {
+        position: 'absolute',
+        width: 300,
+        height: 300,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    particle: {
+        position: 'absolute',
+        width: 4,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    },
+    particle1: {
+        top: 0,
+        left: '50%',
+        marginLeft: -2,
+    },
+    particle2: {
+        top: '50%',
+        right: 0,
+        marginTop: -2,
+    },
+    particle3: {
+        bottom: 0,
+        left: '50%',
+        marginLeft: -2,
+    },
+    particle4: {
+        top: '50%',
+        left: 0,
+        marginTop: -2,
+    },
+    particle5: {
+        top: '25%',
+        right: '25%',
+    },
+    particle6: {
+        bottom: '25%',
+        left: '25%',
     },
 });
 

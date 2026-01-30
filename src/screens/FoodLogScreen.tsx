@@ -519,6 +519,10 @@ export const FoodLogScreen: React.FC = () => {
                 keyboardShouldPersistTaps="handled"
                 removeClippedSubviews={false}
                 scrollEnabled={true}
+                bounces={false}
+                overScrollMode="never"
+                alwaysBounceVertical={false}
+                decelerationRate="normal"
             >
                 {/* Gradient Background - Scrolls with content, extends into status bar */}
                 <View style={[styles.gradientContainer, { height: 300 + insets.top }]}>
@@ -849,6 +853,25 @@ export const FoodLogScreen: React.FC = () => {
                     setShowEditSheet(false);
                     setSelectedEntry(null);
                 } : undefined}
+            />
+
+            {/* White to transparent gradient behind buttons */}
+            <LinearGradient
+                colors={['rgba(255, 255, 255, 0)', 'rgba(255, 255, 255, 1)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
+                style={[
+                    {
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        height: 150,
+                        zIndex: 99, // Behind buttons but above content
+                    },
+                    { paddingBottom: insets.bottom }
+                ]}
+                pointerEvents="none"
             />
         </View>
     );

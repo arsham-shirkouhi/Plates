@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { fonts } from '../constants/fonts';
+import { useAddFood } from '../context/AddFoodContext';
 
 interface FoodItem {
     name: string;
@@ -15,54 +16,79 @@ interface FoodLogProps {
 }
 
 export const FoodLog: React.FC<FoodLogProps> = ({
-    items = [
-        { name: 'teh tarik', calories: 130, time: '5m' },
-        { name: 'roti canai', calories: 542, time: '15m' },
-        { name: 'kaya toast', calories: 230, time: '41m' },
-    ],
+    items = [],
     onPress
 }) => {
+    const { showAddFoodSheet } = useAddFood();
+    const isEmpty = !items || items.length === 0;
+    const lastTapRef = useRef<number>(0);
+    const DOUBLE_TAP_DELAY = 300;
+
+    const handlePress = () => {
+        if (isEmpty) {
+            // Double tap detection for empty state
+            const now = Date.now();
+            if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
+                // Double tap detected - open the add food sheet
+                showAddFoodSheet();
+                lastTapRef.current = 0; // Reset to prevent triple tap
+            } else {
+                // First tap - just record it
+                lastTapRef.current = now;
+            }
+        } else if (onPress) {
+            // If has items, navigate to FoodLog page (single tap)
+            onPress();
+        }
+    };
+
     return (
-        <View style={styles.container}>
+        <TouchableOpacity
+            style={styles.container}
+            onPress={handlePress}
+            activeOpacity={0.7}
+        >
             {/* Header */}
-            <TouchableOpacity
-                style={styles.header}
-                onPress={onPress}
-                activeOpacity={0.7}
-            >
+            <View style={styles.header}>
                 <Text style={styles.headerText}>food log</Text>
                 <Ionicons name="chevron-forward" size={20} color="#252525" />
-            </TouchableOpacity>
+            </View>
 
             {/* Separator line */}
             <View style={styles.separator} />
 
-            {/* Food items list */}
-            <View style={styles.itemsContainer}>
-                {items.map((item, index) => (
-                    <View
-                        key={index}
-                        style={[
-                            styles.itemRow,
-                            index === 0 && styles.firstItemSpacing,
-                            index < items.length - 1 && styles.itemSpacing
-                        ]}
-                    >
-                        <Text style={styles.itemName}>{item.name}</Text>
-                        <View style={styles.itemRight}>
-                            <Text style={styles.itemCalories}>{item.calories} kcal</Text>
-                            <Image
-                                source={require('../../assets/images/icons/fire.png')}
-                                style={styles.flameIcon}
-                                resizeMode="contain"
-                            />
-                            <View style={styles.verticalSeparator} />
-                            <Text style={styles.itemTime}>{item.time}</Text>
+            {/* Food items list or empty state */}
+            {isEmpty ? (
+                <View style={styles.emptyStateContainer}>
+                    <Text style={styles.emptyStateText}>double tap to log meal!</Text>
+                </View>
+            ) : (
+                <View style={styles.itemsContainer}>
+                    {items.map((item, index) => (
+                        <View
+                            key={index}
+                            style={[
+                                styles.itemRow,
+                                index === 0 && styles.firstItemSpacing,
+                                index < items.length - 1 && styles.itemSpacing
+                            ]}
+                        >
+                            <Text style={styles.itemName}>{item.name}</Text>
+                            <View style={styles.itemRight}>
+                                <Text style={styles.itemCalories}>{item.calories} kcal</Text>
+                                <Image
+                                    source={require('../../assets/images/icons/fire.png')}
+                                    style={styles.flameIcon}
+                                    resizeMode="contain"
+                                />
+                                <View style={styles.verticalSeparator} />
+                                <Text style={styles.itemTime}>{item.time}</Text>
+                            </View>
                         </View>
-                    </View>
-                ))}
-            </View>
-        </View>
+                    ))}
+                </View>
+            )}
+        </TouchableOpacity>
     );
 };
 
@@ -99,6 +125,20 @@ const styles = StyleSheet.create({
     },
     itemsContainer: {
         width: '100%',
+    },
+    emptyStateContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: 20,
+        minHeight: 60,
+    },
+    emptyStateText: {
+        fontSize: 16,
+        fontFamily: fonts.regular,
+        color: 'rgba(37, 37, 37, 0.5)',
+        textTransform: 'lowercase',
+        textAlign: 'center',
     },
     itemRow: {
         flexDirection: 'row',
