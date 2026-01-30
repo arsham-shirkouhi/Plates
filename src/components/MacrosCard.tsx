@@ -11,9 +11,17 @@ const AnimatedNumber: React.FC<{
     target: number;
     style: any;
 }> = ({ value, target, style }) => {
-    const [displayValue, setDisplayValue] = useState(0);
+    const [displayValue, setDisplayValue] = useState(Math.round(target));
+    const isFirstRender = useRef(true);
 
     useEffect(() => {
+        // On first render, set the value immediately
+        if (isFirstRender.current) {
+            setDisplayValue(Math.round(target));
+            isFirstRender.current = false;
+            return;
+        }
+
         const listener = value.addListener(({ value: currentValue }) => {
             setDisplayValue(Math.round(currentValue));
         });
@@ -23,30 +31,33 @@ const AnimatedNumber: React.FC<{
         };
     }, [value, target]);
 
-    // Also set final value when animation completes
+    // Set final value when target changes (for cases where animation might not complete)
     useEffect(() => {
-        const timer = setTimeout(() => {
-            setDisplayValue(Math.round(target));
-        }, 1000);
-        return () => clearTimeout(timer);
+        if (!isFirstRender.current) {
+            const timer = setTimeout(() => {
+                setDisplayValue(Math.round(target));
+            }, 900); // Slightly longer than animation duration
+            return () => clearTimeout(timer);
+        }
     }, [target]);
 
     return <Text style={style}>{displayValue}</Text>;
 };
 
 interface MacrosCardProps {
-    macros: {
+    macros?: {
         calories: number;
         protein: number;
         carbs: number;
         fats: number;
     };
-    consumed: {
+    consumed?: {
         calories: number;
         protein: number;
         carbs: number;
         fats: number;
     };
+    loading?: boolean;
 }
 
 // Internal component: Calorie Circular Progress
@@ -83,6 +94,9 @@ const CalorieCircularProgress: React.FC<CalorieCircularProgressProps> = ({
     
     // Track last haptic value for calories
     const lastHapticPercentage = useRef(percentage);
+    
+    // Track if this is the first render to prevent animation on initial load
+    const isFirstRender = useRef(true);
     // Inner and outer border radii
     // Outer border: sits at the outer edge of the progress ring
     const outerBorderRadius = radius + strokeWidth / 2;
@@ -90,6 +104,17 @@ const CalorieCircularProgress: React.FC<CalorieCircularProgressProps> = ({
     const innerBorderRadius = radius - strokeWidth / 2;
 
     useEffect(() => {
+        // On first render, set values immediately without animation
+        if (isFirstRender.current) {
+            animatedValue.setValue(percentage);
+            numberAnimation.setValue(remaining);
+            previousPercentage.current = percentage;
+            previousRemaining.current = remaining;
+            lastHapticPercentage.current = percentage;
+            isFirstRender.current = false;
+            return;
+        }
+
         // Set animations to start from previous values
         animatedValue.setValue(previousPercentage.current);
         numberAnimation.setValue(previousRemaining.current);
@@ -258,8 +283,22 @@ const MacroProgressBar: React.FC<MacroProgressBarProps> = ({
     
     // Track last haptic value for macro bars
     const lastHapticPercentage = useRef(percentage);
+    
+    // Track if this is the first render to prevent animation on initial load
+    const isFirstRender = useRef(true);
 
     useEffect(() => {
+        // On first render, set values immediately without animation
+        if (isFirstRender.current) {
+            animatedWidth.setValue(percentage);
+            numberAnimation.setValue(current);
+            previousPercentage.current = percentage;
+            previousCurrent.current = current;
+            lastHapticPercentage.current = percentage;
+            isFirstRender.current = false;
+            return;
+        }
+
         // Set animations to start from previous values
         animatedWidth.setValue(previousPercentage.current);
         numberAnimation.setValue(previousCurrent.current);
@@ -358,15 +397,22 @@ const MacroProgressBar: React.FC<MacroProgressBarProps> = ({
 };
 
 // Main component: Macros Card
-export const MacrosCard: React.FC<MacrosCardProps> = ({ macros, consumed }) => {
+export const MacrosCard: React.FC<MacrosCardProps> = ({ macros, consumed, loading = false }) => {
+    // Use default values if not provided
+    const defaultMacros = { calories: 2000, protein: 150, carbs: 200, fats: 65 };
+    const defaultConsumed = { calories: 0, protein: 0, carbs: 0, fats: 0 };
+    
+    const finalMacros = macros || defaultMacros;
+    const finalConsumed = consumed || defaultConsumed;
+
     return (
         <View style={homeScreenStyles.contentCard}>
             <View style={homeScreenStyles.cardContent}>
                 {/* Left: Calorie Progress */}
                 <View style={homeScreenStyles.calorieSection}>
                     <CalorieCircularProgress
-                        totalCalories={macros.calories}
-                        consumedCalories={consumed.calories}
+                        totalCalories={finalMacros.calories}
+                        consumedCalories={finalConsumed.calories}
                     />
                 </View>
 
@@ -374,22 +420,22 @@ export const MacrosCard: React.FC<MacrosCardProps> = ({ macros, consumed }) => {
                 <View style={homeScreenStyles.macrosSection}>
                     <MacroProgressBar
                         label="protein"
-                        current={consumed.protein}
-                        target={macros.protein}
+                        current={finalConsumed.protein}
+                        target={finalMacros.protein}
                         color="#26F170"
                         hasBottomSpacing={true}
                     />
                     <MacroProgressBar
                         label="carbs"
-                        current={consumed.carbs}
-                        target={macros.carbs}
+                        current={finalConsumed.carbs}
+                        target={finalMacros.carbs}
                         color="#FFD700"
                         hasBottomSpacing={true}
                     />
                     <MacroProgressBar
                         label="fats"
-                        current={consumed.fats}
-                        target={macros.fats}
+                        current={finalConsumed.fats}
+                        target={finalMacros.fats}
                         color="#FF5151"
                         hasBottomSpacing={false}
                     />

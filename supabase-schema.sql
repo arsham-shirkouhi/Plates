@@ -76,6 +76,31 @@ CREATE TABLE IF NOT EXISTS daily_logs (
     UNIQUE(user_id, date)
 );
 
+-- Daily tasks table (todo list items for each day)
+CREATE TABLE IF NOT EXISTS daily_tasks (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    log_date DATE NOT NULL,
+    title TEXT NOT NULL,
+    is_completed BOOLEAN DEFAULT FALSE,
+    completed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id, log_date, title)
+);
+
+-- Daily summaries table (read-optimized snapshot for past days)
+CREATE TABLE IF NOT EXISTS daily_summaries (
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    log_date DATE NOT NULL,
+    tasks_total INTEGER DEFAULT 0,
+    tasks_completed INTEGER DEFAULT 0,
+    completion_rate NUMERIC DEFAULT 0,
+    streak_value INTEGER,
+    notes TEXT,
+    generated_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (user_id, log_date)
+);
+
 -- Indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_daily_logs_user_id ON daily_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_daily_logs_date ON daily_logs(date);
@@ -83,6 +108,8 @@ CREATE INDEX IF NOT EXISTS idx_daily_logs_user_date ON daily_logs(user_id, date)
 CREATE INDEX IF NOT EXISTS idx_usernames_user_id ON usernames(user_id);
 CREATE INDEX IF NOT EXISTS idx_onboarding_data_user_id ON onboarding_data(user_id);
 CREATE INDEX IF NOT EXISTS idx_target_macros_user_id ON target_macros(user_id);
+CREATE INDEX IF NOT EXISTS idx_daily_tasks_user_date ON daily_tasks(user_id, log_date);
+CREATE INDEX IF NOT EXISTS idx_daily_summaries_user_date ON daily_summaries(user_id, log_date);
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -210,6 +237,8 @@ ALTER TABLE usernames ENABLE ROW LEVEL SECURITY;
 ALTER TABLE daily_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE onboarding_data ENABLE ROW LEVEL SECURITY;
 ALTER TABLE target_macros ENABLE ROW LEVEL SECURITY;
+ALTER TABLE daily_tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE daily_summaries ENABLE ROW LEVEL SECURITY;
 
 -- Drop existing policies if they exist (to allow re-running this script)
 DROP POLICY IF EXISTS "Users can view own profile" ON users;
@@ -231,6 +260,14 @@ DROP POLICY IF EXISTS "Users can view own target macros" ON target_macros;
 DROP POLICY IF EXISTS "Users can insert own target macros" ON target_macros;
 DROP POLICY IF EXISTS "Users can update own target macros" ON target_macros;
 DROP POLICY IF EXISTS "Users can delete own target macros" ON target_macros;
+DROP POLICY IF EXISTS "Users can view own daily tasks" ON daily_tasks;
+DROP POLICY IF EXISTS "Users can insert own daily tasks" ON daily_tasks;
+DROP POLICY IF EXISTS "Users can update own daily tasks" ON daily_tasks;
+DROP POLICY IF EXISTS "Users can delete own daily tasks" ON daily_tasks;
+DROP POLICY IF EXISTS "Users can view own daily summaries" ON daily_summaries;
+DROP POLICY IF EXISTS "Users can insert own daily summaries" ON daily_summaries;
+DROP POLICY IF EXISTS "Users can update own daily summaries" ON daily_summaries;
+DROP POLICY IF EXISTS "Users can delete own daily summaries" ON daily_summaries;
 
 -- ============================================================================
 -- USERS TABLE POLICIES
@@ -329,6 +366,46 @@ CREATE POLICY "Users can update own target macros" ON target_macros
     WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Users can delete own target macros" ON target_macros
+    FOR DELETE 
+    USING (auth.uid() = user_id);
+
+-- ============================================================================
+-- DAILY_TASKS TABLE POLICIES
+-- ============================================================================
+CREATE POLICY "Users can view own daily tasks" ON daily_tasks
+    FOR SELECT 
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own daily tasks" ON daily_tasks
+    FOR INSERT 
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own daily tasks" ON daily_tasks
+    FOR UPDATE 
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own daily tasks" ON daily_tasks
+    FOR DELETE 
+    USING (auth.uid() = user_id);
+
+-- ============================================================================
+-- DAILY_SUMMARIES TABLE POLICIES
+-- ============================================================================
+CREATE POLICY "Users can view own daily summaries" ON daily_summaries
+    FOR SELECT 
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own daily summaries" ON daily_summaries
+    FOR INSERT 
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own daily summaries" ON daily_summaries
+    FOR UPDATE 
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own daily summaries" ON daily_summaries
     FOR DELETE 
     USING (auth.uid() = user_id);
 
