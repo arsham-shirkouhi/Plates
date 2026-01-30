@@ -38,12 +38,26 @@ export const getExercisesList = async (limit: number = 20, offset: number = 0): 
             return [];
         }
 
+        // Helper function to clean title (remove prefixes like "30", "arms", etc.)
+        const cleanTitle = (title: string): string => {
+            if (!title) return '';
+            let cleaned = title;
+            // Remove "30" prefix if it exists at the start
+            cleaned = cleaned.replace(/^30\s*/, '').trim();
+            // Remove common category prefixes (arms, legs, chest, back, shoulders, etc.)
+            // Match pattern like "arms - " or "arms " at the start
+            cleaned = cleaned.replace(/^(arms|legs|chest|back|shoulders|core|abs|cardio|full body|upper|lower|push|pull)\s*[-:]\s*/i, '').trim();
+            // Also remove if it's just "arms " at the start without dash/colon
+            cleaned = cleaned.replace(/^(arms|legs|chest|back|shoulders|core|abs|cardio|full body|upper|lower|push|pull)\s+/i, '').trim();
+            return cleaned;
+        };
+
         // Map the data to Exercise interface
         const exercises = data
             .filter((exercise: any) => exercise.Title) // Filter out any exercises without titles
-            .map((exercise: any) => ({
-                id: exercise.id?.toString() || String(exercise.id) || exercise.Title,
-                name: exercise.Title || '',
+            .map((exercise: any, index: number) => ({
+                id: exercise.id?.toString() || String(exercise.id) || `exercise-${index}-${exercise.Title}`,
+                name: cleanTitle(exercise.Title || ''),
             }));
 
         return exercises;
@@ -74,9 +88,23 @@ export const searchExercises = async (query: string): Promise<Exercise[]> => {
             return [];
         }
 
-        return data.map((exercise: any) => ({
-            id: exercise.id?.toString() || exercise.Title,
-            name: exercise.Title || '',
+        // Helper function to clean title (remove prefixes like "30", "arms", etc.)
+        const cleanTitle = (title: string): string => {
+            if (!title) return '';
+            let cleaned = title;
+            // Remove "30" prefix if it exists at the start
+            cleaned = cleaned.replace(/^30\s*/, '').trim();
+            // Remove common category prefixes (arms, legs, chest, back, shoulders, etc.)
+            // Match pattern like "arms - " or "arms " at the start
+            cleaned = cleaned.replace(/^(arms|legs|chest|back|shoulders|core|abs|cardio|full body|upper|lower|push|pull)\s*[-:]\s*/i, '').trim();
+            // Also remove if it's just "arms " at the start without dash/colon
+            cleaned = cleaned.replace(/^(arms|legs|chest|back|shoulders|core|abs|cardio|full body|upper|lower|push|pull)\s+/i, '').trim();
+            return cleaned;
+        };
+
+        return data.map((exercise: any, index: number) => ({
+            id: exercise.id?.toString() || String(exercise.id) || `exercise-search-${index}-${exercise.Title}`,
+            name: cleanTitle(exercise.Title || ''),
         }));
     } catch (error) {
         console.error('Error in searchExercises:', error);

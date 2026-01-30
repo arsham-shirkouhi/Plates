@@ -335,22 +335,14 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
                                     ) : (
                                         <>
                                             {displayedExercises.map((exercise, index) => (
-                                                <View key={`exercise-${exercise.id || index}-${exercise.name || index}`} style={styles.exerciseItem}>
-                                                    <TouchableOpacity
-                                                        style={styles.exerciseItemContent}
-                                                        onPress={() => handleExercisePress(exercise)}
-                                                        activeOpacity={0.7}
-                                                    >
-                                                        <Text style={styles.exerciseName}>{exercise.name}</Text>
-                                                    </TouchableOpacity>
-                                                    <TouchableOpacity
-                                                        style={styles.addButton}
-                                                        onPress={() => handleExercisePress(exercise)}
-                                                        activeOpacity={0.7}
-                                                    >
-                                                        <Ionicons name="add" size={28} color="#ADADAD" />
-                                                    </TouchableOpacity>
-                                                </View>
+                                                <TouchableOpacity
+                                                    key={`exercise-${index}-${exercise.id || exercise.name || 'item'}`}
+                                                    style={styles.exerciseItem}
+                                                    onPress={() => handleExercisePress(exercise)}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <Text style={styles.exerciseName}>{exercise.name}</Text>
+                                                </TouchableOpacity>
                                             ))}
                                             {loadingMore && (
                                                 <View style={styles.loadingMoreContainer}>
@@ -454,37 +446,16 @@ const styles = StyleSheet.create({
         paddingBottom: 10,
     },
     exerciseItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
         paddingVertical: 14,
         paddingHorizontal: 7,
         borderBottomWidth: 2,
         borderBottomColor: '#F0F0F0',
-    },
-    exerciseItemContent: {
-        flex: 1,
     },
     exerciseName: {
         fontSize: 18,
         fontFamily: fonts.regular,
         color: '#252525',
         textTransform: 'lowercase',
-    },
-    buttonContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
-    favoriteButton: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 4,
-    },
-    addButton: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 4,
     },
     emptyContainer: {
         flex: 1,
