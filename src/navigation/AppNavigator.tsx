@@ -14,6 +14,7 @@ import { PreloadedHomeScreen, PreloadedFoodLogScreen, PreloadedWorkoutScreen } f
 import { StartWorkoutScreen } from '../screens/StartWorkoutScreen';
 import { BrowseWorkoutsScreen } from '../screens/BrowseWorkoutsScreen';
 import { ExerciseDetailScreen } from '../screens/ExerciseDetailScreen';
+import { ExerciseInfoScreen } from '../screens/ExerciseInfoScreen';
 import { UniversalNavBar } from '../components/UniversalNavBar';
 import { SimpleNavBar } from '../components/SimpleNavBar';
 import { ScreenPreloader } from '../components/ScreenPreloader';
@@ -59,8 +60,8 @@ export type RootStackParamList = {
             fats: number;
         };
     };
-    Workout: { 
-        startWorkoutType?: 'pick-as-you-go' | 'previous' | 'new' | 'schedule'; 
+    Workout: {
+        startWorkoutType?: 'pick-as-you-go' | 'previous' | 'new' | 'schedule';
         workoutId?: string;
         updatedExerciseId?: string;
         updatedSets?: Array<{ id: string; reps: string; weight: string; completed?: boolean }>;
@@ -96,6 +97,9 @@ export type RootStackParamList = {
             }>;
         }>;
         currentExerciseIndex?: number;
+    };
+    ExerciseInfo: {
+        exerciseId: string;
     };
 };
 
@@ -146,8 +150,8 @@ const NavigatorWithNavBar: React.FC = () => {
                         animationDuration: 300,
                     }}
                 />
-                <Stack.Screen 
-                    name="Home" 
+                <Stack.Screen
+                    name="Home"
                     component={PreloadedHomeScreen}
                     options={{
                         gestureEnabled: true,
@@ -203,6 +207,14 @@ const NavigatorWithNavBar: React.FC = () => {
                 <Stack.Screen
                     name="ExerciseDetail"
                     component={ExerciseDetailScreen}
+                    options={{
+                        animation: 'slide_from_right',
+                        animationDuration: 300,
+                    }}
+                />
+                <Stack.Screen
+                    name="ExerciseInfo"
+                    component={ExerciseInfoScreen}
                     options={{
                         animation: 'slide_from_right',
                         animationDuration: 300,

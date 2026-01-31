@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { AddFoodProvider } from './src/context/AddFoodContext';
 import { AppNavigator } from './src/navigation/AppNavigator';
+import { OverlayProvider } from './src/contexts/OverlayContext';
 import 'react-native-gesture-handler';
 
 interface ErrorBoundaryState {
@@ -82,7 +83,9 @@ export default function App() {
             <SafeAreaProvider>
                 <AuthProvider>
                     <AddFoodProvider>
-                        <AppContent />
+                        <OverlayProvider>
+                            <AppContent />
+                        </OverlayProvider>
                     </AddFoodProvider>
                 </AuthProvider>
             </SafeAreaProvider>

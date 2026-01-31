@@ -43,11 +43,11 @@ export const FoodLog: React.FC<FoodLogProps> = ({
     };
 
     return (
-        <TouchableOpacity
+            <TouchableOpacity
             style={styles.container}
             onPress={handlePress}
-            activeOpacity={0.7}
-        >
+                activeOpacity={0.7}
+            >
             {/* Header */}
             <View style={styles.header}>
                 <Text style={styles.headerText}>food log</Text>
@@ -63,30 +63,30 @@ export const FoodLog: React.FC<FoodLogProps> = ({
                     <Text style={styles.emptyStateText}>double tap to log meal!</Text>
                 </View>
             ) : (
-                <View style={styles.itemsContainer}>
-                    {items.map((item, index) => (
-                        <View
-                            key={index}
-                            style={[
-                                styles.itemRow,
-                                index === 0 && styles.firstItemSpacing,
-                                index < items.length - 1 && styles.itemSpacing
-                            ]}
-                        >
-                            <Text style={styles.itemName}>{item.name}</Text>
-                            <View style={styles.itemRight}>
-                                <Text style={styles.itemCalories}>{item.calories} kcal</Text>
-                                <Image
-                                    source={require('../../assets/images/icons/fire.png')}
-                                    style={styles.flameIcon}
-                                    resizeMode="contain"
-                                />
-                                <View style={styles.verticalSeparator} />
-                                <Text style={styles.itemTime}>{item.time}</Text>
-                            </View>
+            <View style={styles.itemsContainer}>
+                {items.map((item, index) => (
+                    <View
+                        key={index}
+                        style={[
+                            styles.itemRow,
+                            index === 0 && styles.firstItemSpacing,
+                            index < items.length - 1 && styles.itemSpacing
+                        ]}
+                    >
+                        <Text style={styles.itemName}>{item.name}</Text>
+                        <View style={styles.itemRight}>
+                            <Text style={styles.itemCalories}>{item.calories} kcal</Text>
+                            <Image
+                                source={require('../../assets/images/icons/fire.png')}
+                                style={styles.flameIcon}
+                                resizeMode="contain"
+                            />
+                            <View style={styles.verticalSeparator} />
+                            <Text style={styles.itemTime}>{item.time}</Text>
                         </View>
-                    ))}
-                </View>
+                    </View>
+                ))}
+            </View>
             )}
         </TouchableOpacity>
     );

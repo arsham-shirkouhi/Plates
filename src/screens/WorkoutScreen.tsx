@@ -26,6 +26,7 @@ import { Confetti, ConfettiParticle } from '../components/Confetti';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StartWorkoutBottomSheet } from '../components/StartWorkoutBottomSheet';
 import { AddExerciseOverlay } from '../components/AddExerciseOverlay';
+import { useOverlay } from '../contexts/OverlayContext';
 
 type WorkoutScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Workout'>;
 
@@ -55,6 +56,7 @@ export const WorkoutScreen: React.FC = () => {
     const navigation = useNavigation<WorkoutScreenNavigationProp>();
     const route = useRoute<RouteProp<RootStackParamList, 'Workout'>>();
     const insets = useSafeAreaInsets();
+    const { registerOverlay } = useOverlay();
     const [hasCompletedWorkout, setHasCompletedWorkout] = useState(false);
     const screenHeight = Dimensions.get('window').height;
     const headerHeight = 200; // Header section height (gradient + header)
@@ -224,6 +226,27 @@ export const WorkoutScreen: React.FC = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     };
 
+    const handleSelectExerciseAndNavigate = (exercise: { id: string; name: string }, createdExercise: Exercise, allExercises: Exercise[], exerciseIndex: number) => {
+        if (!activeWorkout) return;
+
+        // Add the exercise to the workout
+        const updatedExercises = [...activeWorkout.exercises, createdExercise];
+        const updatedWorkout = {
+            ...activeWorkout,
+            exercises: updatedExercises,
+        };
+        setActiveWorkout(updatedWorkout);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+        // Navigate to ExerciseDetail screen with all exercises
+        navigation.navigate('ExerciseDetail', {
+            exercise: createdExercise,
+            exerciseId: createdExercise.id,
+            allExercises: updatedExercises,
+            currentExerciseIndex: updatedExercises.length - 1, // Index of the newly added exercise
+        });
+    };
+
 
     const handleExercisePress = (exercise: Exercise) => {
         if (!activeWorkout) return;
@@ -282,6 +305,14 @@ export const WorkoutScreen: React.FC = () => {
             ),
         });
     };
+
+    // Register countdown modal overlay state
+    useEffect(() => {
+        registerOverlay('WorkoutCountdown', showCountdown);
+        return () => {
+            registerOverlay('WorkoutCountdown', false);
+        };
+    }, [showCountdown, registerOverlay]);
 
     // Listen for navigation focus to handle exercise updates
     useEffect(() => {
@@ -383,10 +414,27 @@ export const WorkoutScreen: React.FC = () => {
     const handleFinishWorkout = () => {
         if (!activeWorkout) return;
 
-        // TODO: Save workout to database
-        setActiveWorkout(null);
-        setHasCompletedWorkout(true);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        // Show native iOS-style alert
+        Alert.alert(
+            'Finish Workout',
+            'Are you sure you want to finish this workout?',
+            [
+                {
+                    text: 'Cancel',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Finish',
+                    style: 'default',
+                    onPress: () => {
+                        // TODO: Save workout to database
+                        setActiveWorkout(null);
+                        setHasCompletedWorkout(true);
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    },
+                },
+            ]
+        );
     };
 
     const handleBrowseWorkouts = () => {
@@ -731,7 +779,7 @@ export const WorkoutScreen: React.FC = () => {
                                     onPress={handleAddExercise}
                                     activeOpacity={0.7}
                                 >
-                                    <Ionicons name="add" size={24} color="#252525" />
+                                    <Ionicons name="add" size={24} color="#526EFF" />
                                 </TouchableOpacity>
                             </View>
 
@@ -824,6 +872,7 @@ export const WorkoutScreen: React.FC = () => {
                 visible={showAddExerciseOverlay}
                 onClose={() => setShowAddExerciseOverlay(false)}
                 onSelectExercise={handleSelectExercise}
+                onSelectExerciseAndNavigate={handleSelectExerciseAndNavigate}
             />
 
             {/* Countdown Overlay - Using Modal to ensure it's above navbar */}

@@ -5,6 +5,16 @@ export interface Exercise {
     name: string;
 }
 
+export interface ExerciseDetails {
+    id: string;
+    Title: string;
+    Desc?: string;
+    Type?: string;
+    BodyPart?: string;
+    Equipment?: string;
+    Level?: string;
+}
+
 /**
  * Fetch exercises from the exercises table with pagination
  * @param limit - Number of exercises to fetch (default: 20)
@@ -22,7 +32,7 @@ export const getExercisesList = async (limit: number = 20, offset: number = 0): 
             console.error('❌ Error fetching exercises:', error);
             console.error('Error code:', error.code);
             console.error('Error message:', error.message);
-            
+
             // Common RLS error
             if (error.code === '42501' || error.message?.includes('permission denied')) {
                 console.error('');
@@ -30,7 +40,7 @@ export const getExercisesList = async (limit: number = 20, offset: number = 0): 
                 console.error('The exercises table likely has RLS enabled without a public read policy.');
                 console.error('');
             }
-            
+
             return [];
         }
 
@@ -56,7 +66,7 @@ export const getExercisesList = async (limit: number = 20, offset: number = 0): 
         const exercises = data
             .filter((exercise: any) => exercise.Title) // Filter out any exercises without titles
             .map((exercise: any, index: number) => ({
-                id: exercise.id?.toString() || String(exercise.id) || `exercise-${index}-${exercise.Title}`,
+                id: exercise.Id?.toString() || String(exercise.Id) || `exercise-${index}-${exercise.Title}`,
                 name: cleanTitle(exercise.Title || ''),
             }));
 
@@ -103,12 +113,47 @@ export const searchExercises = async (query: string): Promise<Exercise[]> => {
         };
 
         return data.map((exercise: any, index: number) => ({
-            id: exercise.id?.toString() || String(exercise.id) || `exercise-search-${index}-${exercise.Title}`,
+            id: exercise.Id?.toString() || String(exercise.Id) || `exercise-search-${index}-${exercise.Title}`,
             name: cleanTitle(exercise.Title || ''),
         }));
     } catch (error) {
         console.error('Error in searchExercises:', error);
         return [];
+    }
+};
+
+/**
+ * Get full exercise details by ID
+ */
+export const getExerciseDetails = async (exerciseId: string): Promise<ExerciseDetails | null> => {
+    try {
+        const { data, error } = await supabase
+            .from('exercises')
+            .select('*')
+            .eq('Id', exerciseId)
+            .single();
+
+        if (error) {
+            console.error('Error fetching exercise details:', error);
+            return null;
+        }
+
+        if (!data) {
+            return null;
+        }
+
+        return {
+            id: data.Id?.toString() || String(data.Id),
+            Title: data.Title || '',
+            Desc: data.Desc || data.Description || '',
+            Type: data.Type || '',
+            BodyPart: data.BodyPart || '',
+            Equipment: data.Equipment || '',
+            Level: data.Level || '',
+        };
+    } catch (error) {
+        console.error('Exception in getExerciseDetails:', error);
+        return null;
     }
 };
 
