@@ -458,7 +458,7 @@ export const TodaysGoalsOverlay: React.FC<TodaysGoalsOverlayProps> = ({
                                             })
                                         ) : (
                                             <View style={styles.emptyIncompleteContainer}>
-                                                <Text style={styles.emptyIncompleteText}>hold to add, double tap to remove</Text>
+                                                <Text style={styles.emptyIncompleteText}>hold to remove and double tap to add</Text>
                                             </View>
                                         )}
                                     </View>
@@ -844,7 +844,7 @@ const styles = StyleSheet.create({
     emptyIncompleteText: {
         fontSize: 12,
         fontFamily: fonts.regular,
-        color: '#E0E0E0',
+        color: '#666666',
         textTransform: 'lowercase',
         textAlign: 'center',
     },

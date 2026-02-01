@@ -18,6 +18,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import * as Haptics from 'expo-haptics';
+import { Button } from '../components/Button';
 import { fonts } from '../constants/fonts';
 import { PlateSlider } from '../components/PlateSlider';
 
@@ -48,9 +49,10 @@ export const ExerciseDetailScreen: React.FC = () => {
     const initialIndex = currentExerciseIndex !== undefined ? currentExerciseIndex : 0;
     const screenWidth = Dimensions.get('window').width;
     const horizontalScrollRef = useRef<ScrollView>(null);
+    const historyScrollRef = useRef<ScrollView>(null);
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [exerciseStates, setExerciseStates] = useState<Map<string, { sets: Set[]; exercise: Exercise }>>(new Map());
-    
+
     // Active set state
     const [activeSetExpanded, setActiveSetExpanded] = useState(false);
     const [activeReps, setActiveReps] = useState('10');
@@ -67,7 +69,7 @@ export const ExerciseDetailScreen: React.FC = () => {
             });
         });
         setExerciseStates(states);
-        
+
         // Scroll to initial exercise
         setTimeout(() => {
             horizontalScrollRef.current?.scrollTo({
@@ -76,7 +78,7 @@ export const ExerciseDetailScreen: React.FC = () => {
             });
         }, 100);
     }, []);
-    
+
     const currentExerciseState = exerciseStates.get(exercises[currentIndex]?.id);
     const [exercise, setExercise] = useState<Exercise>(currentExerciseState?.exercise || initialExercise);
     const [sets, setSets] = useState<Set[]>(currentExerciseState?.sets || initialExercise.sets);
@@ -175,7 +177,7 @@ export const ExerciseDetailScreen: React.FC = () => {
                     sets: updatedSets,
                 })));
             }
-            
+
             const completedSet = updatedSets.find(set => set.id === setId);
             if (completedSet?.completed) {
                 const animValue = setAnimations.get(setId) || new Animated.Value(0);
@@ -192,7 +194,7 @@ export const ExerciseDetailScreen: React.FC = () => {
                     animValue.setValue(0);
                 }
             }
-            
+
             return updatedSets;
         });
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -201,7 +203,7 @@ export const ExerciseDetailScreen: React.FC = () => {
     const handleRemoveSet = (setId: string) => {
         const removeAnim = setAnimations.get(setId) || new Animated.Value(1);
         setAnimations.set(setId, removeAnim);
-        
+
         Animated.timing(removeAnim, {
             toValue: 0,
             duration: 300,
@@ -221,7 +223,7 @@ export const ExerciseDetailScreen: React.FC = () => {
             });
             setAnimations.delete(setId);
         });
-        
+
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     };
 
@@ -231,7 +233,7 @@ export const ExerciseDetailScreen: React.FC = () => {
             name: state.exercise.name,
             sets: state.sets,
         }));
-        
+
         const newlyCompletedExercises: string[] = [];
         updatedExercises.forEach(updatedEx => {
             const originalEx = exercises.find(ex => ex.id === updatedEx.id);
@@ -243,7 +245,7 @@ export const ExerciseDetailScreen: React.FC = () => {
                 }
             }
         });
-        
+
         navigation.navigate('Workout', {
             updatedExercises: updatedExercises,
             newlyCompletedExerciseIds: newlyCompletedExercises,
@@ -257,7 +259,7 @@ export const ExerciseDetailScreen: React.FC = () => {
         const isCurrent = index === currentIndex;
         const pageCompletedSets = exerciseSets.filter(set => set.completed);
         const pageActiveSets = exerciseSets.filter(set => !set.completed);
-        
+
         return (
             <View key={ex.id} style={{ width: screenWidth, flex: 1 }}>
                 <KeyboardAvoidingView
@@ -269,9 +271,9 @@ export const ExerciseDetailScreen: React.FC = () => {
                         {/* Header */}
                         <View style={styles.headerContainer}>
                             <View style={styles.header}>
-                                <TouchableOpacity 
-                                    style={styles.backButton} 
-                                    onPress={handleClose} 
+                                <TouchableOpacity
+                                    style={styles.backButton}
+                                    onPress={handleClose}
                                     activeOpacity={0.7}
                                 >
                                     <Ionicons name="chevron-back" size={24} color="#526EFF" />
@@ -279,8 +281,8 @@ export const ExerciseDetailScreen: React.FC = () => {
                                 <View style={styles.headerCenter}>
                                     <Text style={styles.headerTitle}>{ex.name.toLowerCase()}</Text>
                                 </View>
-                                <TouchableOpacity 
-                                    style={styles.addSetHeaderButton} 
+                                <TouchableOpacity
+                                    style={styles.addSetHeaderButton}
                                     onPress={handleAddSet}
                                     activeOpacity={0.7}
                                 >
@@ -295,64 +297,102 @@ export const ExerciseDetailScreen: React.FC = () => {
                             <View style={styles.historySection}>
                                 <Text style={styles.sectionTitle}>previous sets</Text>
                                 <ScrollView
-                                    style={styles.historyScroll}
-                                    contentContainerStyle={styles.historyContent}
-                                    showsVerticalScrollIndicator={false}
-                                >
-                                    {pageCompletedSets.length === 0 ? (
-                                        <View style={styles.emptyState}>
-                                            <Text style={styles.emptyStateText}>no completed sets yet</Text>
-                                        </View>
-                                    ) : (
-                                        pageCompletedSets.map((set, setIndex) => {
-                                            const animValue = setAnimations.get(set.id) || new Animated.Value(1);
-                                            if (!setAnimations.has(set.id)) {
-                                                setAnimations.set(set.id, animValue);
+                                    horizontal
+                                    pagingEnabled
+                                    showsHorizontalScrollIndicator={false}
+                                    onScroll={(event) => {
+                                        const offsetX = event.nativeEvent.contentOffset.x;
+                                        const pageWidth = screenWidth - 40;
+                                        const newIndex = Math.round(offsetX / pageWidth);
+                                        if (newIndex !== currentIndex && newIndex >= 0 && newIndex < exercises.length) {
+                                            setCurrentIndex(newIndex);
+                                            const newExerciseState = exerciseStates.get(exercises[newIndex].id);
+                                            if (newExerciseState) {
+                                                setExercise(newExerciseState.exercise);
+                                                setSets(newExerciseState.sets.map(set => ({ ...set })));
                                             }
-                                            
-                                            return (
-                                                <Animated.View
-                                                    key={set.id}
-                                                    style={[
-                                                        styles.setCard,
-                                                        {
-                                                            opacity: animValue,
-                                                            transform: [
-                                                                {
-                                                                    scale: animValue.interpolate({
-                                                                        inputRange: [0, 1],
-                                                                        outputRange: [0.8, 1],
-                                                                    }),
-                                                                },
-                                                            ],
-                                                        },
-                                                    ]}
-                                                >
-                                                    <View style={styles.setCardHeader}>
-                                                        <Text style={styles.setNumber}>set {setIndex + 1}</Text>
-                                                        {isCurrent && (
-                                                            <TouchableOpacity
-                                                                onPress={() => handleRemoveSet(set.id)}
-                                                                activeOpacity={0.7}
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                            // Sync the main horizontal scroll
+                                            horizontalScrollRef.current?.scrollTo({
+                                                x: newIndex * screenWidth,
+                                                animated: true,
+                                            });
+                                        }
+                                    }}
+                                    scrollEventThrottle={16}
+                                    ref={historyScrollRef}
+                                    style={styles.historyScroll}
+                                    contentContainerStyle={styles.historyScrollContent}
+                                >
+                                    {exercises.map((ex, exerciseIndex) => {
+                                        const exerciseState = exerciseStates.get(ex.id);
+                                        const exerciseCompletedSets = exerciseState?.sets.filter(s => s.completed) || [];
+                                        const isCurrentExercise = exerciseIndex === currentIndex;
+
+                                        return (
+                                            <ScrollView
+                                                key={ex.id}
+                                                style={[styles.historyPage, { width: screenWidth - 40 }]}
+                                                contentContainerStyle={styles.historyContent}
+                                                showsVerticalScrollIndicator={false}
+                                            >
+                                                {exerciseCompletedSets.length === 0 ? (
+                                                    <View style={styles.emptyState}>
+                                                        <Text style={styles.emptyStateText}>no completed sets yet</Text>
+                                                    </View>
+                                                ) : (
+                                                    exerciseCompletedSets.map((set, setIndex) => {
+                                                        const animValue = setAnimations.get(set.id) || new Animated.Value(1);
+                                                        if (!setAnimations.has(set.id)) {
+                                                            setAnimations.set(set.id, animValue);
+                                                        }
+
+                                                        return (
+                                                            <Animated.View
+                                                                key={set.id}
+                                                                style={[
+                                                                    styles.setCard,
+                                                                    {
+                                                                        opacity: animValue,
+                                                                        transform: [
+                                                                            {
+                                                                                scale: animValue.interpolate({
+                                                                                    inputRange: [0, 1],
+                                                                                    outputRange: [0.8, 1],
+                                                                                }),
+                                                                            },
+                                                                        ],
+                                                                    },
+                                                                ]}
                                                             >
-                                                                <Ionicons name="close" size={18} color="#9E9E9E" />
-                                                            </TouchableOpacity>
-                                                        )}
-                                                    </View>
-                                                    <View style={styles.setCardContent}>
-                                                        <View style={styles.setCardStat}>
-                                                            <Text style={styles.setCardLabel}>weight</Text>
-                                                            <Text style={styles.setCardValue}>{set.weight} kg</Text>
-                                                        </View>
-                                                        <View style={styles.setCardStat}>
-                                                            <Text style={styles.setCardLabel}>reps</Text>
-                                                            <Text style={styles.setCardValue}>{set.reps}</Text>
-                                                        </View>
-                                                    </View>
-                                                </Animated.View>
-                                            );
-                                        })
-                                    )}
+                                                                <View style={styles.setCardHeader}>
+                                                                    <Text style={styles.setNumber}>set {setIndex + 1}</Text>
+                                                                    {isCurrentExercise && (
+                                                                        <TouchableOpacity
+                                                                            onPress={() => handleRemoveSet(set.id)}
+                                                                            activeOpacity={0.7}
+                                                                        >
+                                                                            <Ionicons name="close" size={18} color="#9E9E9E" />
+                                                                        </TouchableOpacity>
+                                                                    )}
+                                                                </View>
+                                                                <View style={styles.setCardContent}>
+                                                                    <View style={styles.setCardStat}>
+                                                                        <Text style={styles.setCardLabel}>weight</Text>
+                                                                        <Text style={styles.setCardValue}>{set.weight} kg</Text>
+                                                                    </View>
+                                                                    <View style={styles.setCardStat}>
+                                                                        <Text style={styles.setCardLabel}>reps</Text>
+                                                                        <Text style={styles.setCardValue}>{set.reps}</Text>
+                                                                    </View>
+                                                                </View>
+                                                            </Animated.View>
+                                                        );
+                                                    })
+                                                )}
+                                            </ScrollView>
+                                        );
+                                    })}
                                 </ScrollView>
                             </View>
 
@@ -399,38 +439,26 @@ export const ExerciseDetailScreen: React.FC = () => {
                                             </TouchableOpacity>
                                         </View>
 
-                                        {/* Plate Slider */}
+                                        {/* Plate Slider with inline Reps Input */}
                                         <PlateSlider
                                             value={activeWeight}
                                             onValueChange={(value) => {
                                                 setActiveWeight(value);
                                             }}
-                                            min={20}
+                                            min={2.5}
                                             max={250}
                                             step={2.5}
+                                            repsValue={activeReps}
+                                            onRepsChange={setActiveReps}
                                         />
 
-                                        {/* Reps Input */}
-                                        <View style={styles.repsInputContainer}>
-                                            <Text style={styles.repsLabel}>reps</Text>
-                                            <TextInput
-                                                style={styles.repsInput}
-                                                value={activeReps}
-                                                onChangeText={setActiveReps}
-                                                keyboardType="numeric"
-                                                placeholder="10"
-                                                placeholderTextColor="#9E9E9E"
-                                            />
-                                        </View>
-
                                         {/* Add Set Button */}
-                                        <TouchableOpacity
-                                            style={styles.addSetButton}
+                                        <Button
+                                            variant="primary"
+                                            title="add set"
                                             onPress={handleAddSet}
-                                            activeOpacity={0.8}
-                                        >
-                                            <Text style={styles.addSetButtonText}>add set</Text>
-                                        </TouchableOpacity>
+                                            containerStyle={styles.addSetButtonContainer}
+                                        />
                                     </View>
                                 )}
                             </Animated.View>
@@ -548,6 +576,13 @@ const styles = StyleSheet.create({
     historyScroll: {
         flex: 1,
     },
+    historyScrollContent: {
+        flexDirection: 'row',
+    },
+    historyPage: {
+        width: Dimensions.get('window').width - 40,
+        paddingHorizontal: 0,
+    },
     historyContent: {
         paddingBottom: 20,
         gap: 12,
@@ -660,19 +695,9 @@ const styles = StyleSheet.create({
         borderColor: '#E0E0E0',
         textAlign: 'center',
     },
-    addSetButton: {
-        backgroundColor: '#526EFF',
-        borderRadius: 12,
-        padding: 16,
-        alignItems: 'center',
-        justifyContent: 'center',
+    addSetButtonContainer: {
         marginTop: 8,
-    },
-    addSetButtonText: {
-        fontSize: 16,
-        fontFamily: fonts.bold,
-        color: '#fff',
-        textTransform: 'lowercase',
+        width: '100%',
     },
     paginationContainer: {
         flexDirection: 'row',

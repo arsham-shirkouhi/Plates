@@ -427,10 +427,10 @@ export const WorkoutScreen: React.FC = () => {
                     text: 'Finish',
                     style: 'default',
                     onPress: () => {
-                        // TODO: Save workout to database
-                        setActiveWorkout(null);
-                        setHasCompletedWorkout(true);
-                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        // TODO: Save workout to database
+        setActiveWorkout(null);
+        setHasCompletedWorkout(true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                     },
                 },
             ]
@@ -462,7 +462,7 @@ export const WorkoutScreen: React.FC = () => {
     }, [showCountdown]);
 
     const handleStartWorkoutPress = () => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         Alert.alert(
             'Start Workout',
             'Do you want to start a workout?',
@@ -873,7 +873,7 @@ export const WorkoutScreen: React.FC = () => {
                 onClose={() => setShowAddExerciseOverlay(false)}
                 onSelectExercise={handleSelectExercise}
                 onSelectExerciseAndNavigate={handleSelectExerciseAndNavigate}
-            />
+                            />
 
             {/* Countdown Overlay - Using Modal to ensure it's above navbar */}
             <Modal

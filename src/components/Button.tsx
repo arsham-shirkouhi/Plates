@@ -370,7 +370,7 @@ export const Button: React.FC<ButtonProps> = ({
                                             getTextStyle(),
                                             textStyle,
                                             {
-                                                color: isDisabled ? '#252525' : '#fff',
+                                                color: textStyle?.color || (isDisabled ? '#252525' : '#fff'),
                                                 opacity: colorOverlayOpacity.interpolate({
                                                     inputRange: [0, 1],
                                                     outputRange: [1, 1],
