@@ -54,10 +54,10 @@ export const ExerciseDetailScreen: React.FC = () => {
     const [exerciseStates, setExerciseStates] = useState<Map<string, { sets: Set[]; exercise: Exercise }>>(new Map());
 
     // Active set state
-    const [activeSetExpanded, setActiveSetExpanded] = useState(false);
+    const [activeSetExpanded, setActiveSetExpanded] = useState(true);
     const [activeReps, setActiveReps] = useState('10');
     const [activeWeight, setActiveWeight] = useState(20);
-    const activeSetSlideAnim = useRef(new Animated.Value(0)).current;
+    const activeSetSlideAnim = useRef(new Animated.Value(1)).current;
 
     // Initialize exercise states
     useEffect(() => {
@@ -158,10 +158,10 @@ export const ExerciseDetailScreen: React.FC = () => {
             useNativeDriver: true,
         }).start();
 
-        // Reset active set
+        // Reset active set values
         setActiveReps('10');
         setActiveWeight(20);
-        setActiveSetExpanded(false);
+        // Keep the active set expanded
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     };
 
@@ -396,6 +396,21 @@ export const ExerciseDetailScreen: React.FC = () => {
                                 </ScrollView>
                             </View>
 
+                            {/* Pagination Indicator */}
+                            {exercises.length > 1 && (
+                                <View style={styles.paginationContainer}>
+                                    {exercises.map((_, idx) => (
+                                        <View
+                                            key={idx}
+                                            style={[
+                                                styles.paginationDot,
+                                                idx === currentIndex && styles.paginationDotActive,
+                                            ]}
+                                        />
+                                    ))}
+                                </View>
+                            )}
+
                             {/* Bottom Section: Active Set Input */}
                             <Animated.View
                                 style={[
@@ -403,7 +418,7 @@ export const ExerciseDetailScreen: React.FC = () => {
                                     {
                                         maxHeight: activeSetSlideAnim.interpolate({
                                             inputRange: [0, 1],
-                                            outputRange: [80, 600],
+                                            outputRange: [160, 600],
                                         }),
                                         opacity: activeSetSlideAnim.interpolate({
                                             inputRange: [0, 0.3, 1],
@@ -413,21 +428,25 @@ export const ExerciseDetailScreen: React.FC = () => {
                                 ]}
                             >
                                 {!activeSetExpanded ? (
-                                    <TouchableOpacity
-                                        style={styles.activeSetCollapsed}
-                                        onPress={() => {
-                                            setActiveSetExpanded(true);
-                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                        }}
-                                        activeOpacity={0.8}
-                                    >
-                                        <Text style={styles.activeSetCollapsedText}>tap to add set</Text>
-                                        <Ionicons name="chevron-up" size={20} color="#526EFF" />
-                                    </TouchableOpacity>
+                                    <View style={styles.activeSetCollapsed}>
+                                        <View style={styles.handleBar} />
+                                        <TouchableOpacity
+                                            style={styles.activeSetCollapsedContent}
+                                            onPress={() => {
+                                                setActiveSetExpanded(true);
+                                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                            }}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Text style={styles.activeSetCollapsedText}>tap to add set</Text>
+                                            <Ionicons name="chevron-up" size={20} color="#526EFF" />
+                                        </TouchableOpacity>
+                                    </View>
                                 ) : (
                                     <View style={styles.activeSetExpanded}>
+                                        <View style={styles.handleBar} />
                                         <View style={styles.activeSetHeader}>
-                                            <Text style={styles.activeSetTitle}>active set</Text>
+                                            <Text style={styles.activeSetTitle}>set {completedSets.length + 1}</Text>
                                             <TouchableOpacity
                                                 onPress={() => {
                                                     setActiveSetExpanded(false);
@@ -439,7 +458,7 @@ export const ExerciseDetailScreen: React.FC = () => {
                                             </TouchableOpacity>
                                         </View>
 
-                                        {/* Plate Slider with inline Reps Input */}
+                                        {/* Plate Slider */}
                                         <PlateSlider
                                             value={activeWeight}
                                             onValueChange={(value) => {
@@ -448,36 +467,59 @@ export const ExerciseDetailScreen: React.FC = () => {
                                             min={2.5}
                                             max={250}
                                             step={2.5}
-                                            repsValue={activeReps}
-                                            onRepsChange={setActiveReps}
                                         />
 
-                                        {/* Add Set Button */}
-                                        <Button
-                                            variant="primary"
-                                            title="add set"
-                                            onPress={handleAddSet}
-                                            containerStyle={styles.addSetButtonContainer}
-                                        />
+                                        {/* Reps Counter and Add Set Button */}
+                                        <View style={styles.repsAndAddSetContainer}>
+                                            <View style={styles.repsButtonWrapper}>
+                                                <Button
+                                                    variant="secondary"
+                                                    title="-"
+                                                    onPress={() => {
+                                                        const currentValue = parseInt(activeReps) || 0;
+                                                        const newValue = Math.max(0, currentValue - 1);
+                                                        setActiveReps(newValue.toString());
+                                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                                    }}
+                                                    containerStyle={styles.repsButtonContainer}
+                                                    textStyle={styles.repsButtonText}
+                                                />
+                                            </View>
+                                            <TextInput
+                                                style={styles.repsInput}
+                                                value={activeReps}
+                                                onChangeText={setActiveReps}
+                                                keyboardType="numeric"
+                                                placeholder="10"
+                                                placeholderTextColor="#9E9E9E"
+                                            />
+                                            <View style={styles.repsButtonWrapper}>
+                                                <Button
+                                                    variant="secondary"
+                                                    title="+"
+                                                    onPress={() => {
+                                                        const currentValue = parseInt(activeReps) || 0;
+                                                        const newValue = currentValue + 1;
+                                                        setActiveReps(newValue.toString());
+                                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                                    }}
+                                                    containerStyle={styles.repsButtonContainer}
+                                                    textStyle={styles.repsButtonText}
+                                                />
+                                            </View>
+                                            <View style={styles.addSetButtonWrapper}>
+                                                <Button
+                                                    variant="primary"
+                                                    title="add set"
+                                                    onPress={handleAddSet}
+                                                    containerStyle={styles.addSetButtonContainer}
+                                                />
+                                            </View>
+                                        </View>
                                     </View>
                                 )}
                             </Animated.View>
                         </View>
-
-                        {/* Pagination Indicator */}
-                        {exercises.length > 1 && (
-                            <View style={styles.paginationContainer}>
-                                {exercises.map((_, idx) => (
-                                    <View
-                                        key={idx}
-                                        style={[
-                                            styles.paginationDot,
-                                            idx === currentIndex && styles.paginationDotActive,
-                                        ]}
-                                    />
-                                ))}
-                            </View>
-                        )}
                     </View>
                 </KeyboardAvoidingView>
             </View>
@@ -523,7 +565,7 @@ const styles = StyleSheet.create({
     },
     header: {
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         justifyContent: 'space-between',
         minHeight: 48,
     },
@@ -638,18 +680,38 @@ const styles = StyleSheet.create({
     },
     activeSetSection: {
         backgroundColor: '#fff',
-        borderTopWidth: 2,
-        borderTopColor: '#E0E0E0',
-        paddingHorizontal: 20,
-        paddingTop: 16,
-        paddingBottom: 20,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        borderWidth: 2,
+        borderColor: '#252525',
+        borderBottomWidth: 0,
+        paddingHorizontal: 0,
+        paddingTop: 0,
+        paddingBottom: 0,
         overflow: 'hidden',
+        width: '100%',
     },
     activeSetCollapsed: {
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        borderWidth: 0,
+        paddingHorizontal: 20,
+        paddingTop: 12,
+        paddingBottom: 20,
+    },
+    handleBar: {
+        width: 40,
+        height: 4,
+        backgroundColor: '#E0E0E0',
+        borderRadius: 2,
+        alignSelf: 'center',
+        marginBottom: 16,
+    },
+    activeSetCollapsedContent: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 20,
         gap: 8,
     },
     activeSetCollapsedText: {
@@ -659,6 +721,9 @@ const styles = StyleSheet.create({
         textTransform: 'lowercase',
     },
     activeSetExpanded: {
+        width: '100%',
+        paddingHorizontal: 20,
+        paddingTop: 12,
         paddingBottom: 20,
     },
     activeSetHeader: {
@@ -668,8 +733,8 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     activeSetTitle: {
-        fontSize: 14,
-        fontFamily: fonts.bold,
+        fontSize: 18,
+        fontFamily: fonts.regular,
         color: '#252525',
         textTransform: 'lowercase',
     },
@@ -677,33 +742,61 @@ const styles = StyleSheet.create({
         marginTop: 20,
         marginBottom: 20,
     },
-    repsLabel: {
-        fontSize: 14,
-        fontFamily: fonts.regular,
-        color: '#9E9E9E',
-        textTransform: 'lowercase',
-        marginBottom: 8,
+    repsAndAddSetContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        marginTop: 8,
+        marginBottom: 12,
+        width: '100%',
     },
-    repsInput: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 16,
+    repsButtonWrapper: {
+        height: 50,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: -6, // Compensate for button's marginBottom: 12 / 2
+        marginBottom: -6,
+    },
+    repsButtonContainer: {
+        width: 50,
+        height: 50,
+        margin: 0,
+    },
+    repsButtonText: {
         fontSize: 24,
         fontFamily: fonts.bold,
         color: '#252525',
+    },
+    repsInput: {
+        width: 50,
+        backgroundColor: '#fff',
+        borderRadius: 12,
         borderWidth: 2,
-        borderColor: '#E0E0E0',
+        borderColor: '#252525',
+        paddingHorizontal: 12,
+        paddingVertical: 16,
+        fontSize: 16,
+        fontFamily: fonts.bold,
+        color: '#252525',
         textAlign: 'center',
+        height: 50, // Match button height
+    },
+    addSetButtonWrapper: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 2,
+        marginBottom: -6,
     },
     addSetButtonContainer: {
-        marginTop: 8,
         width: '100%',
+        margin: 0,
     },
     paginationContainer: {
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        gap: 8,
+        gap: 10,
         paddingVertical: 12,
         paddingHorizontal: 20,
     },

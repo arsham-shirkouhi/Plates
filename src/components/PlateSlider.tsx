@@ -8,7 +8,9 @@ import {
     Dimensions,
     Easing,
     TextInput,
+    TouchableOpacity,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../constants/fonts';
 
@@ -674,7 +676,7 @@ export const PlateSlider: React.FC<PlateSliderProps> = ({
                                     <View style={{ width: (plateGroup.count - 1) * PLATE_OFFSET + PLATE_SIZE * (0.6 + (plateGroup.weight / 25) * 0.4) }} />
                                 </View>
                                 {/* Count indicator - below the plates */}
-                                <Text style={styles.plateCount}>{plateGroup.count}×</Text>
+                                <Text style={styles.plateCount} numberOfLines={1}>{plateGroup.count}×</Text>
                             </View>
                         );
                     })}
@@ -684,6 +686,7 @@ export const PlateSlider: React.FC<PlateSliderProps> = ({
             {/* Weight Display with Reps Input */}
             <View style={styles.weightDisplay}>
                 <Animated.Text
+                    numberOfLines={1}
                     style={[
                         styles.weightValue,
                         {
@@ -694,18 +697,44 @@ export const PlateSlider: React.FC<PlateSliderProps> = ({
                 >
                     {displayedWeight.toFixed(1)}
                 </Animated.Text>
-                <Text style={styles.weightUnit}>kg</Text>
+                <Text style={styles.weightUnit} numberOfLines={1}>kg</Text>
                 {repsValue !== undefined && onRepsChange && (
                     <View style={styles.repsInputInline}>
                         <Text style={styles.repsLabelInline}>reps</Text>
-                        <TextInput
-                            style={styles.repsInputSmall}
-                            value={repsValue}
-                            onChangeText={onRepsChange}
-                            keyboardType="numeric"
-                            placeholder="10"
-                            placeholderTextColor="#9E9E9E"
-                        />
+                        <View style={styles.repsControlContainer}>
+                            <TouchableOpacity
+                                style={styles.repsButton}
+                                onPress={() => {
+                                    const currentValue = parseInt(repsValue) || 0;
+                                    const newValue = Math.max(0, currentValue - 1);
+                                    onRepsChange(newValue.toString());
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                }}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons name="remove" size={18} color="#526EFF" />
+                            </TouchableOpacity>
+                            <TextInput
+                                style={styles.repsInputSmall}
+                                value={repsValue}
+                                onChangeText={onRepsChange}
+                                keyboardType="numeric"
+                                placeholder="10"
+                                placeholderTextColor="#9E9E9E"
+                            />
+                            <TouchableOpacity
+                                style={styles.repsButton}
+                                onPress={() => {
+                                    const currentValue = parseInt(repsValue) || 0;
+                                    const newValue = currentValue + 1;
+                                    onRepsChange(newValue.toString());
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                }}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons name="add" size={18} color="#526EFF" />
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 )}
             </View>
@@ -758,6 +787,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         minHeight: 120, // Reduced height
         overflow: 'visible',
+        marginTop: -3, // Decrease top spacing by 3px
         marginBottom: 10, // Reduced bottom margin
         position: 'relative',
         alignSelf: 'center', // Center the container itself
@@ -834,17 +864,24 @@ const styles = StyleSheet.create({
         alignItems: 'baseline',
         justifyContent: 'center',
         marginBottom: 10, // Reduced spacing
-        gap: 8,
+        gap: 0,
+        flexWrap: 'nowrap',
+        width: '100%',
+        minWidth: 200,
     },
     weightValue: {
         fontSize: 36, // Reduced from 48
         fontFamily: fonts.bold,
         color: '#252525',
+        flexShrink: 0,
+        minWidth: 100,
     },
     weightUnit: {
         fontSize: 18, // Reduced from 24
         fontFamily: fonts.regular,
         color: '#9E9E9E',
+        marginLeft: 0,
+        paddingLeft: 0,
     },
     repsInputInline: {
         flexDirection: 'row',
@@ -857,6 +894,21 @@ const styles = StyleSheet.create({
         fontFamily: fonts.regular,
         color: '#9E9E9E',
         textTransform: 'lowercase',
+    },
+    repsControlContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    repsButton: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        borderWidth: 2,
+        borderColor: '#E0E0E0',
+        backgroundColor: '#fff',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     repsInputSmall: {
         backgroundColor: '#fff',
@@ -887,6 +939,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         gap: 4, // Gap between plates and count text
         marginHorizontal: 2, // Reduced margin from 4 to 2
+        minWidth: 50, // Ensure enough width for count text
     },
     plateGroupContainer: {
         position: 'relative',
@@ -905,6 +958,8 @@ const styles = StyleSheet.create({
         color: '#252525',
         marginTop: 4,
         textAlign: 'center',
+        width: '100%',
+        flexShrink: 0,
     },
     validationLabel: {
         marginTop: 16,
