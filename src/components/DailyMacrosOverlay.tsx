@@ -360,7 +360,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     headerTitle: {
-        fontSize: 20,
+        fontSize: 18,
         fontFamily: fonts.bold,
         color: '#252525',
         textTransform: 'lowercase',

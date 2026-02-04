@@ -11,6 +11,9 @@ interface UndoToastProps {
     onDismiss?: () => void;
     duration?: number; // Auto-dismiss duration in ms (default: 3000)
     bottomOffset?: number; // Additional offset from bottom (default: 0)
+    showUndo?: boolean;
+    actionLabel?: string;
+    onAction?: () => void;
 }
 
 export const UndoToast: React.FC<UndoToastProps> = ({
@@ -20,6 +23,9 @@ export const UndoToast: React.FC<UndoToastProps> = ({
     onDismiss,
     duration = 3000,
     bottomOffset = 0,
+    showUndo = true,
+    actionLabel,
+    onAction,
 }) => {
     const insets = useSafeAreaInsets();
     const slideAnim = useRef(new Animated.Value(-100)).current;
@@ -94,6 +100,17 @@ export const UndoToast: React.FC<UndoToastProps> = ({
         handleDismiss();
     };
 
+    const handleAction = () => {
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+        }
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        if (onAction) {
+            onAction();
+        }
+        handleDismiss();
+    };
+
     if (!visible) {
         return null;
     }
@@ -111,9 +128,16 @@ export const UndoToast: React.FC<UndoToastProps> = ({
                 pointerEvents="auto"
             >
                 <Text style={styles.toastText}>{message}</Text>
-                <TouchableOpacity onPress={handleUndo} activeOpacity={0.7}>
-                    <Text style={styles.undoButtonText}>undo</Text>
-                </TouchableOpacity>
+                {showUndo && (
+                    <TouchableOpacity onPress={handleUndo} activeOpacity={0.7}>
+                        <Text style={styles.undoButtonText}>undo</Text>
+                    </TouchableOpacity>
+                )}
+                {!showUndo && actionLabel && (
+                    <TouchableOpacity onPress={handleAction} activeOpacity={0.7}>
+                        <Text style={styles.undoButtonText}>{actionLabel}</Text>
+                    </TouchableOpacity>
+                )}
             </Animated.View>
         </View>
     );

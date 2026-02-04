@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
         width: 40,
     },
     headerTitle: {
-        fontSize: 20,
+        fontSize: 18,
         fontFamily: fonts.bold,
         color: '#252525',
         textTransform: 'lowercase',

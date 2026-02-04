@@ -364,8 +364,8 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
                 statusBarTranslucent={true}
                 presentationStyle="overFullScreen"
             >
-                <View style={styles.container} pointerEvents="auto">
-                    {/* Backdrop - blocks all touches */}
+                <View style={styles.container}>
+                    {/* Backdrop */}
                     <Animated.View
                         style={[
                             styles.backdrop,
@@ -373,15 +373,12 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
                                 opacity: backdropOpacity,
                             },
                         ]}
-                        pointerEvents="auto"
                     >
-                        <View style={StyleSheet.absoluteFill} pointerEvents="auto">
-                            <TouchableOpacity
-                                style={StyleSheet.absoluteFill}
-                                activeOpacity={1}
-                                onPress={handleBackdropPress}
-                            />
-                        </View>
+                        <TouchableOpacity
+                            style={StyleSheet.absoluteFill}
+                            activeOpacity={1}
+                            onPress={handleBackdropPress}
+                        />
                     </Animated.View>
 
                     {/* Content - Full screen overlay */}
@@ -394,9 +391,8 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
                                 paddingBottom: insets.bottom,
                             },
                         ]}
-                        pointerEvents="box-none"
                     >
-                        <View style={styles.contentInner} pointerEvents="auto">
+                        <View style={styles.contentInner}>
                             {/* Header */}
                             <View style={styles.header}>
                                 <TouchableOpacity
@@ -423,10 +419,11 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
                                     )}
                                 </View>
                             </View>
+                            <View style={styles.headerDivider} />
 
                             {showDetailView ? (
                                 /* Detail View */
-                                <View style={styles.contentInnerView}>
+                                <View style={styles.detailViewContainer}>
                                     {loadingDetails ? (
                                         <View style={styles.loadingContainer}>
                                             <ActivityIndicator size="large" color="#526EFF" />
@@ -439,7 +436,7 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
                                     ) : (
                                         <ScrollView
                                             style={styles.scrollView}
-                                            contentContainerStyle={styles.scrollContent}
+                                            contentContainerStyle={styles.detailScrollContent}
                                             showsVerticalScrollIndicator={false}
                                         >
                                             {/* Title */}
@@ -515,62 +512,69 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
                                             </TouchableOpacity>
                                         )}
                                     </View>
-
-                                    <View style={styles.contentInnerView}>
-                                        {/* Exercises List */}
-                                        {loading ? (
-                                            <View style={styles.loadingContainer}>
-                                                <ActivityIndicator size="large" color="#526EFF" />
-                                                <Text style={styles.loadingText}>loading exercises...</Text>
-                                            </View>
-                                        ) : (
-                                            <ScrollView
-                                                ref={scrollViewRef}
-                                                style={styles.scrollView}
-                                                contentContainerStyle={styles.scrollContent}
-                                                showsVerticalScrollIndicator={false}
-                                                onScroll={handleScroll}
-                                                scrollEventThrottle={400}
-                                            >
-                                                {displayedExercises.length === 0 ? (
-                                                    <View style={styles.emptyContainer}>
-                                                        <Text style={styles.emptyText}>no exercises found</Text>
-                                                    </View>
-                                                ) : (
-                                                    <>
-                                                        {displayedExercises.map((exercise, index) => (
-                                                            <View
-                                                                key={`exercise-${index}-${exercise.id || exercise.name || 'item'}`}
-                                                                style={styles.exerciseItem}
-                                                            >
-                                                                <TouchableOpacity
-                                                                    style={styles.exerciseTitleContainer}
-                                                                    onPress={() => handleExerciseTitlePress(exercise)}
-                                                                    activeOpacity={0.7}
-                                                                >
-                                                                    <Text style={styles.exerciseName}>{exercise.name}</Text>
-                                                                </TouchableOpacity>
-                                                                <TouchableOpacity
-                                                                    style={styles.addButton}
-                                                                    onPress={() => handleAddExercise(exercise)}
-                                                                    activeOpacity={0.7}
-                                                                >
-                                                                    <Ionicons name="add" size={24} color="#526EFF" />
-                                                                </TouchableOpacity>
-                                                            </View>
-                                                        ))}
-                                                        {loadingMore && (
-                                                            <View style={styles.loadingMoreContainer}>
-                                                                <ActivityIndicator size="small" color="#526EFF" />
-                                                                <Text style={styles.loadingMoreText}>loading more...</Text>
-                                                            </View>
-                                                        )}
-                                                    </>
-                                                )}
-                                            </ScrollView>
-                                        )}
-                                    </View>
                                 </>
+                            )}
+
+                            {!showDetailView && (
+                                <View style={styles.exercisesContainer}>
+                                    {/* Exercises List */}
+                                    {loading ? (
+                                        <View style={styles.loadingContainer}>
+                                            <ActivityIndicator size="large" color="#526EFF" />
+                                            <Text style={styles.loadingText}>loading exercises...</Text>
+                                        </View>
+                                    ) : (
+                                        <ScrollView
+                                            ref={scrollViewRef}
+                                            style={styles.scrollView}
+                                            contentContainerStyle={styles.scrollContent}
+                                            showsVerticalScrollIndicator={false}
+                                            onScroll={handleScroll}
+                                            scrollEventThrottle={400}
+                                        >
+                                            {displayedExercises.length === 0 ? (
+                                                <View style={styles.emptyContainer}>
+                                                    <Text style={styles.emptyText}>no exercises found</Text>
+                                                </View>
+                                            ) : (
+                                                <>
+                                                    {displayedExercises.map((exercise, index) => (
+                                                        <View
+                                                            key={`exercise-${index}-${exercise.id || exercise.name || 'item'}`}
+                                                            style={styles.exerciseItem}
+                                                        >
+                                                            <TouchableOpacity
+                                                                style={styles.exerciseTitleContainer}
+                                                                onPress={() => handleExerciseTitlePress(exercise)}
+                                                                activeOpacity={0.7}
+                                                            >
+                                                                <Text style={styles.exerciseName}>{exercise.name}</Text>
+                                                                {!!exercise.bodyPart && (
+                                                                    <Text style={styles.exerciseBodyPart}>
+                                                                        {exercise.bodyPart.toLowerCase()}
+                                                                    </Text>
+                                                                )}
+                                                            </TouchableOpacity>
+                                                            <TouchableOpacity
+                                                                style={styles.addButton}
+                                                                onPress={() => handleAddExercise(exercise)}
+                                                                activeOpacity={0.7}
+                                                            >
+                                                                <Ionicons name="add" size={24} color="#526EFF" />
+                                                            </TouchableOpacity>
+                                                        </View>
+                                                    ))}
+                                                    {loadingMore && (
+                                                        <View style={styles.loadingMoreContainer}>
+                                                            <ActivityIndicator size="small" color="#526EFF" />
+                                                            <Text style={styles.loadingMoreText}>loading more...</Text>
+                                                        </View>
+                                                    )}
+                                                </>
+                                            )}
+                                        </ScrollView>
+                                    )}
+                                </View>
                             )}
                         </View>
                     </Animated.View>
@@ -583,21 +587,14 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: 'transparent',
     },
     backdrop: {
         ...StyleSheet.absoluteFillObject,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        zIndex: 1,
     },
     content: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
+        flex: 1,
         backgroundColor: '#fff',
-        zIndex: 2,
     },
     contentInner: {
         flex: 1,
@@ -607,13 +604,15 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingVertical: 16,
-        borderBottomWidth: 2,
-        borderBottomColor: '#F0F0F0',
+        paddingVertical: 6,
+    },
+    headerDivider: {
+        height: 2,
+        backgroundColor: '#E0E0E0',
     },
     backButton: {
-        width: 40,
-        height: 40,
+        width: 32,
+        height: 32,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -622,31 +621,34 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     headerRight: {
-        width: 40,
+        width: 32,
         alignItems: 'center',
         justifyContent: 'center',
     },
     headerAddButton: {
-        width: 40,
-        height: 40,
+        width: 32,
+        height: 32,
         alignItems: 'center',
         justifyContent: 'center',
     },
     headerTitle: {
-        fontSize: 20,
+        fontSize: 18,
         fontFamily: fonts.bold,
         color: '#252525',
         textTransform: 'lowercase',
     },
-    contentInnerView: {
+    exercisesContainer: {
+        flex: 1,
+    },
+    detailViewContainer: {
         flex: 1,
     },
     searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
+        marginTop: 16,
+        marginBottom: 6,
         marginHorizontal: 20,
-        marginTop: 12,
-        marginBottom: 12,
         paddingHorizontal: 16,
         paddingVertical: 12,
         backgroundColor: '#F5F5F5',
@@ -672,14 +674,18 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         paddingHorizontal: 20,
-        paddingBottom: 10,
+        paddingTop: 0,
+        paddingBottom: 8,
+    },
+    detailScrollContent: {
+        paddingHorizontal: 20,
+        paddingVertical: 20,
     },
     exerciseItem: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingVertical: 14,
-        paddingHorizontal: 7,
         borderBottomWidth: 2,
         borderBottomColor: '#F0F0F0',
     },
@@ -692,6 +698,13 @@ const styles = StyleSheet.create({
         fontFamily: fonts.regular,
         color: '#252525',
         textTransform: 'lowercase',
+    },
+    exerciseBodyPart: {
+        fontSize: 12,
+        fontFamily: fonts.regular,
+        color: '#9E9E9E',
+        textTransform: 'lowercase',
+        marginTop: 2,
     },
     addButton: {
         width: 40,

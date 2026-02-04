@@ -12,6 +12,7 @@ import {
     TextInput,
     Modal,
     Alert,
+    Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -260,6 +261,32 @@ export const WorkoutScreen: React.FC = () => {
         });
     };
 
+    const handleDeleteExercise = (exercise: Exercise) => {
+        if (!activeWorkout) return;
+        
+        Alert.alert(
+            'Delete Exercise',
+            `Are you sure you want to delete "${exercise.name}"?`,
+            [
+                {
+                    text: 'Cancel',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: () => {
+                        setActiveWorkout({
+                            ...activeWorkout,
+                            exercises: activeWorkout.exercises.filter(ex => ex.id !== exercise.id),
+                        });
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    },
+                },
+            ]
+        );
+    };
+
     const handleUpdateExerciseSets = (exerciseId: string, updatedSets: Set[]) => {
         if (!activeWorkout) return;
 
@@ -330,11 +357,8 @@ export const WorkoutScreen: React.FC = () => {
                     previousCompletionStates.set(ex.id, wasComplete);
                 });
 
-                // Update all exercises
-                const updatedExercises = activeWorkout.exercises.map(ex => {
-                    const updated = params.updatedExercises.find((ue: Exercise) => ue.id === ex.id);
-                    return updated || ex;
-                });
+                // Replace with the updated list (supports deletions)
+                const updatedExercises = params.updatedExercises;
 
                 setActiveWorkout({
                     ...activeWorkout,
@@ -825,6 +849,7 @@ export const WorkoutScreen: React.FC = () => {
                                                     isComplete={isComplete}
                                                     hasBorder={index < activeWorkout.exercises.length - 1}
                                                     onPress={() => handleExercisePress(exercise)}
+                                                    onLongPress={() => handleDeleteExercise(exercise)}
                                                     onLayout={(ref) => {
                                                         exerciseItemRefs.current.set(exercise.id, ref);
                                                     }}
@@ -951,10 +976,11 @@ interface ExerciseItemProps {
     isComplete: boolean;
     hasBorder: boolean;
     onPress: () => void;
+    onLongPress: () => void;
     onLayout: (ref: { measureInWindow: (callback: (x: number, y: number, width: number, height: number) => void) => void; getTextWidth: () => number }) => void;
 }
 
-const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isComplete, hasBorder, onPress, onLayout }) => {
+const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isComplete, hasBorder, onPress, onLongPress, onLayout }) => {
     const strikeThroughWidth = useRef(new Animated.Value(0)).current;
     const itemRef = useRef<View>(null);
     const textRef = useRef<Text>(null);
@@ -996,16 +1022,21 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isComplete, hasBo
             activeOpacity={0.7}
         >
             <View style={styles.exerciseItemNameContainer}>
-                <Text
-                    ref={textRef}
-                    style={styles.exerciseItemName}
-                    onTextLayout={(event) => {
-                        const { width } = event.nativeEvent.lines[0] || { width: 0 };
-                        setTextWidth(width);
-                    }}
+                <Pressable
+                    onLongPress={onLongPress}
+                    delayLongPress={500}
                 >
-                    {exercise.name}
-                </Text>
+                    <Text
+                        ref={textRef}
+                        style={styles.exerciseItemName}
+                        onTextLayout={(event) => {
+                            const { width } = event.nativeEvent.lines[0] || { width: 0 };
+                            setTextWidth(width);
+                        }}
+                    >
+                        {exercise.name}
+                    </Text>
+                </Pressable>
                 {isComplete && (
                     <Animated.View
                         style={[

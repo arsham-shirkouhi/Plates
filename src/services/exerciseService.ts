@@ -3,6 +3,7 @@ import { supabase } from './supabase';
 export interface Exercise {
     id: string;
     name: string;
+    bodyPart?: string;
 }
 
 export interface ExerciseDetails {
@@ -68,6 +69,7 @@ export const getExercisesList = async (limit: number = 20, offset: number = 0): 
             .map((exercise: any, index: number) => ({
                 id: exercise.Id?.toString() || String(exercise.Id) || `exercise-${index}-${exercise.Title}`,
                 name: cleanTitle(exercise.Title || ''),
+                bodyPart: exercise.BodyPart || '',
             }));
 
         return exercises;
@@ -115,6 +117,7 @@ export const searchExercises = async (query: string): Promise<Exercise[]> => {
         return data.map((exercise: any, index: number) => ({
             id: exercise.Id?.toString() || String(exercise.Id) || `exercise-search-${index}-${exercise.Title}`,
             name: cleanTitle(exercise.Title || ''),
+            bodyPart: exercise.BodyPart || '',
         }));
     } catch (error) {
         console.error('Error in searchExercises:', error);
@@ -131,7 +134,7 @@ export const getExerciseDetails = async (exerciseId: string): Promise<ExerciseDe
             .from('exercises')
             .select('*')
             .eq('Id', exerciseId)
-            .single();
+            .maybeSingle();
 
         if (error) {
             console.error('Error fetching exercise details:', error);
