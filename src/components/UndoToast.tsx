@@ -129,9 +129,9 @@ export const UndoToast: React.FC<UndoToastProps> = ({
             >
                 <Text style={styles.toastText}>{message}</Text>
                 {showUndo && (
-                    <TouchableOpacity onPress={handleUndo} activeOpacity={0.7}>
-                        <Text style={styles.undoButtonText}>undo</Text>
-                    </TouchableOpacity>
+                <TouchableOpacity onPress={handleUndo} activeOpacity={0.7}>
+                    <Text style={styles.undoButtonText}>undo</Text>
+                </TouchableOpacity>
                 )}
                 {!showUndo && actionLabel && (
                     <TouchableOpacity onPress={handleAction} activeOpacity={0.7}>

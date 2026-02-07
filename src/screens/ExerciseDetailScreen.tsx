@@ -42,6 +42,38 @@ interface Exercise {
     sets: Set[];
 }
 
+const PLATE_WEIGHTS = [25, 20, 15, 10, 5, 2.5, 1.25];
+const PLATE_COLORS: Record<number, string> = {
+    25: '#D32F2F',
+    20: '#1976D2',
+    15: '#FFD600',
+    10: '#2E7D32',
+    5: '#F57C00',
+    2.5: '#6D4C41',
+    1.25: '#455A64',
+};
+
+const getMiniPlateStack = (weightValue: number): number[] => {
+    let remaining = Math.max(0, weightValue);
+    const plates: number[] = [];
+    PLATE_WEIGHTS.forEach((plate) => {
+        const count = Math.floor((remaining + 1e-6) / plate);
+        for (let i = 0; i < count; i += 1) {
+            plates.push(plate);
+        }
+        remaining = Math.max(0, remaining - count * plate);
+    });
+    return plates;
+};
+
+const getMiniPlateSize = (weightValue: number): number => {
+    const min = 12;
+    const max = 20;
+    const normalized = Math.min(25, Math.max(1.25, weightValue));
+    const ratio = (normalized - 1.25) / (25 - 1.25);
+    return min + ratio * (max - min);
+};
+
 export const ExerciseDetailScreen: React.FC = () => {
     const navigation = useNavigation<ExerciseDetailScreenNavigationProp>();
     const route = useRoute<ExerciseDetailScreenRouteProp>();
@@ -66,6 +98,7 @@ export const ExerciseDetailScreen: React.FC = () => {
     const [setToastMessage, setSetToastMessage] = useState('');
     const [setToastActionLabel, setSetToastActionLabel] = useState<string | undefined>(undefined);
     const lastAddedSetIdRef = useRef<string | null>(null);
+    const activeSetTitleAnim = useRef(new Animated.Value(1)).current;
     const [detailsById, setDetailsById] = useState<Record<string, { equipment: string | null; bodyPart: string | null }>>({});
     const requestedEquipmentRef = useRef(new Set<string>());
 
@@ -162,6 +195,17 @@ export const ExerciseDetailScreen: React.FC = () => {
         setActiveSetNumber(completedSets.length + 1);
     }, [currentIndex, sets, completedSets.length]);
 
+    useEffect(() => {
+        activeSetTitleAnim.setValue(0.9);
+        Animated.spring(activeSetTitleAnim, {
+            toValue: 1,
+            tension: 220,
+            friction: 14,
+            useNativeDriver: true,
+        }).start();
+    }, [activeSetNumber, activeSetTitleAnim]);
+
+
     const handleAddSet = () => {
         if (selectedSetId) {
             // Update selected set instead of adding a new one
@@ -220,9 +264,9 @@ export const ExerciseDetailScreen: React.FC = () => {
             useNativeDriver: true,
         }).start();
 
-        // Reset active set values
+        // Carry forward last used weight, reset reps
         setActiveReps('10');
-        setActiveWeight(20);
+        setActiveWeight(parseFloat(newSet.weight));
         setActiveSetNumber(completedSets.length + 2);
         lastAddedSetIdRef.current = newSetId;
         setSetToastMessage('set added!');
@@ -454,6 +498,10 @@ export const ExerciseDetailScreen: React.FC = () => {
                                                         if (!setAnimations.has(set.id)) {
                                                             setAnimations.set(set.id, animValue);
                                                         }
+                                                        const setWeightValue = parseFloat(set.weight);
+                                                        const miniPlates = getMiniPlateStack(
+                                                            Number.isFinite(setWeightValue) ? setWeightValue : 0
+                                                        );
 
                                                         const handleSelectSet = () => {
                                                             if (selectedSetId === set.id) {
@@ -476,45 +524,81 @@ export const ExerciseDetailScreen: React.FC = () => {
                                                                 activeOpacity={0.8}
                                                                 onPress={handleSelectSet}
                                                             >
-                                                                <Animated.View
-                                                                    style={[
-                                                                        styles.setCard,
-                                                                        selectedSetId === set.id && styles.setCardSelected,
-                                                                        {
-                                                                            opacity: animValue,
-                                                                            transform: [
-                                                                                {
-                                                                                    scale: animValue.interpolate({
-                                                                                        inputRange: [0, 1],
-                                                                                        outputRange: [0.8, 1],
-                                                                                    }),
-                                                                                },
-                                                                            ],
-                                                                        },
-                                                                    ]}
-                                                                >
-                                                                    <View style={styles.setCardHeader}>
-                                                                        <Text style={styles.setNumber}>set {setIndex + 1}</Text>
-                                                                        {isCurrentExercise && (
-                                                                            <TouchableOpacity
-                                                                                onPress={() => handleRemoveSet(set.id)}
-                                                                                activeOpacity={0.7}
-                                                                            >
-                                                                                <Ionicons name="close" size={18} color="#9E9E9E" />
-                                                                            </TouchableOpacity>
-                                                                        )}
-                                                                    </View>
-                                                                    <View style={styles.setCardContent}>
-                                                                        <View style={styles.setCardStat}>
-                                                                            <Text style={styles.setCardLabel}>weight</Text>
-                                                                            <Text style={styles.setCardValue}>{set.weight} kg</Text>
+                                                                <View style={styles.setCardWrapper}>
+                                                                    <Animated.View
+                                                                        style={[
+                                                                            styles.setCard,
+                                                                            selectedSetId === set.id && styles.setCardSelected,
+                                                                            {
+                                                                                opacity: animValue,
+                                                                                transform: [
+                                                                                    {
+                                                                                        scale: animValue.interpolate({
+                                                                                            inputRange: [0, 1],
+                                                                                            outputRange: [0.8, 1],
+                                                                                        }),
+                                                                                    },
+                                                                                ],
+                                                                            },
+                                                                        ]}
+                                                                    >
+                                                                        <View style={styles.setCardHeader}>
+                                                                            <View style={styles.setNumberRow}>
+                                                                                <Text style={styles.setNumber}>set {setIndex + 1}</Text>
+                                                                                {selectedSetId === set.id && (
+                                                                                    <View style={styles.setEditingPill}>
+                                                                                        <Text style={styles.setEditingText}>editing</Text>
+                                                                                    </View>
+                                                                                )}
+                                                                            </View>
+                                                                            {isCurrentExercise && (
+                                                                                <TouchableOpacity
+                                                                                    onPress={() => handleRemoveSet(set.id)}
+                                                                                    activeOpacity={0.7}
+                                                                                >
+                                                                                    <Ionicons name="close" size={20} color="#252525" />
+                                                                                </TouchableOpacity>
+                                                                            )}
                                                                         </View>
-                                                                        <View style={styles.setCardStat}>
-                                                                            <Text style={styles.setCardLabel}>reps</Text>
-                                                                            <Text style={styles.setCardValue}>{set.reps}</Text>
+                                                                        <View style={styles.setCardContent}>
+                                                                            <View style={styles.setCardStats}>
+                                                                                <View style={styles.setCardStat}>
+                                                                                    <Text style={styles.setCardLabel}>weight</Text>
+                                                                                    <Text style={[styles.setCardValue, styles.setCardWeightValue]}>
+                                                                                        {Number.isFinite(parseFloat(set.weight))
+                                                                                            ? `${parseFloat(set.weight).toFixed(1)}kg`
+                                                                                            : `${set.weight}kg`}
+                                                                                    </Text>
+                                                                                </View>
+                                                                                <View style={styles.setCardDivider} />
+                                                                                <View style={styles.setCardStat}>
+                                                                                    <Text style={styles.setCardLabel}>reps</Text>
+                                                                                    <Text style={styles.setCardValue}>{set.reps}</Text>
+                                                                                </View>
+                                                                            </View>
+                                                                            <View style={styles.miniPlateStack}>
+                                                                                {miniPlates.map((plate, plateIndex) => {
+                                                                                    const size = getMiniPlateSize(plate);
+                                                                                    return (
+                                                                                        <View
+                                                                                            key={`${set.id}-plate-${plateIndex}-${plate}`}
+                                                                                            style={[
+                                                                                                styles.miniPlate,
+                                                                                                {
+                                                                                                    width: size,
+                                                                                                    height: size,
+                                                                                                    borderRadius: size / 2,
+                                                                                                    backgroundColor: PLATE_COLORS[plate] || '#8E8E93',
+                                                                                                    marginLeft: plateIndex === 0 ? 0 : -Math.max(4, size * 0.35),
+                                                                                                },
+                                                                                            ]}
+                                                                                        />
+                                                                                    );
+                                                                                })}
+                                                                            </View>
                                                                         </View>
-                                                                    </View>
-                                                                </Animated.View>
+                                                                    </Animated.View>
+                                                                </View>
                                                             </TouchableOpacity>
                                                         );
                                                     })
@@ -544,7 +628,20 @@ export const ExerciseDetailScreen: React.FC = () => {
                             <View style={styles.activeSetSection}>
                                 <View style={styles.activeSetExpanded}>
                                     <View style={styles.activeSetHeader}>
-                                        <Text style={styles.activeSetTitle}>set {activeSetNumber}</Text>
+                                        <Animated.Text
+                                            style={[
+                                                styles.activeSetTitle,
+                                                {
+                                                    transform: [{ scale: activeSetTitleAnim }],
+                                                    opacity: activeSetTitleAnim.interpolate({
+                                                        inputRange: [0.9, 1],
+                                                        outputRange: [0.6, 1],
+                                                    }),
+                                                },
+                                            ]}
+                                        >
+                                            set {activeSetNumber}
+                                        </Animated.Text>
                                     </View>
 
                                     {isBodyweight ? (
@@ -806,16 +903,40 @@ const styles = StyleSheet.create({
         color: '#9E9E9E',
         textTransform: 'lowercase',
     },
+    setCardWrapper: {
+        position: 'relative',
+    },
     setCard: {
-        backgroundColor: '#fff',
+        backgroundColor: '#F8F8F8',
         borderRadius: 12,
         padding: 10,
         borderWidth: 2,
         borderColor: '#252525',
+        position: 'relative',
+        zIndex: 1,
     },
     setCardSelected: {
-        backgroundColor: '#F3F6FF',
+        backgroundColor: '#F2F5FF',
         borderColor: '#526EFF',
+    },
+    setNumberRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    setEditingPill: {
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 10,
+        borderWidth: 2,
+        borderColor: '#526EFF',
+        backgroundColor: '#F2F5FF',
+    },
+    setEditingText: {
+        fontSize: 10,
+        fontFamily: fonts.bold,
+        color: '#526EFF',
+        textTransform: 'lowercase',
     },
     setCardHeader: {
         flexDirection: 'row',
@@ -825,16 +946,29 @@ const styles = StyleSheet.create({
     },
     setNumber: {
         fontSize: 18,
-        fontFamily: fonts.regular,
-        color: '#666',
+        fontFamily: fonts.bold,
+        color: '#252525',
         textTransform: 'lowercase',
     },
     setCardContent: {
         flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    setCardStats: {
+        flexDirection: 'row',
+        alignItems: 'center',
         gap: 12,
+        flexShrink: 0,
+        minWidth: 150,
     },
     setCardStat: {
         flex: 1,
+    },
+    setCardDivider: {
+        width: 1,
+        height: 32,
+        backgroundColor: '#E0E0E0',
     },
     setCardLabel: {
         fontSize: 11,
@@ -845,8 +979,22 @@ const styles = StyleSheet.create({
     },
     setCardValue: {
         fontSize: 16,
-        fontFamily: fonts.regular,
+        fontFamily: fonts.bold,
         color: '#252525',
+    },
+    setCardWeightValue: {
+        width: 100,
+    },
+    miniPlateStack: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        width: 80,
+        marginLeft: 12,
+    },
+    miniPlate: {
+        borderWidth: 2,
+        borderColor: '#252525',
     },
     activeSetSection: {
         backgroundColor: '#fff',
