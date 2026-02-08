@@ -245,12 +245,12 @@ export const WorkoutHeaderSection: React.FC<WorkoutHeaderSectionProps> = ({
                             <View style={styles.statsRow}>
                                 <View style={styles.statItem}>
                                     <Text style={styles.statLabel}>sets</Text>
-                                    <Text style={styles.statValue}>{displayCompletedSets}/{displayTotalSets}</Text>
+                                    <Text style={styles.statValue}>{displayCompletedSets}</Text>
                                 </View>
                                 <Text style={styles.separator}>|</Text>
                                 <View style={styles.statItem}>
                                     <Text style={styles.statLabel}>reps</Text>
-                                    <Text style={styles.statValue}>{displayCompletedReps}/{displayTotalReps}</Text>
+                                    <Text style={styles.statValue}>{displayCompletedReps}</Text>
                                 </View>
                             </View>
                             <View style={styles.timerRow}>

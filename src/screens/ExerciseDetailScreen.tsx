@@ -82,6 +82,7 @@ export const ExerciseDetailScreen: React.FC = () => {
     const { exercise: initialExercise, exerciseId, allExercises, currentExerciseIndex } = route.params;
 
     const exercises = allExercises || [initialExercise];
+    const exerciseKey = exercises.map(ex => ex.id).join('|');
     const initialIndex = currentExerciseIndex !== undefined ? currentExerciseIndex : 0;
     const screenWidth = Dimensions.get('window').width;
     const horizontalScrollRef = useRef<ScrollView>(null);
@@ -98,11 +99,14 @@ export const ExerciseDetailScreen: React.FC = () => {
     const [setToastMessage, setSetToastMessage] = useState('');
     const [setToastActionLabel, setSetToastActionLabel] = useState<string | undefined>(undefined);
     const lastAddedSetIdRef = useRef<string | null>(null);
+    const lastAddedWeightRef = useRef<number>(20);
     const activeSetTitleAnim = useRef(new Animated.Value(1)).current;
+    const isClosingRef = useRef(false);
+    const cardPressAnims = useRef(new Map<string, Animated.Value>()).current;
     const [detailsById, setDetailsById] = useState<Record<string, { equipment: string | null; bodyPart: string | null }>>({});
     const requestedEquipmentRef = useRef(new Set<string>());
 
-    // Initialize exercise states
+    // Initialize/reset exercise states when the exercise list changes
     useEffect(() => {
         const states = new Map<string, { sets: Set[]; exercise: Exercise }>();
         exercises.forEach(ex => {
@@ -112,6 +116,19 @@ export const ExerciseDetailScreen: React.FC = () => {
             });
         });
         setExerciseStates(states);
+        setCurrentIndex(initialIndex);
+        setExercise(states.get(exercises[initialIndex]?.id)?.exercise || initialExercise);
+        setSets(states.get(exercises[initialIndex]?.id)?.sets || initialExercise.sets);
+        setSelectedSetId(null);
+        setActiveSetNumber((states.get(exercises[initialIndex]?.id)?.sets || []).filter(set => set.completed).length + 1);
+        setActiveReps('10');
+        setActiveWeight(20);
+        lastAddedWeightRef.current = 20;
+        lastAddedSetIdRef.current = null;
+        cardPressAnims.clear();
+        setAnimations.clear();
+        setDetailsById({});
+        requestedEquipmentRef.current.clear();
 
         // Scroll to initial exercise
         setTimeout(() => {
@@ -120,7 +137,7 @@ export const ExerciseDetailScreen: React.FC = () => {
                 animated: false,
             });
         }, 100);
-    }, []);
+    }, [exerciseKey]);
 
     const currentExerciseState = exerciseStates.get(exercises[currentIndex]?.id);
     const [exercise, setExercise] = useState<Exercise>(currentExerciseState?.exercise || initialExercise);
@@ -128,26 +145,39 @@ export const ExerciseDetailScreen: React.FC = () => {
     const setAnimations = useRef<Map<string, Animated.Value>>(new Map()).current;
 
     // Update current exercise when scroll position changes
+    const ensureExerciseState = (ex: Exercise) => {
+        const existing = exerciseStates.get(ex.id);
+        if (existing) return existing;
+        const nextState = {
+            exercise: ex,
+            sets: ex.sets.map(set => ({ ...set })),
+        };
+        setExerciseStates(prev => {
+            const nextMap = new Map(prev);
+            nextMap.set(ex.id, nextState);
+            return nextMap;
+        });
+        return nextState;
+    };
+
     const handleScroll = (event: any) => {
         const offsetX = event.nativeEvent.contentOffset.x;
         const newIndex = Math.round(offsetX / screenWidth);
         if (newIndex !== currentIndex && newIndex >= 0 && newIndex < exercises.length) {
             setCurrentIndex(newIndex);
-            const newExerciseState = exerciseStates.get(exercises[newIndex].id);
-            if (newExerciseState) {
-                setExercise(newExerciseState.exercise);
-                setSets(newExerciseState.sets.map(set => ({ ...set })));
-            }
+            const newExerciseState = ensureExerciseState(exercises[newIndex]);
+            setExercise(newExerciseState.exercise);
+            setSets(newExerciseState.sets.map(set => ({ ...set })));
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
     };
 
     useEffect(() => {
-        const currentState = exerciseStates.get(exercises[currentIndex]?.id);
-        if (currentState) {
-            setExercise(currentState.exercise);
-            setSets(currentState.sets.map(set => ({ ...set })));
-        }
+        const currentExercise = exercises[currentIndex];
+        if (!currentExercise) return;
+        const currentState = ensureExerciseState(currentExercise);
+        setExercise(currentState.exercise);
+        setSets(currentState.sets.map(set => ({ ...set })));
     }, [currentIndex, exerciseStates]);
 
     useEffect(() => {
@@ -180,7 +210,10 @@ export const ExerciseDetailScreen: React.FC = () => {
     const isBodyweight = !!currentEquipment && /body\s*only|bodyweight|body weight/i.test(currentEquipment);
 
     useEffect(() => {
-        setActiveWeight(isBodyweight ? 0 : 20);
+        const defaultWeight = isBodyweight ? 0 : 20;
+        setActiveWeight(defaultWeight);
+        lastAddedWeightRef.current = defaultWeight;
+        setActiveReps('10');
     }, [currentIndex, isBodyweight]);
 
     // Keep active set inputs visible at all times
@@ -207,25 +240,28 @@ export const ExerciseDetailScreen: React.FC = () => {
 
 
     const handleAddSet = () => {
+        const currentExercise = exercises[currentIndex] ?? exercise;
         if (selectedSetId) {
             // Update selected set instead of adding a new one
             setSets(prevSets => {
-                const updated = prevSets.map(set =>
+                const completedOnly = prevSets.filter(set => set.completed);
+                const updated = completedOnly.map(set =>
                     set.id === selectedSetId
                         ? { ...set, reps: activeReps, weight: activeWeight.toFixed(2) }
                         : set
                 );
-                const currentState = exerciseStates.get(exercise.id);
-                if (currentState) {
-                    setExerciseStates(new Map(exerciseStates.set(exercise.id, {
-                        ...currentState,
+                setExerciseStates(prev => {
+                    const next = new Map(prev);
+                    const existing = next.get(currentExercise.id);
+                    next.set(currentExercise.id, {
+                        exercise: existing?.exercise ?? currentExercise,
                         sets: updated,
-                    })));
-                }
+                    });
+                    return next;
+                });
                 return updated;
             });
             setSelectedSetId(null);
-            setActiveSetNumber(completedSets.length + 1);
             setSetToastMessage('set updated!');
             setSetToastActionLabel('ok');
             setShowSetToast(true);
@@ -234,7 +270,7 @@ export const ExerciseDetailScreen: React.FC = () => {
         }
 
         // Add the active set to the exercise (marked as completed when added)
-        const newSetId = Date.now().toString();
+        const newSetId = `${currentExercise.id}-${Date.now().toString()}`;
         const newSet: Set = {
             id: newSetId,
             reps: activeReps,
@@ -243,14 +279,17 @@ export const ExerciseDetailScreen: React.FC = () => {
         };
 
         setSets(prevSets => {
-            const updated = [...prevSets, newSet];
-            const currentState = exerciseStates.get(exercise.id);
-            if (currentState) {
-                setExerciseStates(new Map(exerciseStates.set(exercise.id, {
-                    ...currentState,
+            const completedOnly = prevSets.filter(set => set.completed);
+            const updated = [...completedOnly, newSet];
+            setExerciseStates(prev => {
+                const next = new Map(prev);
+                const existing = next.get(currentExercise.id);
+                next.set(currentExercise.id, {
+                    exercise: existing?.exercise ?? currentExercise,
                     sets: updated,
-                })));
-            }
+                });
+                return next;
+            });
             return updated;
         });
 
@@ -266,13 +305,33 @@ export const ExerciseDetailScreen: React.FC = () => {
 
         // Carry forward last used weight, reset reps
         setActiveReps('10');
-        setActiveWeight(parseFloat(newSet.weight));
-        setActiveSetNumber(completedSets.length + 2);
+        const newWeightValue = parseFloat(newSet.weight);
+        lastAddedWeightRef.current = Number.isFinite(newWeightValue) ? newWeightValue : lastAddedWeightRef.current;
+        setActiveWeight(lastAddedWeightRef.current);
         lastAddedSetIdRef.current = newSetId;
         setSetToastMessage('set added!');
         setSetToastActionLabel('undo');
         setShowSetToast(true);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    };
+
+    const getCardPressAnim = (id: string) => {
+        let anim = cardPressAnims.get(id);
+        if (!anim) {
+            anim = new Animated.Value(0);
+            cardPressAnims.set(id, anim);
+        }
+        return anim;
+    };
+
+    const animateCardPress = (id: string, toValue: number) => {
+        const anim = getCardPressAnim(id);
+        Animated.timing(anim, {
+            toValue,
+            duration: 120,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+        }).start();
     };
 
     const handleToggleSetCompleted = (setId: string) => {
@@ -311,24 +370,27 @@ export const ExerciseDetailScreen: React.FC = () => {
     };
 
     const handleRemoveSet = (setId: string) => {
+        const currentExercise = exercises[currentIndex] ?? exercise;
         const removeAnim = setAnimations.get(setId) || new Animated.Value(1);
         setAnimations.set(setId, removeAnim);
 
         Animated.timing(removeAnim, {
             toValue: 0,
-            duration: 300,
-            easing: Easing.out(Easing.ease),
+            duration: 220,
+            easing: Easing.out(Easing.cubic),
             useNativeDriver: true,
         }).start(() => {
             setSets(prevSets => {
                 const updated = prevSets.filter(set => set.id !== setId);
-                const currentState = exerciseStates.get(exercise.id);
-                if (currentState) {
-                    setExerciseStates(new Map(exerciseStates.set(exercise.id, {
-                        ...currentState,
+                setExerciseStates(prev => {
+                    const next = new Map(prev);
+                    const existing = next.get(currentExercise.id);
+                    next.set(currentExercise.id, {
+                        exercise: existing?.exercise ?? currentExercise,
                         sets: updated,
-                    })));
-                }
+                    });
+                    return next;
+                });
                 return updated;
             });
             setAnimations.delete(setId);
@@ -338,10 +400,12 @@ export const ExerciseDetailScreen: React.FC = () => {
     };
 
     const handleClose = () => {
+        if (isClosingRef.current) return;
+        isClosingRef.current = true;
         const updatedExercises = Array.from(exerciseStates.values()).map(state => ({
             id: state.exercise.id,
             name: state.exercise.name,
-            sets: state.sets,
+            sets: state.sets.filter(set => set.completed),
         }));
 
         const newlyCompletedExercises: string[] = [];
@@ -363,10 +427,20 @@ export const ExerciseDetailScreen: React.FC = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     };
 
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+            if (isClosingRef.current) return;
+            e.preventDefault();
+            handleClose();
+        });
+        return unsubscribe;
+    }, [navigation, handleClose]);
+
     const handleDeleteExercise = () => {
+        const currentExercise = exercises[currentIndex] ?? exercise;
         Alert.alert(
             'Delete Exercise',
-            `Remove "${exercise.name}" from this workout?`,
+            `Remove "${currentExercise.name}" from this workout?`,
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
@@ -374,11 +448,11 @@ export const ExerciseDetailScreen: React.FC = () => {
                     style: 'destructive',
                     onPress: () => {
                         // Remove current exercise from the list
-                        const updatedExercises = exercises.filter(ex => ex.id !== exercise.id);
+                        const updatedExercises = exercises.filter(ex => ex.id !== currentExercise.id);
 
                         // Update exercise states to remove the deleted exercise
                         const newExerciseStates = new Map(exerciseStates);
-                        newExerciseStates.delete(exercise.id);
+                        newExerciseStates.delete(currentExercise.id);
                         setExerciseStates(newExerciseStates);
 
                         // Navigate back with updated exercises (excluding the deleted one)
@@ -505,16 +579,23 @@ export const ExerciseDetailScreen: React.FC = () => {
 
                                                         const handleSelectSet = () => {
                                                             if (selectedSetId === set.id) {
+                                                                animateCardPress(set.id, 0);
                                                                 setSelectedSetId(null);
                                                                 setActiveSetNumber(completedSets.length + 1);
+                                                                setActiveReps('10');
+                                                                setActiveWeight(lastAddedWeightRef.current);
                                                                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                                                                 return;
+                                                            }
+                                                            if (selectedSetId) {
+                                                                animateCardPress(selectedSetId, 0);
                                                             }
                                                             const parsedWeight = parseFloat(set.weight);
                                                             setActiveWeight(Number.isFinite(parsedWeight) ? parsedWeight : 0);
                                                             setActiveReps(set.reps || '0');
                                                             setActiveSetNumber(setIndex + 1);
                                                             setSelectedSetId(set.id);
+                                                            animateCardPress(set.id, 4);
                                                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                                                         };
 
@@ -527,30 +608,46 @@ export const ExerciseDetailScreen: React.FC = () => {
                                                                 <View style={styles.setCardWrapper}>
                                                                     <Animated.View
                                                                         style={[
+                                                                            styles.setCardShadow,
+                                                                            {
+                                                                                opacity: Animated.multiply(
+                                                                                    animValue.interpolate({
+                                                                                        inputRange: [0, 0.5, 1],
+                                                                                        outputRange: [0, 0, 1],
+                                                                                    }),
+                                                                                    getCardPressAnim(set.id).interpolate({
+                                                                                        inputRange: [0, 4],
+                                                                                        outputRange: [1, 0],
+                                                                                    })
+                                                                                ),
+                                                                            },
+                                                                        ]}
+                                                                    />
+                                                                    <Animated.View
+                                                                        style={[
                                                                             styles.setCard,
                                                                             selectedSetId === set.id && styles.setCardSelected,
                                                                             {
-                                                                                opacity: animValue,
+                                                                                opacity: animValue.interpolate({
+                                                                                    inputRange: [0, 0.35, 1],
+                                                                                    outputRange: [0, 0, 1],
+                                                                                }),
                                                                                 transform: [
                                                                                     {
-                                                                                        scale: animValue.interpolate({
+                                                                                        translateY: animValue.interpolate({
                                                                                             inputRange: [0, 1],
-                                                                                            outputRange: [0.8, 1],
+                                                                                            outputRange: [-20, 0],
                                                                                         }),
+                                                                                    },
+                                                                                    {
+                                                                                        translateY: getCardPressAnim(set.id),
                                                                                     },
                                                                                 ],
                                                                             },
                                                                         ]}
                                                                     >
                                                                         <View style={styles.setCardHeader}>
-                                                                            <View style={styles.setNumberRow}>
-                                                                                <Text style={styles.setNumber}>set {setIndex + 1}</Text>
-                                                                                {selectedSetId === set.id && (
-                                                                                    <View style={styles.setEditingPill}>
-                                                                                        <Text style={styles.setEditingText}>editing</Text>
-                                                                                    </View>
-                                                                                )}
-                                                                            </View>
+                                                                            <Text style={styles.setNumber}>set {setIndex + 1}</Text>
                                                                             {isCurrentExercise && (
                                                                                 <TouchableOpacity
                                                                                     onPress={() => handleRemoveSet(set.id)}
@@ -810,14 +907,14 @@ const styles = StyleSheet.create({
     },
     headerContainer: {
         paddingHorizontal: 20,
-        paddingTop: 8,
-        paddingBottom: 12,
+        paddingTop: 6,
+        paddingBottom: 6,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'flex-start',
         justifyContent: 'space-between',
-        minHeight: 48,
+        minHeight: 40,
     },
     backButton: {
         padding: 12,
@@ -890,7 +987,7 @@ const styles = StyleSheet.create({
     },
     historyContent: {
         paddingBottom: 12,
-        gap: 8,
+        gap: 12,
     },
     emptyState: {
         paddingVertical: 40,
@@ -905,6 +1002,17 @@ const styles = StyleSheet.create({
     },
     setCardWrapper: {
         position: 'relative',
+        paddingBottom: 4,
+    },
+    setCardShadow: {
+        position: 'absolute',
+        top: 4,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: '#252525',
+        borderRadius: 12,
+        zIndex: 0,
     },
     setCard: {
         backgroundColor: '#F8F8F8',
@@ -917,26 +1025,7 @@ const styles = StyleSheet.create({
     },
     setCardSelected: {
         backgroundColor: '#F2F5FF',
-        borderColor: '#526EFF',
-    },
-    setNumberRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
-    setEditingPill: {
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 10,
-        borderWidth: 2,
-        borderColor: '#526EFF',
-        backgroundColor: '#F2F5FF',
-    },
-    setEditingText: {
-        fontSize: 10,
-        fontFamily: fonts.bold,
-        color: '#526EFF',
-        textTransform: 'lowercase',
+        borderColor: '#252525',
     },
     setCardHeader: {
         flexDirection: 'row',

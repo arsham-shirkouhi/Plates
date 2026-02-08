@@ -162,11 +162,11 @@ export const WorkoutScreen: React.FC = () => {
     const setCount = activeWorkout?.exercises.reduce((sum, ex) => sum + ex.sets.length, 0) || 0;
     const completedSets = activeWorkout?.exercises.reduce((sum, ex) =>
         sum + ex.sets.filter(set => set.completed).length, 0) || 0;
-    const totalSets = activeWorkout?.exercises.reduce((sum, ex) => sum + ex.sets.length, 0) || 0;
+    // Only count completed sets/reps toward totals shown in header.
+    const totalSets = completedSets;
     const completedReps = activeWorkout?.exercises.reduce((sum, ex) =>
         sum + ex.sets.filter(set => set.completed).reduce((repSum, set) => repSum + (parseInt(set.reps) || 0), 0), 0) || 0;
-    const totalReps = activeWorkout?.exercises.reduce((sum, ex) =>
-        sum + ex.sets.reduce((repSum, set) => repSum + (parseInt(set.reps) || 0), 0), 0) || 0;
+    const totalReps = completedReps;
     const [workoutDuration, setWorkoutDuration] = useState(0); // in minutes
     const [workoutTimer, setWorkoutTimer] = useState(0); // in seconds
 
@@ -263,7 +263,7 @@ export const WorkoutScreen: React.FC = () => {
 
     const handleDeleteExercise = (exercise: Exercise) => {
         if (!activeWorkout) return;
-        
+
         Alert.alert(
             'Delete Exercise',
             `Are you sure you want to delete "${exercise.name}"?`,
@@ -451,10 +451,10 @@ export const WorkoutScreen: React.FC = () => {
                     text: 'Finish',
                     style: 'default',
                     onPress: () => {
-        // TODO: Save workout to database
-        setActiveWorkout(null);
-        setHasCompletedWorkout(true);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        // TODO: Save workout to database
+                        setActiveWorkout(null);
+                        setHasCompletedWorkout(true);
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                     },
                 },
             ]
@@ -486,7 +486,7 @@ export const WorkoutScreen: React.FC = () => {
     }, [showCountdown]);
 
     const handleStartWorkoutPress = () => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         Alert.alert(
             'Start Workout',
             'Do you want to start a workout?',
@@ -898,7 +898,7 @@ export const WorkoutScreen: React.FC = () => {
                 onClose={() => setShowAddExerciseOverlay(false)}
                 onSelectExercise={handleSelectExercise}
                 onSelectExerciseAndNavigate={handleSelectExerciseAndNavigate}
-                            />
+            />
 
             {/* Countdown Overlay - Using Modal to ensure it's above navbar */}
             <Modal
