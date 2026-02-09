@@ -368,7 +368,7 @@ export const WorkoutScreen: React.FC = () => {
                 // Trigger confetti for newly completed exercises
                 const newlyCompletedIds = params.newlyCompletedExerciseIds || [];
                 newlyCompletedIds.forEach((exerciseId: string) => {
-                    const exercise = updatedExercises.find(ex => ex.id === exerciseId);
+                    const exercise = updatedExercises.find((ex: Exercise) => ex.id === exerciseId);
                     if (exercise) {
                         const itemRef = exerciseItemRefs.current.get(exerciseId);
                         if (itemRef) {
@@ -981,24 +981,20 @@ interface ExerciseItemProps {
 }
 
 const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isComplete, hasBorder, onPress, onLongPress, onLayout }) => {
-    const strikeThroughWidth = useRef(new Animated.Value(0)).current;
     const itemRef = useRef<View>(null);
     const textRef = useRef<Text>(null);
     const [textWidth, setTextWidth] = useState(0);
-
-    useEffect(() => {
-        if (isComplete && textWidth > 0) {
-            // Animate strike-through to exact text width
-            Animated.timing(strikeThroughWidth, {
-                toValue: textWidth,
-                duration: 400,
-                easing: Easing.out(Easing.ease),
-                useNativeDriver: false,
-            }).start();
-        } else {
-            strikeThroughWidth.setValue(0);
-        }
-    }, [isComplete, textWidth]);
+    const completedSets = exercise.sets.filter(set => set.completed);
+    const totalSets = exercise.sets.length;
+    const lastCompletedSet = completedSets[completedSets.length - 1];
+    const lastWeight = lastCompletedSet?.weight;
+    const completedCount = completedSets.length;
+    const averageWeight = completedCount > 0
+        ? completedSets.reduce((sum, set) => sum + (parseFloat(set.weight) || 0), 0) / completedCount
+        : 0;
+    const averageReps = completedCount > 0
+        ? completedSets.reduce((sum, set) => sum + (parseInt(set.reps) || 0), 0) / completedCount
+        : 0;
 
     useEffect(() => {
         if (itemRef.current) {
@@ -1014,45 +1010,69 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isComplete, hasBo
     return (
         <TouchableOpacity
             ref={itemRef}
-            style={[
-                styles.exerciseItem,
-                hasBorder && styles.exerciseItemBorder
-            ]}
             onPress={onPress}
-            activeOpacity={0.7}
+            activeOpacity={0.85}
+            style={styles.exerciseItemWrapper}
         >
-            <View style={styles.exerciseItemNameContainer}>
-                <Pressable
-                    onLongPress={onLongPress}
-                    delayLongPress={500}
-                >
-                    <Text
-                        ref={textRef}
-                        style={styles.exerciseItemName}
-                        onTextLayout={(event) => {
-                            const { width } = event.nativeEvent.lines[0] || { width: 0 };
-                            setTextWidth(width);
-                        }}
-                    >
-                        {exercise.name}
-                    </Text>
-                </Pressable>
-                {isComplete && (
-                    <Animated.View
-                        style={[
-                            styles.strikeThrough,
-                            {
-                                width: strikeThroughWidth,
-                            },
-                        ]}
-                    />
-                )}
+            <View
+                style={[
+                    styles.exerciseItemCard,
+                    hasBorder && styles.exerciseItemBorder
+                ]}
+            >
+                <View style={styles.exerciseItemHeader}>
+                    <View style={styles.exerciseItemNameContainer}>
+                        <Pressable
+                            onLongPress={onLongPress}
+                            delayLongPress={500}
+                        >
+                            <Text
+                                ref={textRef}
+                                style={styles.exerciseItemName}
+                                onTextLayout={(event) => {
+                                    const { width } = event.nativeEvent.lines[0] || { width: 0 };
+                                    setTextWidth(width);
+                                }}
+                            >
+                                {exercise.name}
+                            </Text>
+                        </Pressable>
+                    </View>
+                    {isComplete ? (
+                        <View style={styles.exerciseItemStatus}>
+                            <Text style={styles.exerciseItemStatusText}>completed</Text>
+                        </View>
+                    ) : (
+                        <Ionicons
+                            name="chevron-forward"
+                            size={20}
+                            color="#252525"
+                        />
+                    )}
+                </View>
+                <View style={styles.exerciseItemMetaRow}>
+                    <View style={styles.exerciseItemMetaBlock}>
+                        <Text style={styles.exerciseItemMetaLabel}>sets</Text>
+                        <Text style={styles.exerciseItemMetaValue}>
+                            {completedSets.length}/{totalSets}
+                        </Text>
+                    </View>
+                    <View style={styles.exerciseItemMetaDivider} />
+                    <View style={styles.exerciseItemMetaBlock}>
+                        <Text style={styles.exerciseItemMetaLabel}>avg weight</Text>
+                        <Text style={styles.exerciseItemMetaValue}>
+                            {completedCount > 0 ? `${averageWeight.toFixed(1)}kg` : '--'}
+                        </Text>
+                    </View>
+                    <View style={styles.exerciseItemMetaDivider} />
+                    <View style={styles.exerciseItemMetaBlock}>
+                        <Text style={styles.exerciseItemMetaLabel}>avg reps</Text>
+                        <Text style={styles.exerciseItemMetaValue}>
+                            {completedCount > 0 ? Math.round(averageReps) : '--'}
+                        </Text>
+                    </View>
+                </View>
             </View>
-            <Ionicons
-                name={isComplete ? "checkmark-sharp" : "chevron-forward"}
-                size={20}
-                color={isComplete ? "#526EFF" : "#252525"}
-            />
         </TouchableOpacity>
     );
 };
@@ -1143,7 +1163,7 @@ const styles = StyleSheet.create({
         borderWidth: 2.5,
         borderColor: '#252525',
         marginBottom: 16,
-        overflow: 'hidden',
+        overflow: 'visible',
     },
     workoutBoxHeader: {
         flexDirection: 'row',
@@ -1170,7 +1190,9 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     exercisesScrollContent: {
-        paddingBottom: 0,
+        paddingTop: 12,
+        paddingHorizontal: 12,
+        paddingBottom: 12,
     },
     exercisesScrollContentEmpty: {
         flexGrow: 1,
@@ -1224,16 +1246,21 @@ const styles = StyleSheet.create({
         backgroundColor: '#E0E0E0',
         marginHorizontal: 16,
     },
-    exerciseItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingVertical: 14,
+    exerciseItemWrapper: {
+        position: 'relative',
+        marginBottom: 14,
+        paddingBottom: 4,
+    },
+    exerciseItemCard: {
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        borderWidth: 2,
+        borderColor: '#252525',
+        paddingVertical: 12,
         paddingHorizontal: 15,
     },
     exerciseItemBorder: {
-        borderBottomWidth: 2,
-        borderBottomColor: '#F0F0F0',
+        borderBottomWidth: 0,
     },
     exerciseItemNameContainer: {
         flex: 1,
@@ -1245,12 +1272,50 @@ const styles = StyleSheet.create({
         color: '#252525',
         textTransform: 'lowercase',
     },
-    strikeThrough: {
-        position: 'absolute',
-        left: 0,
-        top: '50%',
-        height: 2,
-        backgroundColor: '#252525',
+    exerciseItemHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    exerciseItemMetaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 10,
+    },
+    exerciseItemMetaBlock: {
+        flex: 1,
+    },
+    exerciseItemMetaLabel: {
+        fontSize: 12,
+        fontFamily: fonts.regular,
+        color: '#9E9E9E',
+        textTransform: 'lowercase',
+        marginBottom: 2,
+    },
+    exerciseItemMetaValue: {
+        fontSize: 16,
+        fontFamily: fonts.bold,
+        color: '#252525',
+    },
+    exerciseItemMetaDivider: {
+        width: 1,
+        height: 24,
+        backgroundColor: '#E0E0E0',
+        marginHorizontal: 12,
+    },
+    exerciseItemStatus: {
+        borderWidth: 2,
+        borderColor: '#526EFF',
+        backgroundColor: '#F2F5FF',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 999,
+    },
+    exerciseItemStatusText: {
+        fontSize: 12,
+        fontFamily: fonts.bold,
+        color: '#526EFF',
+        textTransform: 'lowercase',
     },
     actionButtons: {
         marginTop: 0,

@@ -520,189 +520,149 @@ export const ExerciseDetailScreen: React.FC = () => {
                             {/* Top Section: Previous Sets (History) */}
                             <View style={styles.historySection}>
                                 <ScrollView
-                                    horizontal
-                                    pagingEnabled
-                                    showsHorizontalScrollIndicator={false}
-                                    onScroll={(event) => {
-                                        const offsetX = event.nativeEvent.contentOffset.x;
-                                        const pageWidth = screenWidth - 40;
-                                        const newIndex = Math.round(offsetX / pageWidth);
-                                        if (newIndex !== currentIndex && newIndex >= 0 && newIndex < exercises.length) {
-                                            setCurrentIndex(newIndex);
-                                            const newExerciseState = exerciseStates.get(exercises[newIndex].id);
-                                            if (newExerciseState) {
-                                                setExercise(newExerciseState.exercise);
-                                                setSets(newExerciseState.sets.map(set => ({ ...set })));
-                                            }
-                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                            // Sync the main horizontal scroll
-                                            horizontalScrollRef.current?.scrollTo({
-                                                x: newIndex * screenWidth,
-                                                animated: true,
-                                            });
-                                        }
-                                    }}
-                                    scrollEventThrottle={16}
-                                    ref={historyScrollRef}
-                                    style={styles.historyScroll}
-                                    contentContainerStyle={styles.historyScrollContent}
+                                    style={[styles.historyPage, { width: screenWidth - 40 }]}
+                                    contentContainerStyle={styles.historyContent}
+                                    showsVerticalScrollIndicator={false}
+                                    scrollEnabled={pageCompletedSets.length > 3}
                                 >
-                                    {exercises.map((ex, exerciseIndex) => {
-                                        const exerciseState = exerciseStates.get(ex.id);
-                                        const exerciseCompletedSets = exerciseState?.sets.filter(s => s.completed) || [];
-                                        const isCurrentExercise = exerciseIndex === currentIndex;
+                                    {pageCompletedSets.length === 0 ? (
+                                        <View style={styles.emptyState}>
+                                            <Text style={styles.emptyStateText}>no completed sets yet</Text>
+                                        </View>
+                                    ) : (
+                                        pageCompletedSets.map((set, setIndex) => {
+                                            const animValue = setAnimations.get(set.id) || new Animated.Value(1);
+                                            if (!setAnimations.has(set.id)) {
+                                                setAnimations.set(set.id, animValue);
+                                            }
+                                            const setWeightValue = parseFloat(set.weight);
+                                            const miniPlates = getMiniPlateStack(
+                                                Number.isFinite(setWeightValue) ? setWeightValue : 0
+                                            );
 
-                                        const canScrollSets = exerciseCompletedSets.length > 3;
+                                            const handleSelectSet = () => {
+                                                if (selectedSetId === set.id) {
+                                                    animateCardPress(set.id, 0);
+                                                    setSelectedSetId(null);
+                                                    setActiveSetNumber(pageCompletedSets.length + 1);
+                                                    setActiveReps('10');
+                                                    setActiveWeight(lastAddedWeightRef.current);
+                                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                                    return;
+                                                }
+                                                if (selectedSetId) {
+                                                    animateCardPress(selectedSetId, 0);
+                                                }
+                                                const parsedWeight = parseFloat(set.weight);
+                                                setActiveWeight(Number.isFinite(parsedWeight) ? parsedWeight : 0);
+                                                setActiveReps(set.reps || '0');
+                                                setActiveSetNumber(setIndex + 1);
+                                                setSelectedSetId(set.id);
+                                                animateCardPress(set.id, 4);
+                                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                            };
 
-                                        return (
-                                            <ScrollView
-                                                key={ex.id}
-                                                style={[styles.historyPage, { width: screenWidth - 40 }]}
-                                                contentContainerStyle={styles.historyContent}
-                                                showsVerticalScrollIndicator={false}
-                                                scrollEnabled={canScrollSets}
-                                            >
-                                                {exerciseCompletedSets.length === 0 ? (
-                                                    <View style={styles.emptyState}>
-                                                        <Text style={styles.emptyStateText}>no completed sets yet</Text>
-                                                    </View>
-                                                ) : (
-                                                    exerciseCompletedSets.map((set, setIndex) => {
-                                                        const animValue = setAnimations.get(set.id) || new Animated.Value(1);
-                                                        if (!setAnimations.has(set.id)) {
-                                                            setAnimations.set(set.id, animValue);
-                                                        }
-                                                        const setWeightValue = parseFloat(set.weight);
-                                                        const miniPlates = getMiniPlateStack(
-                                                            Number.isFinite(setWeightValue) ? setWeightValue : 0
-                                                        );
-
-                                                        const handleSelectSet = () => {
-                                                            if (selectedSetId === set.id) {
-                                                                animateCardPress(set.id, 0);
-                                                                setSelectedSetId(null);
-                                                                setActiveSetNumber(completedSets.length + 1);
-                                                                setActiveReps('10');
-                                                                setActiveWeight(lastAddedWeightRef.current);
-                                                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                                                return;
-                                                            }
-                                                            if (selectedSetId) {
-                                                                animateCardPress(selectedSetId, 0);
-                                                            }
-                                                            const parsedWeight = parseFloat(set.weight);
-                                                            setActiveWeight(Number.isFinite(parsedWeight) ? parsedWeight : 0);
-                                                            setActiveReps(set.reps || '0');
-                                                            setActiveSetNumber(setIndex + 1);
-                                                            setSelectedSetId(set.id);
-                                                            animateCardPress(set.id, 4);
-                                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                                        };
-
-                                                        return (
-                                                            <TouchableOpacity
-                                                                key={set.id}
-                                                                activeOpacity={0.8}
-                                                                onPress={handleSelectSet}
-                                                            >
-                                                                <View style={styles.setCardWrapper}>
-                                                                    <Animated.View
-                                                                        style={[
-                                                                            styles.setCardShadow,
-                                                                            {
-                                                                                opacity: Animated.multiply(
-                                                                                    animValue.interpolate({
-                                                                                        inputRange: [0, 0.5, 1],
-                                                                                        outputRange: [0, 0, 1],
-                                                                                    }),
-                                                                                    getCardPressAnim(set.id).interpolate({
-                                                                                        inputRange: [0, 4],
-                                                                                        outputRange: [1, 0],
-                                                                                    })
-                                                                                ),
-                                                                            },
-                                                                        ]}
-                                                                    />
-                                                                    <Animated.View
-                                                                        style={[
-                                                                            styles.setCard,
-                                                                            selectedSetId === set.id && styles.setCardSelected,
-                                                                            {
-                                                                                opacity: animValue.interpolate({
-                                                                                    inputRange: [0, 0.35, 1],
-                                                                                    outputRange: [0, 0, 1],
-                                                                                }),
-                                                                                transform: [
-                                                                                    {
-                                                                                        translateY: animValue.interpolate({
-                                                                                            inputRange: [0, 1],
-                                                                                            outputRange: [-20, 0],
-                                                                                        }),
-                                                                                    },
-                                                                                    {
-                                                                                        translateY: getCardPressAnim(set.id),
-                                                                                    },
-                                                                                ],
-                                                                            },
-                                                                        ]}
+                                            return (
+                                                <TouchableOpacity
+                                                    key={set.id}
+                                                    activeOpacity={0.8}
+                                                    onPress={handleSelectSet}
+                                                >
+                                                    <View style={styles.setCardWrapper}>
+                                                        <Animated.View
+                                                            style={[
+                                                                styles.setCardShadow,
+                                                                {
+                                                                    opacity: Animated.multiply(
+                                                                        animValue.interpolate({
+                                                                            inputRange: [0, 0.5, 1],
+                                                                            outputRange: [0, 0, 1],
+                                                                        }),
+                                                                        getCardPressAnim(set.id).interpolate({
+                                                                            inputRange: [0, 4],
+                                                                            outputRange: [1, 0],
+                                                                        })
+                                                                    ),
+                                                                },
+                                                            ]}
+                                                        />
+                                                        <Animated.View
+                                                            style={[
+                                                                styles.setCard,
+                                                                selectedSetId === set.id && styles.setCardSelected,
+                                                                {
+                                                                    opacity: animValue.interpolate({
+                                                                        inputRange: [0, 0.35, 1],
+                                                                        outputRange: [0, 0, 1],
+                                                                    }),
+                                                                    transform: [
+                                                                        {
+                                                                            translateY: animValue.interpolate({
+                                                                                inputRange: [0, 1],
+                                                                                outputRange: [-20, 0],
+                                                                            }),
+                                                                        },
+                                                                        {
+                                                                            translateY: getCardPressAnim(set.id),
+                                                                        },
+                                                                    ],
+                                                                },
+                                                            ]}
+                                                        >
+                                                            <View style={styles.setCardHeader}>
+                                                                <Text style={styles.setNumber}>set {setIndex + 1}</Text>
+                                                                {isCurrent && (
+                                                                    <TouchableOpacity
+                                                                        onPress={() => handleRemoveSet(set.id)}
+                                                                        activeOpacity={0.7}
                                                                     >
-                                                                        <View style={styles.setCardHeader}>
-                                                                            <Text style={styles.setNumber}>set {setIndex + 1}</Text>
-                                                                            {isCurrentExercise && (
-                                                                                <TouchableOpacity
-                                                                                    onPress={() => handleRemoveSet(set.id)}
-                                                                                    activeOpacity={0.7}
-                                                                                >
-                                                                                    <Ionicons name="close" size={20} color="#252525" />
-                                                                                </TouchableOpacity>
-                                                                            )}
-                                                                        </View>
-                                                                        <View style={styles.setCardContent}>
-                                                                            <View style={styles.setCardStats}>
-                                                                                <View style={styles.setCardStat}>
-                                                                                    <Text style={styles.setCardLabel}>weight</Text>
-                                                                                    <Text style={[styles.setCardValue, styles.setCardWeightValue]}>
-                                                                                        {Number.isFinite(parseFloat(set.weight))
-                                                                                            ? `${parseFloat(set.weight).toFixed(1)}kg`
-                                                                                            : `${set.weight}kg`}
-                                                                                    </Text>
-                                                                                </View>
-                                                                                <View style={styles.setCardDivider} />
-                                                                                <View style={styles.setCardStat}>
-                                                                                    <Text style={styles.setCardLabel}>reps</Text>
-                                                                                    <Text style={styles.setCardValue}>{set.reps}</Text>
-                                                                                </View>
-                                                                            </View>
-                                                                            <View style={styles.miniPlateStack}>
-                                                                                {miniPlates.map((plate, plateIndex) => {
-                                                                                    const size = getMiniPlateSize(plate);
-                                                                                    return (
-                                                                                        <View
-                                                                                            key={`${set.id}-plate-${plateIndex}-${plate}`}
-                                                                                            style={[
-                                                                                                styles.miniPlate,
-                                                                                                {
-                                                                                                    width: size,
-                                                                                                    height: size,
-                                                                                                    borderRadius: size / 2,
-                                                                                                    backgroundColor: PLATE_COLORS[plate] || '#8E8E93',
-                                                                                                    marginLeft: plateIndex === 0 ? 0 : -Math.max(4, size * 0.35),
-                                                                                                },
-                                                                                            ]}
-                                                                                        />
-                                                                                    );
-                                                                                })}
-                                                                            </View>
-                                                                        </View>
-                                                                    </Animated.View>
+                                                                        <Ionicons name="close" size={20} color="#252525" />
+                                                                    </TouchableOpacity>
+                                                                )}
+                                                            </View>
+                                                            <View style={styles.setCardContent}>
+                                                                <View style={styles.setCardStats}>
+                                                                    <View style={styles.setCardStat}>
+                                                                        <Text style={styles.setCardLabel}>weight</Text>
+                                                                        <Text style={[styles.setCardValue, styles.setCardWeightValue]}>
+                                                                            {Number.isFinite(parseFloat(set.weight))
+                                                                                ? `${parseFloat(set.weight).toFixed(1)}kg`
+                                                                                : `${set.weight}kg`}
+                                                                        </Text>
+                                                                    </View>
+                                                                    <View style={styles.setCardDivider} />
+                                                                    <View style={styles.setCardStat}>
+                                                                        <Text style={styles.setCardLabel}>reps</Text>
+                                                                        <Text style={styles.setCardValue}>{set.reps}</Text>
+                                                                    </View>
                                                                 </View>
-                                                            </TouchableOpacity>
-                                                        );
-                                                    })
-                                                )}
-                                            </ScrollView>
-                                        );
-                                    })}
+                                                                <View style={styles.miniPlateStack}>
+                                                                    {miniPlates.map((plate, plateIndex) => {
+                                                                        const size = getMiniPlateSize(plate);
+                                                                        return (
+                                                                            <View
+                                                                                key={`${set.id}-plate-${plateIndex}-${plate}`}
+                                                                                style={[
+                                                                                    styles.miniPlate,
+                                                                                    {
+                                                                                        width: size,
+                                                                                        height: size,
+                                                                                        borderRadius: size / 2,
+                                                                                        backgroundColor: PLATE_COLORS[plate] || '#8E8E93',
+                                                                                        marginLeft: plateIndex === 0 ? 0 : -Math.max(4, size * 0.35),
+                                                                                    },
+                                                                                ]}
+                                                                            />
+                                                                        );
+                                                                    })}
+                                                                </View>
+                                                            </View>
+                                                        </Animated.View>
+                                                    </View>
+                                                </TouchableOpacity>
+                                            );
+                                        })
+                                    )}
                                 </ScrollView>
 
                                 {/* Pagination Indicator */}
