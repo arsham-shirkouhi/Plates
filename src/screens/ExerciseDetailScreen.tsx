@@ -20,7 +20,6 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import * as Haptics from 'expo-haptics';
 import { Button } from '../components/Button';
-import { UndoToast } from '../components/UndoToast';
 import { fonts } from '../constants/fonts';
 import { PlateSlider } from '../components/PlateSlider';
 import { Slider } from '../components/Slider';
@@ -95,10 +94,6 @@ export const ExerciseDetailScreen: React.FC = () => {
     const [activeWeight, setActiveWeight] = useState(20);
     const [activeSetNumber, setActiveSetNumber] = useState(1);
     const [selectedSetId, setSelectedSetId] = useState<string | null>(null);
-    const [showSetToast, setShowSetToast] = useState(false);
-    const [setToastMessage, setSetToastMessage] = useState('');
-    const [setToastActionLabel, setSetToastActionLabel] = useState<string | undefined>(undefined);
-    const lastAddedSetIdRef = useRef<string | null>(null);
     const lastAddedWeightRef = useRef<number>(20);
     const activeSetTitleAnim = useRef(new Animated.Value(1)).current;
     const isClosingRef = useRef(false);
@@ -124,7 +119,6 @@ export const ExerciseDetailScreen: React.FC = () => {
         setActiveReps('10');
         setActiveWeight(20);
         lastAddedWeightRef.current = 20;
-        lastAddedSetIdRef.current = null;
         cardPressAnims.clear();
         setAnimations.clear();
         setDetailsById({});
@@ -262,9 +256,6 @@ export const ExerciseDetailScreen: React.FC = () => {
                 return updated;
             });
             setSelectedSetId(null);
-            setSetToastMessage('set updated!');
-            setSetToastActionLabel('ok');
-            setShowSetToast(true);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             return;
         }
@@ -296,10 +287,10 @@ export const ExerciseDetailScreen: React.FC = () => {
         // Animate the new set card appearing
         const animValue = new Animated.Value(0);
         setAnimations.set(newSet.id, animValue);
-        Animated.spring(animValue, {
+        Animated.timing(animValue, {
             toValue: 1,
-            tension: 200,
-            friction: 15,
+            duration: 160,
+            easing: Easing.out(Easing.ease),
             useNativeDriver: true,
         }).start();
 
@@ -308,10 +299,6 @@ export const ExerciseDetailScreen: React.FC = () => {
         const newWeightValue = parseFloat(newSet.weight);
         lastAddedWeightRef.current = Number.isFinite(newWeightValue) ? newWeightValue : lastAddedWeightRef.current;
         setActiveWeight(lastAddedWeightRef.current);
-        lastAddedSetIdRef.current = newSetId;
-        setSetToastMessage('set added!');
-        setSetToastActionLabel('undo');
-        setShowSetToast(true);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     };
 
@@ -353,7 +340,7 @@ export const ExerciseDetailScreen: React.FC = () => {
                 setAnimations.set(setId, animValue);
                 Animated.timing(animValue, {
                     toValue: 1,
-                    duration: 300,
+                    duration: 180,
                     easing: Easing.out(Easing.ease),
                     useNativeDriver: true,
                 }).start();
@@ -376,8 +363,8 @@ export const ExerciseDetailScreen: React.FC = () => {
 
         Animated.timing(removeAnim, {
             toValue: 0,
-            duration: 220,
-            easing: Easing.out(Easing.cubic),
+            duration: 140,
+            easing: Easing.out(Easing.ease),
             useNativeDriver: true,
         }).start(() => {
             setSets(prevSets => {
@@ -447,6 +434,9 @@ export const ExerciseDetailScreen: React.FC = () => {
                     text: 'Delete',
                     style: 'destructive',
                     onPress: () => {
+                        if (isClosingRef.current) return;
+                        isClosingRef.current = true;
+
                         // Remove current exercise from the list
                         const updatedExercises = exercises.filter(ex => ex.id !== currentExercise.id);
 
@@ -456,11 +446,15 @@ export const ExerciseDetailScreen: React.FC = () => {
                         setExerciseStates(newExerciseStates);
 
                         // Navigate back with updated exercises (excluding the deleted one)
-                        const exercisesToReturn = Array.from(newExerciseStates.values()).map(state => ({
-                            id: state.exercise.id,
-                            name: state.exercise.name,
-                            sets: state.sets,
-                        }));
+                        const exercisesToReturn = updatedExercises.map(exerciseItem => {
+                            const state = newExerciseStates.get(exerciseItem.id);
+                            const setsToReturn = (state?.sets ?? exerciseItem.sets).filter(set => set.completed);
+                            return {
+                                id: exerciseItem.id,
+                                name: exerciseItem.name,
+                                sets: setsToReturn,
+                            };
+                        });
 
                         navigation.navigate('Workout', {
                             updatedExercises: exercisesToReturn,
@@ -810,42 +804,11 @@ export const ExerciseDetailScreen: React.FC = () => {
                 horizontal
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
-                onScroll={handleScroll}
-                scrollEventThrottle={16}
+                onMomentumScrollEnd={handleScroll}
                 style={styles.horizontalScrollView}
             >
                 {exercises.map((ex, index) => renderExercisePage(ex, index))}
             </ScrollView>
-            <UndoToast
-                visible={showSetToast}
-                message={setToastMessage}
-                showUndo={setToastActionLabel === 'undo'}
-                actionLabel={setToastActionLabel === 'undo' ? undefined : setToastActionLabel}
-                onAction={() => {
-                    setShowSetToast(false);
-                }}
-                onUndo={() => {
-                    const lastAddedId = lastAddedSetIdRef.current;
-                    if (!lastAddedId) {
-                        setShowSetToast(false);
-                        return;
-                    }
-                    setSets(prevSets => {
-                        const updated = prevSets.filter(set => set.id !== lastAddedId);
-                        const currentState = exerciseStates.get(exercise.id);
-                        if (currentState) {
-                            setExerciseStates(new Map(exerciseStates.set(exercise.id, {
-                                ...currentState,
-                                sets: updated,
-                            })));
-                        }
-                        return updated;
-                    });
-                    lastAddedSetIdRef.current = null;
-                }}
-                onDismiss={() => setShowSetToast(false)}
-                duration={2000}
-            />
         </View>
     );
 };
@@ -912,10 +875,8 @@ const styles = StyleSheet.create({
         marginTop: 8,
     },
     deleteExerciseButton: {
-        padding: 12,
-        marginRight: -12,
-        minWidth: 44,
-        minHeight: 44,
+        padding: 4,
+        marginRight: -5,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -975,7 +936,7 @@ const styles = StyleSheet.create({
         zIndex: 0,
     },
     setCard: {
-        backgroundColor: '#F8F8F8',
+        backgroundColor: '#FFFFFF',
         borderRadius: 12,
         padding: 10,
         borderWidth: 2,

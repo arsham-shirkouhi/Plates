@@ -51,7 +51,35 @@ interface ActiveWorkout {
     workoutName?: string;
 }
 
+interface WorkoutSummaryItem {
+    id: string;
+    name: string;
+    topWeight: number;
+    topReps: number;
+    plateColor: string;
+}
+
+interface WorkoutSummary {
+    dateLabel: string;
+    durationLabel: string;
+    totalWeight: number;
+    totalSets: number;
+    totalReps: number;
+    exercises: WorkoutSummaryItem[];
+}
+
+
 const SCREEN_WIDTH = Dimensions.get('window').width;
+const PLATE_WEIGHTS = [25, 20, 15, 10, 5, 2.5, 1.25];
+const PLATE_COLORS: Record<number, string> = {
+    25: '#D32F2F',
+    20: '#1976D2',
+    15: '#FFD600',
+    10: '#2E7D32',
+    5: '#F57C00',
+    2.5: '#6D4C41',
+    1.25: '#455A64',
+};
 
 export const WorkoutScreen: React.FC = () => {
     const navigation = useNavigation<WorkoutScreenNavigationProp>();
@@ -74,6 +102,8 @@ export const WorkoutScreen: React.FC = () => {
     const [showStartWorkoutSheet, setShowStartWorkoutSheet] = useState(false);
     const [showCountdown, setShowCountdown] = useState(false);
     const [showAddExerciseOverlay, setShowAddExerciseOverlay] = useState(false);
+    const [showWorkoutReceipt, setShowWorkoutReceipt] = useState(false);
+    const [workoutSummary, setWorkoutSummary] = useState<WorkoutSummary | null>(null);
     const [countdownValue, setCountdownValue] = useState(3);
     const countdownScale = useRef(new Animated.Value(0)).current;
     const countdownOpacity = useRef(new Animated.Value(0)).current;
@@ -85,6 +115,8 @@ export const WorkoutScreen: React.FC = () => {
     const dashedBoxScale = useRef(new Animated.Value(1)).current;
     const dashedBoxOpacity = useRef(new Animated.Value(1)).current;
     const workoutFadeIn = useRef(new Animated.Value(0)).current;
+    const receiptOpacity = useRef(new Animated.Value(0)).current;
+    const receiptTranslateY = useRef(new Animated.Value(40)).current;
     const scrollViewRef = useRef<ScrollView>(null);
     const lastTapRef = useRef<{ time: number }>({ time: 0 });
     const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -287,6 +319,35 @@ export const WorkoutScreen: React.FC = () => {
         );
     };
 
+    const handleRemoveExerciseFromOverlay = (exercise: { name: string }) => {
+        if (!activeWorkout) return;
+        const targetName = exercise.name.trim().toLowerCase();
+
+        Alert.alert(
+            'Delete Exercise',
+            `Are you sure you want to delete "${exercise.name}"?`,
+            [
+                {
+                    text: 'Cancel',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: () => {
+                        setActiveWorkout({
+                            ...activeWorkout,
+                            exercises: activeWorkout.exercises.filter(
+                                (ex) => ex.name.trim().toLowerCase() !== targetName
+                            ),
+                        });
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    },
+                },
+            ]
+        );
+    };
+
     const handleUpdateExerciseSets = (exerciseId: string, updatedSets: Set[]) => {
         if (!activeWorkout) return;
 
@@ -435,6 +496,28 @@ export const WorkoutScreen: React.FC = () => {
     }, [activeWorkout]);
 
 
+    const handleReceiptContinue = () => {
+        Animated.parallel([
+            Animated.timing(receiptOpacity, {
+                toValue: 0,
+                duration: 200,
+                easing: Easing.in(Easing.ease),
+                useNativeDriver: true,
+            }),
+            Animated.timing(receiptTranslateY, {
+                toValue: 40,
+                duration: 200,
+                easing: Easing.in(Easing.ease),
+                useNativeDriver: true,
+            }),
+        ]).start(() => {
+            setShowWorkoutReceipt(false);
+            setWorkoutSummary(null);
+            setActiveWorkout(null);
+            setHasCompletedWorkout(true);
+        });
+    };
+
     const handleFinishWorkout = () => {
         if (!activeWorkout) return;
 
@@ -452,8 +535,10 @@ export const WorkoutScreen: React.FC = () => {
                     style: 'default',
                     onPress: () => {
                         // TODO: Save workout to database
+                        const summary = buildWorkoutSummary(activeWorkout);
+                        setWorkoutSummary(summary);
+                        setShowWorkoutReceipt(true);
                         setActiveWorkout(null);
-                        setHasCompletedWorkout(true);
                         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                     },
                 },
@@ -473,8 +558,120 @@ export const WorkoutScreen: React.FC = () => {
         return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
     };
 
+    const formatReceiptDate = (date: Date): string => {
+        const dayPart = date.toLocaleDateString('en-US', {
+            weekday: 'long',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+        });
+        const timePart = date.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+        });
+        return `${dayPart} · ${timePart}`.toLowerCase();
+    };
+
+    const formatDurationLabel = (durationSeconds: number): string => {
+        const totalSeconds = Math.max(0, Math.floor(durationSeconds));
+        if (totalSeconds < 60) {
+            return `${totalSeconds}s`;
+        }
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+    };
+
+    const formatWeightLabel = (value: number): string => {
+        if (!Number.isFinite(value)) return '0';
+        const rounded = Math.round(value * 10) / 10;
+        return rounded % 1 === 0
+            ? rounded.toLocaleString('en-US', { maximumFractionDigits: 0 })
+            : rounded.toFixed(1);
+    };
+
+    const getClosestPlateColor = (weight: number): string => {
+        if (!Number.isFinite(weight) || weight <= 0) return '#252525';
+        let closest = PLATE_WEIGHTS[0];
+        PLATE_WEIGHTS.forEach((plate) => {
+            if (Math.abs(plate - weight) < Math.abs(closest - weight)) {
+                closest = plate;
+            }
+        });
+        return PLATE_COLORS[closest];
+    };
+
+    const buildWorkoutSummary = (workout: ActiveWorkout): WorkoutSummary => {
+        const allSets = workout.exercises.flatMap((exercise) => exercise.sets);
+        const completedOnly = allSets.filter((set) => set.completed);
+        const summarySets = completedOnly.length > 0 ? completedOnly : allSets;
+        const durationSeconds = Math.floor((Date.now() - workout.startedAt.getTime()) / 1000);
+        const totalWeight = summarySets.reduce((sum, set) => {
+            const weight = parseFloat(set.weight) || 0;
+            const reps = parseInt(set.reps, 10) || 0;
+            return sum + weight * reps;
+        }, 0);
+        const totalSets = summarySets.length;
+        const totalReps = summarySets.reduce((sum, set) => sum + (parseInt(set.reps, 10) || 0), 0);
+        const exercises = workout.exercises.map((exercise) => {
+            const completedSetsForExercise = exercise.sets.filter((set) => set.completed);
+            const setsForTop = completedSetsForExercise.length > 0 ? completedSetsForExercise : exercise.sets;
+            let topSet = setsForTop[0];
+            setsForTop.forEach((set) => {
+                if (!topSet) {
+                    topSet = set;
+                    return;
+                }
+                const weight = parseFloat(set.weight) || 0;
+                const topWeight = parseFloat(topSet.weight) || 0;
+                if (weight > topWeight) {
+                    topSet = set;
+                }
+            });
+            const topWeight = topSet ? (parseFloat(topSet.weight) || 0) : 0;
+            const topReps = topSet ? (parseInt(topSet.reps, 10) || 0) : 0;
+            return {
+                id: exercise.id,
+                name: exercise.name,
+                topWeight,
+                topReps,
+                plateColor: getClosestPlateColor(topWeight),
+            };
+        });
+
+        return {
+            dateLabel: formatReceiptDate(new Date()),
+            durationLabel: formatDurationLabel(durationSeconds),
+            totalWeight,
+            totalSets,
+            totalReps,
+            exercises,
+        };
+    };
+
+
+
     // Determine if user has never logged a workout
     const hasNeverLoggedWorkout = !hasCompletedWorkout && !activeWorkout;
+    useEffect(() => {
+        if (!showWorkoutReceipt) return;
+        receiptOpacity.setValue(0);
+        receiptTranslateY.setValue(40);
+        Animated.parallel([
+            Animated.timing(receiptOpacity, {
+                toValue: 1,
+                duration: 250,
+                easing: Easing.out(Easing.ease),
+                useNativeDriver: true,
+            }),
+            Animated.spring(receiptTranslateY, {
+                toValue: 0,
+                tension: 120,
+                friction: 10,
+                useNativeDriver: true,
+            }),
+        ]).start();
+    }, [showWorkoutReceipt]);
 
     // Ensure countdown is visible when Modal opens
     useEffect(() => {
@@ -651,48 +848,19 @@ export const WorkoutScreen: React.FC = () => {
 
     // Start workout with transition animation
     const startWorkoutWithAnimation = () => {
-        // Fade out and scale down dashed box
-        Animated.parallel([
-            Animated.timing(dashedBoxOpacity, {
-                toValue: 0,
-                duration: 400,
-                easing: Easing.out(Easing.ease),
-                useNativeDriver: true,
-            }),
-            Animated.timing(dashedBoxScale, {
-                toValue: 0.9,
-                duration: 400,
-                easing: Easing.out(Easing.ease),
-                useNativeDriver: true,
-            }),
-        ]).start(() => {
-            // Hide countdown after dashed box animation
-            setShowCountdown(false);
+        // Skip slow transitions and start immediately.
+        dashedBoxScale.setValue(1);
+        dashedBoxOpacity.setValue(0);
+        workoutFadeIn.setValue(1);
+        setShowCountdown(false);
 
-            // Start the workout
-            const newWorkout: ActiveWorkout = {
-                id: Date.now().toString(),
-                startedAt: new Date(),
-                exercises: [],
-            };
-            setActiveWorkout(newWorkout);
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-            // Reset dashed box animations for next time
-            dashedBoxScale.setValue(1);
-            dashedBoxOpacity.setValue(1);
-
-            // Fade in workout view with a slight delay for smooth transition
-            workoutFadeIn.setValue(0);
-            setTimeout(() => {
-                Animated.timing(workoutFadeIn, {
-                    toValue: 1,
-                    duration: 500,
-                    easing: Easing.out(Easing.ease),
-                    useNativeDriver: true,
-                }).start();
-            }, 100);
-        });
+        const newWorkout: ActiveWorkout = {
+            id: Date.now().toString(),
+            startedAt: new Date(),
+            exercises: [],
+        };
+        setActiveWorkout(newWorkout);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     };
 
     return (
@@ -706,7 +874,7 @@ export const WorkoutScreen: React.FC = () => {
                 nestedScrollEnabled={true}
                 keyboardShouldPersistTaps="handled"
                 removeClippedSubviews={false}
-                scrollEnabled={!hasNeverLoggedWorkout}
+                scrollEnabled={false}
                 bounces={false}
                 overScrollMode="never"
                 alwaysBounceVertical={false}
@@ -847,12 +1015,12 @@ export const WorkoutScreen: React.FC = () => {
                                                     key={exercise.id}
                                                     exercise={exercise}
                                                     isComplete={isComplete}
-                                                    hasBorder={index < activeWorkout.exercises.length - 1}
                                                     onPress={() => handleExercisePress(exercise)}
                                                     onLongPress={() => handleDeleteExercise(exercise)}
                                                     onLayout={(ref) => {
                                                         exerciseItemRefs.current.set(exercise.id, ref);
                                                     }}
+                                                    isLast={index === activeWorkout.exercises.length - 1}
                                                 />
                                             );
                                         })
@@ -898,7 +1066,124 @@ export const WorkoutScreen: React.FC = () => {
                 onClose={() => setShowAddExerciseOverlay(false)}
                 onSelectExercise={handleSelectExercise}
                 onSelectExerciseAndNavigate={handleSelectExerciseAndNavigate}
+                currentExerciseIds={activeWorkout?.exercises.map((exercise) => exercise.id) ?? []}
+                currentExerciseNames={activeWorkout?.exercises.map((exercise) => exercise.name) ?? []}
+                onRemoveExercise={handleRemoveExerciseFromOverlay}
             />
+
+            {/* Workout Summary Receipt Overlay */}
+            <Modal
+                visible={showWorkoutReceipt && !!workoutSummary}
+                transparent
+                animationType="none"
+                statusBarTranslucent={true}
+                presentationStyle="overFullScreen"
+                onRequestClose={handleReceiptContinue}
+            >
+                <View style={styles.receiptPage}>
+                    <Animated.Image
+                        source={require('../../assets/images/aura_ball.png')}
+                        style={[
+                            styles.receiptAuraTopRight,
+                            { transform: [{ rotate: '0deg' }] },
+                        ]}
+                        resizeMode="contain"
+                    />
+                    <Animated.Image
+                        source={require('../../assets/images/aura_ball.png')}
+                        style={[
+                            styles.receiptAuraBottomLeft,
+                            { transform: [{ rotate: '0deg' }] },
+                        ]}
+                        resizeMode="contain"
+                    />
+                    <ScrollView
+                        contentContainerStyle={[
+                            styles.receiptScrollContent,
+                            { paddingBottom: 120 + insets.bottom },
+                        ]}
+                        showsVerticalScrollIndicator={false}
+                        scrollEventThrottle={16}
+                        removeClippedSubviews={false}
+                        nestedScrollEnabled={true}
+                        keyboardShouldPersistTaps="handled"
+                        decelerationRate="normal"
+                        bounces={true}
+                        overScrollMode="auto"
+                        scrollEnabled={true}
+                    >
+                        <Animated.View
+                            style={[
+                                styles.receiptContent,
+                                {
+                                    opacity: receiptOpacity,
+                                    transform: [{ translateY: receiptTranslateY }],
+                                },
+                            ]}
+                        >
+                            <Text style={styles.receiptTitle}>workout complete!</Text>
+                            <Text style={styles.receiptSubtitle}>{workoutSummary?.dateLabel}</Text>
+                            {workoutSummary?.durationLabel && (
+                                <Text style={styles.receiptSubline}>
+                                    workout duration · {workoutSummary?.durationLabel}
+                                </Text>
+                            )}
+
+                            <View style={styles.totalWeightSection}>
+                                <View style={styles.totalWeightRow}>
+                                    <View style={styles.redPlateIcon} />
+                                    <Text style={styles.totalWeightValue}>
+                                        {formatWeightLabel(workoutSummary?.totalWeight ?? 0)}kg
+                                    </Text>
+                                </View>
+                                <Text style={styles.totalWeightLabel}>total weight lifted</Text>
+                            </View>
+
+                            <View style={styles.statsGrid}>
+                                <View style={styles.statCard}>
+                                    <Text style={styles.statValue}>{workoutSummary?.totalSets ?? 0}</Text>
+                                    <Text style={styles.statLabel}>sets</Text>
+                                </View>
+                                <View style={styles.statCard}>
+                                    <Text style={styles.statValue}>{workoutSummary?.totalReps ?? 0}</Text>
+                                    <Text style={styles.statLabel}>reps</Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.exerciseListSection}>
+                                <Text style={styles.exerciseListTitle}>set history</Text>
+                                <ScrollView
+                                    style={styles.exerciseListScroll}
+                                    contentContainerStyle={styles.exerciseListContent}
+                                    showsVerticalScrollIndicator={false}
+                                >
+                                    {workoutSummary?.exercises.map((exercise) => (
+                                        <View key={exercise.id} style={styles.exerciseRow}>
+                                            <View style={[styles.exercisePlateDot, { backgroundColor: exercise.plateColor }]} />
+                                            <Text style={styles.exerciseRowName} numberOfLines={1}>
+                                                {exercise.name.toLowerCase()}
+                                            </Text>
+                                            <Text style={styles.exerciseRowValue}>
+                                                {formatWeightLabel(exercise.topWeight)}kg
+                                                {exercise.topReps > 0 ? ` x ${exercise.topReps}` : ''}
+                                            </Text>
+                                        </View>
+                                    ))}
+                                </ScrollView>
+                            </View>
+
+                        </Animated.View>
+                    </ScrollView>
+                    <View style={[styles.receiptFooter, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+                        <Button
+                            variant="primary"
+                            title="continue"
+                            onPress={handleReceiptContinue}
+                            containerStyle={styles.receiptFooterButton}
+                        />
+                    </View>
+                </View>
+            </Modal>
 
             {/* Countdown Overlay - Using Modal to ensure it's above navbar */}
             <Modal
@@ -974,13 +1259,13 @@ export const WorkoutScreen: React.FC = () => {
 interface ExerciseItemProps {
     exercise: Exercise;
     isComplete: boolean;
-    hasBorder: boolean;
     onPress: () => void;
     onLongPress: () => void;
     onLayout: (ref: { measureInWindow: (callback: (x: number, y: number, width: number, height: number) => void) => void; getTextWidth: () => number }) => void;
+    isLast?: boolean;
 }
 
-const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isComplete, hasBorder, onPress, onLongPress, onLayout }) => {
+const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isComplete, onPress, onLongPress, onLayout, isLast }) => {
     const itemRef = useRef<View>(null);
     const textRef = useRef<Text>(null);
     const [textWidth, setTextWidth] = useState(0);
@@ -1012,14 +1297,9 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isComplete, hasBo
             ref={itemRef}
             onPress={onPress}
             activeOpacity={0.85}
-            style={styles.exerciseItemWrapper}
+            style={[styles.exerciseItemWrapper, isLast && styles.exerciseItemWrapperLast]}
         >
-            <View
-                style={[
-                    styles.exerciseItemCard,
-                    hasBorder && styles.exerciseItemBorder
-                ]}
-            >
+            <View style={styles.exerciseItemCard}>
                 <View style={styles.exerciseItemHeader}>
                     <View style={styles.exerciseItemNameContainer}>
                         <Pressable
@@ -1038,17 +1318,11 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isComplete, hasBo
                             </Text>
                         </Pressable>
                     </View>
-                    {isComplete ? (
-                        <View style={styles.exerciseItemStatus}>
-                            <Text style={styles.exerciseItemStatusText}>completed</Text>
-                        </View>
-                    ) : (
-                        <Ionicons
-                            name="chevron-forward"
-                            size={20}
-                            color="#252525"
-                        />
-                    )}
+                    <Ionicons
+                        name={isComplete ? "checkmark-sharp" : "chevron-forward"}
+                        size={20}
+                        color={isComplete ? "#526EFF" : "#252525"}
+                    />
                 </View>
                 <View style={styles.exerciseItemMetaRow}>
                     <View style={styles.exerciseItemMetaBlock}>
@@ -1129,7 +1403,7 @@ const styles = StyleSheet.create({
         marginBottom: 0,
     },
     startWorkoutCardWithButton: {
-        marginTop: 20,
+        marginTop: 5,
     },
     startWorkoutTextLarge: {
         fontSize: 20,
@@ -1163,7 +1437,7 @@ const styles = StyleSheet.create({
         borderWidth: 2.5,
         borderColor: '#252525',
         marginBottom: 16,
-        overflow: 'visible',
+        overflow: 'hidden',
     },
     workoutBoxHeader: {
         flexDirection: 'row',
@@ -1192,7 +1466,7 @@ const styles = StyleSheet.create({
     exercisesScrollContent: {
         paddingTop: 12,
         paddingHorizontal: 12,
-        paddingBottom: 12,
+        paddingBottom: 14,
     },
     exercisesScrollContentEmpty: {
         flexGrow: 1,
@@ -1248,8 +1522,11 @@ const styles = StyleSheet.create({
     },
     exerciseItemWrapper: {
         position: 'relative',
-        marginBottom: 14,
-        paddingBottom: 4,
+        marginBottom: 16,
+        paddingBottom: 0,
+    },
+    exerciseItemWrapperLast: {
+        marginBottom: 0,
     },
     exerciseItemCard: {
         backgroundColor: '#fff',
@@ -1258,9 +1535,6 @@ const styles = StyleSheet.create({
         borderColor: '#252525',
         paddingVertical: 12,
         paddingHorizontal: 15,
-    },
-    exerciseItemBorder: {
-        borderBottomWidth: 0,
     },
     exerciseItemNameContainer: {
         flex: 1,
@@ -1303,20 +1577,6 @@ const styles = StyleSheet.create({
         backgroundColor: '#E0E0E0',
         marginHorizontal: 12,
     },
-    exerciseItemStatus: {
-        borderWidth: 2,
-        borderColor: '#526EFF',
-        backgroundColor: '#F2F5FF',
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 999,
-    },
-    exerciseItemStatusText: {
-        fontSize: 12,
-        fontFamily: fonts.bold,
-        color: '#526EFF',
-        textTransform: 'lowercase',
-    },
     actionButtons: {
         marginTop: 0,
         marginBottom: 16,
@@ -1329,6 +1589,176 @@ const styles = StyleSheet.create({
     },
     activeWorkoutContainer: {
         width: '100%',
+    },
+    receiptPage: {
+        flex: 1,
+        backgroundColor: '#fff',
+        position: 'relative',
+        overflow: 'hidden',
+    },
+    receiptAuraTopRight: {
+        position: 'absolute',
+        top: -250,
+        right: -250,
+        width: 500,
+        height: 500,
+        zIndex: 0,
+    },
+    receiptAuraBottomLeft: {
+        position: 'absolute',
+        bottom: -250,
+        left: -250,
+        width: 500,
+        height: 500,
+        zIndex: 0,
+    },
+    receiptScrollContent: {
+        flexGrow: 1,
+        justifyContent: 'center',
+        padding: 20,
+        alignItems: 'center',
+    },
+    receiptContent: {
+        width: '100%',
+        maxWidth: 400,
+        alignItems: 'center',
+        zIndex: 1,
+    },
+    receiptTitle: {
+        fontSize: 26,
+        fontFamily: fonts.bold,
+        textAlign: 'center',
+        marginBottom: 4,
+        textTransform: 'lowercase',
+        color: '#252525',
+    },
+    receiptSubtitle: {
+        fontSize: 16,
+        fontFamily: fonts.regular,
+        textAlign: 'center',
+        marginBottom: 6,
+        color: '#666',
+        textTransform: 'lowercase',
+    },
+    receiptSubline: {
+        fontSize: 14,
+        fontFamily: fonts.regular,
+        textAlign: 'center',
+        marginBottom: 20,
+        color: '#8A8A8A',
+        textTransform: 'lowercase',
+    },
+    receiptFooter: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        paddingTop: 12,
+        paddingHorizontal: 20,
+        alignItems: 'center',
+    },
+    receiptFooterButton: {
+        width: '100%',
+        maxWidth: 400,
+    },
+    totalWeightSection: {
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    totalWeightRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    redPlateIcon: {
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        backgroundColor: '#D32F2F',
+        borderWidth: 2,
+        borderColor: '#252525',
+        marginRight: 8,
+    },
+    totalWeightValue: {
+        fontSize: 28,
+        fontFamily: fonts.bold,
+        color: '#252525',
+    },
+    totalWeightLabel: {
+        fontSize: 12,
+        fontFamily: fonts.regular,
+        color: '#666',
+        textTransform: 'lowercase',
+        marginTop: 4,
+    },
+    statsGrid: {
+        flexDirection: 'row',
+        gap: 12,
+        alignSelf: 'stretch',
+        marginBottom: 12,
+    },
+    statCard: {
+        flex: 1,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 2,
+        borderColor: '#252525',
+        borderRadius: 12,
+        paddingVertical: 10,
+        alignItems: 'center',
+    },
+    statValue: {
+        fontSize: 20,
+        fontFamily: fonts.bold,
+        color: '#252525',
+    },
+    statLabel: {
+        fontSize: 11,
+        fontFamily: fonts.regular,
+        color: '#666',
+        textTransform: 'lowercase',
+        marginTop: 2,
+    },
+    exerciseListSection: {
+        alignSelf: 'stretch',
+        marginBottom: 12,
+    },
+    exerciseListScroll: {
+        maxHeight: 180,
+    },
+    exerciseListContent: {
+        paddingBottom: 2,
+    },
+    exerciseListTitle: {
+        fontSize: 12,
+        fontFamily: fonts.bold,
+        color: '#252525',
+        textTransform: 'lowercase',
+        marginBottom: 8,
+    },
+    exerciseRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 6,
+    },
+    exercisePlateDot: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        borderWidth: 1,
+        borderColor: '#252525',
+        marginRight: 8,
+    },
+    exerciseRowName: {
+        flex: 1,
+        fontSize: 13,
+        fontFamily: fonts.regular,
+        color: '#252525',
+        textTransform: 'lowercase',
+        marginRight: 8,
+    },
+    exerciseRowValue: {
+        fontSize: 13,
+        fontFamily: fonts.bold,
+        color: '#252525',
     },
     countdownOverlay: {
         flex: 1,

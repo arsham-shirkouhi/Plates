@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Easing } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing, StyleProp, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fonts } from '../constants/fonts';
 import * as Haptics from 'expo-haptics';
@@ -14,6 +14,8 @@ interface UndoToastProps {
     showUndo?: boolean;
     actionLabel?: string;
     onAction?: () => void;
+    inline?: boolean;
+    containerStyle?: StyleProp<ViewStyle>;
 }
 
 export const UndoToast: React.FC<UndoToastProps> = ({
@@ -26,9 +28,11 @@ export const UndoToast: React.FC<UndoToastProps> = ({
     showUndo = true,
     actionLabel,
     onAction,
+    inline = false,
+    containerStyle,
 }) => {
     const insets = useSafeAreaInsets();
-    const slideAnim = useRef(new Animated.Value(-100)).current;
+    const slideAnim = useRef(new Animated.Value(inline ? 12 : -100)).current;
     const opacityAnim = useRef(new Animated.Value(0)).current;
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -73,7 +77,7 @@ export const UndoToast: React.FC<UndoToastProps> = ({
     const handleDismiss = () => {
         Animated.parallel([
             Animated.timing(slideAnim, {
-                toValue: -100,
+                toValue: inline ? 20 : -100,
                 duration: 250,
                 easing: Easing.in(Easing.ease),
                 useNativeDriver: true,
@@ -116,7 +120,14 @@ export const UndoToast: React.FC<UndoToastProps> = ({
     }
 
     return (
-        <View style={[styles.container, { top: insets.top + 8 }]} pointerEvents="box-none">
+        <View
+            style={[
+                styles.container,
+                inline ? styles.inlineContainer : { top: insets.top + 8 },
+                containerStyle,
+            ]}
+            pointerEvents="box-none"
+        >
             <Animated.View
                 style={[
                     styles.toast,
@@ -151,6 +162,16 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         zIndex: 9999,
         elevation: 9999,
+    },
+    inlineContainer: {
+        position: 'relative',
+        top: 0,
+        left: undefined,
+        right: undefined,
+        width: '100%',
+        paddingHorizontal: 0,
+        zIndex: 0,
+        elevation: 0,
     },
     toast: {
         width: '100%',

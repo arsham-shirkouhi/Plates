@@ -222,7 +222,7 @@ export const WorkoutHeaderSection: React.FC<WorkoutHeaderSectionProps> = ({
     };
 
     return (
-        <View style={[styles.container, { paddingTop: 12 }]}>
+        <View style={[styles.container, { paddingTop: 25 }]}>
             {/* Stats row or Empty state text */}
             <View style={styles.topRow}>
                 <View style={styles.statsSection}>

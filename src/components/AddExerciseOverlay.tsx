@@ -31,6 +31,9 @@ interface AddExerciseOverlayProps {
     onClose: () => void;
     onSelectExercise: (exercise: Exercise) => void;
     onSelectExerciseAndNavigate?: (exercise: Exercise, createdExercise: { id: string; name: string; sets: Array<{ id: string; reps: string; weight: string }> }, allExercises: Array<{ id: string; name: string; sets: Array<{ id: string; reps: string; weight: string }> }>, exerciseIndex: number) => void;
+    currentExerciseIds?: string[];
+    currentExerciseNames?: string[];
+    onRemoveExercise?: (exercise: Exercise) => void;
 }
 
 export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
@@ -38,6 +41,9 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
     onClose,
     onSelectExercise,
     onSelectExerciseAndNavigate,
+    currentExerciseIds = [],
+    currentExerciseNames = [],
+    onRemoveExercise,
 }) => {
     const navigation = useNavigation<NavigationProp>();
     const insets = useSafeAreaInsets();
@@ -198,13 +204,13 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
         Animated.parallel([
             Animated.timing(slideAnim, {
                 toValue: SCREEN_HEIGHT,
-                duration: 300,
+                duration: 140,
                 easing: Easing.out(Easing.cubic),
                 useNativeDriver: true,
             }),
             Animated.timing(backdropOpacity, {
                 toValue: 0,
-                duration: 250,
+                duration: 120,
                 easing: Easing.out(Easing.ease),
                 useNativeDriver: true,
             }),
@@ -218,13 +224,13 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
         Animated.parallel([
             Animated.timing(slideAnim, {
                 toValue: SCREEN_HEIGHT,
-                duration: 300,
+                duration: 140,
                 easing: Easing.out(Easing.cubic),
                 useNativeDriver: true,
             }),
             Animated.timing(backdropOpacity, {
                 toValue: 0,
-                duration: 250,
+                duration: 120,
                 easing: Easing.out(Easing.ease),
                 useNativeDriver: true,
             }),
@@ -353,6 +359,10 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
 
     // Use exercises directly from Supabase (already filtered server-side when searching)
     const displayedExercises = exercises;
+    const currentExerciseIdSet = new Set(currentExerciseIds);
+    const currentExerciseNameSet = new Set(
+        currentExerciseNames.map((name) => name.trim().toLowerCase())
+    );
 
     return (
         <>
@@ -538,32 +548,49 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
                                                 </View>
                                             ) : (
                                                 <>
-                                                    {displayedExercises.map((exercise, index) => (
-                                                        <View
-                                                            key={`exercise-${index}-${exercise.id || exercise.name || 'item'}`}
-                                                            style={styles.exerciseItem}
-                                                        >
-                                                            <TouchableOpacity
-                                                                style={styles.exerciseTitleContainer}
-                                                                onPress={() => handleExerciseTitlePress(exercise)}
-                                                                activeOpacity={0.7}
+                                                    {displayedExercises.map((exercise, index) => {
+                                                        const exerciseNameKey = exercise.name?.trim().toLowerCase();
+                                                        const isAlreadyAdded = (!!exercise.id && currentExerciseIdSet.has(exercise.id))
+                                                            || (!!exerciseNameKey && currentExerciseNameSet.has(exerciseNameKey));
+                                                        return (
+                                                            <View
+                                                                key={`exercise-${index}-${exercise.id || exercise.name || 'item'}`}
+                                                                style={styles.exerciseItem}
                                                             >
-                                                                <Text style={styles.exerciseName}>{exercise.name}</Text>
-                                                                {!!exercise.bodyPart && (
-                                                                    <Text style={styles.exerciseBodyPart}>
-                                                                        {exercise.bodyPart.toLowerCase()}
-                                                                    </Text>
+                                                                <TouchableOpacity
+                                                                    style={styles.exerciseTitleContainer}
+                                                                    onPress={() => handleExerciseTitlePress(exercise)}
+                                                                    activeOpacity={0.7}
+                                                                >
+                                                                    <Text style={styles.exerciseName}>{exercise.name}</Text>
+                                                                    {!!exercise.bodyPart && (
+                                                                        <Text style={styles.exerciseBodyPart}>
+                                                                            {exercise.bodyPart.toLowerCase()}
+                                                                        </Text>
+                                                                    )}
+                                                                </TouchableOpacity>
+                                                                {isAlreadyAdded ? (
+                                                                    <View style={styles.recentlyAddedContainer}>
+                                                                        <TouchableOpacity
+                                                                            style={styles.removeButton}
+                                                                            onPress={() => onRemoveExercise?.(exercise)}
+                                                                            activeOpacity={0.7}
+                                                                        >
+                                                                            <Ionicons name="trash-outline" size={24} color="#FF5252" />
+                                                                        </TouchableOpacity>
+                                                                    </View>
+                                                                ) : (
+                                                                    <TouchableOpacity
+                                                                        style={styles.addButton}
+                                                                        onPress={() => handleAddExercise(exercise)}
+                                                                        activeOpacity={0.7}
+                                                                    >
+                                                                        <Ionicons name="add" size={24} color="#526EFF" />
+                                                                    </TouchableOpacity>
                                                                 )}
-                                                            </TouchableOpacity>
-                                                            <TouchableOpacity
-                                                                style={styles.addButton}
-                                                                onPress={() => handleAddExercise(exercise)}
-                                                                activeOpacity={0.7}
-                                                            >
-                                                                <Ionicons name="add" size={24} color="#526EFF" />
-                                                            </TouchableOpacity>
-                                                        </View>
-                                                    ))}
+                                                            </View>
+                                                        );
+                                                    })}
                                                     {loadingMore && (
                                                         <View style={styles.loadingMoreContainer}>
                                                             <ActivityIndicator size="small" color="#526EFF" />
@@ -651,7 +678,7 @@ const styles = StyleSheet.create({
         marginHorizontal: 20,
         paddingHorizontal: 16,
         paddingVertical: 12,
-        backgroundColor: '#F5F5F5',
+        backgroundColor: '#FFFFFF',
         borderRadius: 12,
         borderWidth: 2,
         borderColor: '#252525',
@@ -707,6 +734,18 @@ const styles = StyleSheet.create({
         marginTop: 2,
     },
     addButton: {
+        width: 40,
+        height: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    recentlyAddedContainer: {
+        width: 40,
+        height: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    removeButton: {
         width: 40,
         height: 40,
         alignItems: 'center',
