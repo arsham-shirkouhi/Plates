@@ -12,6 +12,7 @@ interface FoodLogHeaderSectionProps {
     calories: number;
     topInset?: number;
     onProfilePress?: () => void;
+    onMacrosPress?: () => void;
 }
 
 export const FoodLogHeaderSection: React.FC<FoodLogHeaderSectionProps> = ({
@@ -21,6 +22,7 @@ export const FoodLogHeaderSection: React.FC<FoodLogHeaderSectionProps> = ({
     calories,
     topInset = 0,
     onProfilePress,
+    onMacrosPress,
 }) => {
     // Animation values for circle positions
     const profileCircleLeft = useRef(new Animated.Value(0)).current;
@@ -223,7 +225,12 @@ export const FoodLogHeaderSection: React.FC<FoodLogHeaderSectionProps> = ({
         <View style={[styles.container, { paddingTop: 12 }]}>
             {/* Macros and calories row */}
             <View style={styles.topRow}>
-                <View style={styles.macroSection}>
+                <TouchableOpacity
+                    style={styles.macroSection}
+                    onPress={onMacrosPress}
+                    activeOpacity={0.7}
+                    disabled={!onMacrosPress}
+                >
                     <View style={styles.macroRow}>
                         <View style={styles.macroItem}>
                             <View style={[styles.macroDot, styles.proteinDot]} />
@@ -243,7 +250,7 @@ export const FoodLogHeaderSection: React.FC<FoodLogHeaderSectionProps> = ({
                     <View style={styles.caloriesRow}>
                         <Text style={styles.caloriesText}>{formatNumber(displayCalories)}kcal</Text>
                     </View>
-                </View>
+                </TouchableOpacity>
 
                 {/* User icon */}
                 <TouchableOpacity

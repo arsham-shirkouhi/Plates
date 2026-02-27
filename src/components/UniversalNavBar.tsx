@@ -10,55 +10,61 @@ import { useAddFood } from '../context/AddFoodContext';
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export const UniversalNavBar: React.FC = () => {
-    const navigation = useNavigation<NavigationProp>();
-    const { showAddFoodSheet } = useAddFood();
+    // Hide the old navbar - keeping component for potential future use
+    return null;
     
-    // Get current route name from navigation state
-    const routeName = useNavigationState(state => {
-        if (!state) return null;
-        const route = state.routes[state.index];
-        return route?.name;
-    });
-
-    // Determine active screen based on route name
-    const getActiveScreen = (): 'home' | 'food' | 'fitness' => {
-        if (routeName === 'FoodLog') return 'food';
-        if (routeName === 'Fitness') return 'fitness';
-        return 'home';
-    };
-
-    const activeScreen = getActiveScreen();
-
-    // Only show navbar on main app screens
-    const showNavBar = routeName && ['Home', 'FoodLog', 'Fitness'].includes(routeName);
-
-    if (!showNavBar) {
-        return null;
-    }
-
-    return (
-        <BottomNavBar>
-            <NavButtons
-                activeScreen={activeScreen}
-                onHomePress={() => {
-                    if (routeName !== 'Home') {
-                        navigation.navigate('Home');
-                    }
-                }}
-                onFoodPress={() => {
-                    if (routeName !== 'FoodLog') {
-                        navigation.navigate('FoodLog');
-                    }
-                }}
-                onFitnessPress={() => {
-                    Alert.alert('Fitness', 'Fitness screen coming soon');
-                }}
-            />
-            <AddButton
-                onPress={() => {
-                    showAddFoodSheet();
-                }}
-            />
-        </BottomNavBar>
-    );
+    // OLD NAVBAR CODE (hidden but preserved):
+    // const navigation = useNavigation<NavigationProp>();
+    // const { showAddFoodSheet } = useAddFood();
+    // 
+    // // Get current route name from navigation state
+    // const routeName = useNavigationState(state => {
+    //     if (!state) return null;
+    //     const route = state.routes[state.index];
+    //     return route?.name;
+    // });
+    //
+    // // Determine active screen based on route name
+    // const getActiveScreen = (): 'home' | 'food' | 'fitness' => {
+    //     if (routeName === 'FoodLog') return 'food';
+    //     if (routeName === 'Workout') return 'fitness';
+    //     return 'home';
+    // };
+    //
+    // const activeScreen = getActiveScreen();
+    //
+    // // Only show navbar on main app screens
+    // const showNavBar = routeName && ['Home', 'FoodLog', 'Workout'].includes(routeName);
+    //
+    // if (!showNavBar) {
+    //     return null;
+    // }
+    //
+    // return (
+    //     <BottomNavBar>
+    //         <NavButtons
+    //             activeScreen={activeScreen}
+    //             onHomePress={() => {
+    //                 if (routeName !== 'Home') {
+    //                     navigation.navigate('Home');
+    //                 }
+    //             }}
+    //             onFoodPress={() => {
+    //                 if (routeName !== 'FoodLog') {
+    //                     navigation.navigate('FoodLog');
+    //                 }
+    //             }}
+    //             onFitnessPress={() => {
+    //                 if (routeName !== 'Workout') {
+    //                     navigation.navigate('Workout');
+    //                 }
+    //             }}
+    //         />
+    //         <AddButton
+    //             onPress={() => {
+    //                 showAddFoodSheet();
+    //             }}
+    //         />
+    //     </BottomNavBar>
+    // );
 };

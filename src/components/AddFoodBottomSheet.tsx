@@ -21,6 +21,7 @@ import { fonts } from '../constants/fonts';
 import * as Haptics from 'expo-haptics';
 import { searchFoods } from '../services/foodService';
 import { FoodDetailView } from './FoodDetailView';
+import { useOverlay } from '../contexts/OverlayContext';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -58,6 +59,8 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
     onMealChange,
     initialMeal = null,
 }) => {
+    const { registerOverlay } = useOverlay();
+    const OVERLAY_ID = 'AddFoodBottomSheet';
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<FoodItem[]>([]);
     const [addedItems, setAddedItems] = useState<Set<string>>(new Set());
@@ -84,6 +87,14 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
     };
 
     const [selectedMeal, setSelectedMeal] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack' | null>(initialMeal || null);
+
+    // Register overlay state
+    useEffect(() => {
+        registerOverlay(OVERLAY_ID, visible);
+        return () => {
+            registerOverlay(OVERLAY_ID, false);
+        };
+    }, [visible, registerOverlay]);
 
     // Update selected meal when sheet opens or initialMeal prop changes
     useEffect(() => {
@@ -177,7 +188,7 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
             // Reset all animations to initial state
             slideAnim.setValue(SCREEN_HEIGHT + TOASTER_OFFSET);
             backdropOpacity.setValue(0);
-            
+
             // Reset added items when opening so quick add items always show
             // Use setTimeout to ensure quickAddItems are rendered first
             setTimeout(() => {
@@ -1065,7 +1076,7 @@ const styles = StyleSheet.create({
     searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#F5F5F5',
+        backgroundColor: '#FFFFFF',
         borderRadius: 12,
         borderWidth: 2,
         borderColor: '#252525',

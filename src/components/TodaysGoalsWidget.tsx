@@ -102,7 +102,7 @@ export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
             // Fade in animation similar to todo items
             moreTextOpacity.setValue(0);
             moreTextTranslateY.setValue(10);
-            
+
             Animated.parallel([
                 Animated.timing(moreTextOpacity, {
                     toValue: 1,
@@ -139,8 +139,8 @@ export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
                     text: 'Add',
                     onPress: (text) => {
                         if (text && text.trim()) {
-                            const newGoal: Goal = { 
-                                text: text.trim().toLowerCase(), 
+                            const newGoal: Goal = {
+                                text: text.trim().toLowerCase(),
                                 completed: false,
                                 createdAt: new Date().toISOString(),
                                 isRepeating: false,
@@ -225,17 +225,10 @@ export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
 
             {/* Goals list */}
             {incompleteGoals.length === 0 ? (
-                <TouchableOpacity
-                    style={styles.emptyContainer}
-                    onLongPress={handleAddTodo}
-                    activeOpacity={0.7}
-                >
-                    <Text style={styles.emptyText}>hold to add, double tap to remove</Text>
-                </TouchableOpacity>
+                <EmptyAreaWithDoubleTap onDoubleTap={handleAddTodo} />
             ) : (
                 <TouchableOpacity
                     style={styles.goalsContainer}
-                    onLongPress={handleAddTodo}
                     activeOpacity={1}
                 >
                     {visibleGoals.map((goal, displayIndex) => {
@@ -292,6 +285,53 @@ export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
     );
 };
 
+interface EmptyAreaWithDoubleTapProps {
+    onDoubleTap: () => void;
+}
+
+const EmptyAreaWithDoubleTap: React.FC<EmptyAreaWithDoubleTapProps> = ({ onDoubleTap }) => {
+    const lastTapTime = useRef<number>(0);
+    const doubleTapTimer = useRef<NodeJS.Timeout | null>(null);
+
+    React.useEffect(() => {
+        return () => {
+            if (doubleTapTimer.current) {
+                clearTimeout(doubleTapTimer.current);
+            }
+        };
+    }, []);
+
+    const handlePress = () => {
+        const now = Date.now();
+        const timeSinceLastTap = now - lastTapTime.current;
+
+        if (doubleTapTimer.current) {
+            clearTimeout(doubleTapTimer.current);
+            doubleTapTimer.current = null;
+        }
+
+        if (timeSinceLastTap < 300) {
+            onDoubleTap();
+            lastTapTime.current = 0;
+        } else {
+            lastTapTime.current = now;
+            doubleTapTimer.current = setTimeout(() => {
+                lastTapTime.current = 0;
+            }, 300);
+        }
+    };
+
+    return (
+        <TouchableOpacity
+            style={styles.emptyContainer}
+            onPress={handlePress}
+            activeOpacity={0.7}
+        >
+            <Text style={styles.emptyText}>hold to remove &  double tap to add!</Text>
+        </TouchableOpacity>
+    );
+};
+
 interface GoalItemProps {
     goal: Goal;
     index: number;
@@ -310,8 +350,6 @@ const GoalItem: React.FC<GoalItemProps> = ({ goal, index, isRemoving, isNewlyApp
     const textRef = useRef<Text>(null);
     const hasAnimatedIn = useRef(false);
     const [textWidth, setTextWidth] = React.useState(0);
-    const lastTapTime = useRef<number>(0);
-    const doubleTapTimer = useRef<NodeJS.Timeout | null>(null);
 
     React.useEffect(() => {
         // Only set initial values once, don't animate in
@@ -341,7 +379,7 @@ const GoalItem: React.FC<GoalItemProps> = ({ goal, index, isRemoving, isNewlyApp
             // Reset animation values to start from beginning
             strikethroughWidth.setValue(0);
             opacity.setValue(0);
-            
+
             // Use requestAnimationFrame to ensure reset is applied before animation starts
             requestAnimationFrame(() => {
                 // Animate strikethrough appearing - use text width in pixels
@@ -394,42 +432,11 @@ const GoalItem: React.FC<GoalItemProps> = ({ goal, index, isRemoving, isNewlyApp
         }
     }, [isRemoving]);
 
-    // Cleanup timer on unmount
-    React.useEffect(() => {
-        return () => {
-            if (doubleTapTimer.current) {
-                clearTimeout(doubleTapTimer.current);
-            }
-        };
-    }, []);
 
-    const handlePress = (event: any) => {
+    const handleLongPress = (event: any) => {
         if (goal.completed || isRemoving) return;
-
-        const now = Date.now();
-        const timeSinceLastTap = now - lastTapTime.current;
-
-        // Clear any existing timer
-        if (doubleTapTimer.current) {
-            clearTimeout(doubleTapTimer.current);
-            doubleTapTimer.current = null;
-        }
-
-        // If taps are within 300ms, it's a double tap
-        if (timeSinceLastTap < 300) {
-            // Double tap detected
-            const { pageX, pageY } = event.nativeEvent;
-            goalItemRef.current?.measureInWindow((x, y) => {
-                onLongPress(pageX, pageY);
-            });
-            lastTapTime.current = 0; // Reset to prevent triple tap
-        } else {
-            // First tap - wait for potential second tap
-            lastTapTime.current = now;
-            doubleTapTimer.current = setTimeout(() => {
-                lastTapTime.current = 0; // Reset after timeout
-            }, 300);
-        }
+        const { pageX, pageY } = event.nativeEvent;
+        onLongPress(pageX, pageY);
     };
 
     return (
@@ -449,7 +456,7 @@ const GoalItem: React.FC<GoalItemProps> = ({ goal, index, isRemoving, isNewlyApp
             <TouchableOpacity
                 ref={goalItemRef}
                 style={styles.goalItem}
-                onPress={handlePress}
+                onLongPress={handleLongPress}
                 activeOpacity={0.7}
                 disabled={goal.completed || isRemoving}
             >
@@ -617,7 +624,7 @@ const styles = StyleSheet.create({
     emptyText: {
         fontSize: 14,
         fontFamily: fonts.regular,
-        color: '#CCCCCC',
+        color: 'rgba(37, 37, 37, 0.5)',
         textTransform: 'lowercase',
         textAlign: 'center',
     },
