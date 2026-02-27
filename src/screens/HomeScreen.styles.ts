@@ -1,5 +1,11 @@
 import { StyleSheet, Dimensions } from 'react-native';
 
+const screenWidth = Dimensions.get('window').width;
+const containerPadding = 25 * 2;
+const widgetSpacing = 16;
+const availableWidth = screenWidth - containerPadding - widgetSpacing;
+const widgetSize = availableWidth / 2;
+
 export const styles = StyleSheet.create({
     container: {
         flex: 1,
@@ -55,5 +61,13 @@ export const styles = StyleSheet.create({
     },
     logoutButton: {
         marginTop: 12,
+    },
+    widgetRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 16,
+    },
+    widgetSpacer: {
+        width: widgetSize,
     },
 });

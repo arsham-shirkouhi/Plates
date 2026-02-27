@@ -10,6 +10,7 @@ import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { MacroResultsScreen } from '../screens/MacroResultsScreen';
 import { FoodLogScreen } from '../screens/FoodLogScreen';
+import { ExerciseLogScreen } from '../screens/ExerciseLogScreen';
 import { UniversalNavBar } from '../components/UniversalNavBar';
 
 export type RootStackParamList = {
@@ -31,6 +32,7 @@ export type RootStackParamList = {
         goalIntensity: 'mild' | 'moderate' | 'aggressive';
     };
     FoodLog: undefined;
+    ExerciseLog: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -84,6 +86,14 @@ const NavigatorWithNavBar: React.FC = () => {
                 <Stack.Screen
                     name="FoodLog"
                     component={FoodLogScreen}
+                    options={{
+                        animation: 'slide_from_right',
+                        animationDuration: 300,
+                    }}
+                />
+                <Stack.Screen
+                    name="ExerciseLog"
+                    component={ExerciseLogScreen}
                     options={{
                         animation: 'slide_from_right',
                         animationDuration: 300,

@@ -14,7 +14,7 @@ import { FoodLog } from '../components/FoodLog';
 import { AIWidget } from '../components/AIWidget';
 import { TodaysGoalsWidget } from '../components/TodaysGoalsWidget';
 import { TimerWidget } from '../components/TimerWidget'; // ✅ ADD
-import { SquareWidget } from '../components/SquareWidget';
+import { QuickActionsWidget } from '../components/QuickActionsWidget';
 import { TestControls } from '../components/TestControls';
 import { GradientBackground } from '../components/GradientBackground';
 import { AuraOverlay } from '../components/AuraOverlay';
@@ -583,19 +583,26 @@ export const HomeScreen: React.FC = () => {
 
           <AIWidget />
 
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
+          <View style={styles.widgetRow}>
             <TodaysGoalsWidget
               goals={goals}
               onGoalsChange={handleGoalsChange}
               onOverlayChange={setShowGoalsOverlay}
             />
 
-            {/* ✅ TimerWidget added */}
+            <QuickActionsWidget
+              onLogFoodPress={() => navigation.navigate('FoodLog')}
+              onLogExercisePress={() => navigation.navigate('ExerciseLog')}
+            />
+          </View>
+
+          <View style={styles.widgetRow}>
             <TimerWidget
               initialMinutes={0}
               initialSeconds={300}
               onInteractionChange={handleTimerInteractionChange}
             />
+            <View style={styles.widgetSpacer} />
           </View>
 
           {!loadingProfile && macros && (
@@ -623,24 +630,6 @@ export const HomeScreen: React.FC = () => {
       </View>
 
       {showBorderRing && <AuraOverlay isActive={showBorderRing} />}
-
-      <LinearGradient
-        colors={['rgba(255, 255, 255, 0)', 'rgba(255, 255, 255, 1)']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={[
-          {
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: 150,
-            zIndex: 99,
-          },
-          { paddingBottom: insets.bottom },
-        ]}
-        pointerEvents="none"
-      />
 
       <AddFoodBottomSheet
         visible={showAddFoodSheet}
