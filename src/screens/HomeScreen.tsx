@@ -592,7 +592,7 @@ export const HomeScreen: React.FC = () => {
 
             <QuickActionsWidget
               onLogFoodPress={() => navigation.navigate('FoodLog')}
-              onLogExercisePress={() => navigation.navigate('ExerciseLog')}
+              onLogExercisePress={() => navigation.navigate('Workout')}
             />
           </View>
 
