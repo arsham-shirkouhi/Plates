@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useRef, useMemo } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { FoodItem } from '../services/foodService';
 import { AddFoodBottomSheet } from '../components/AddFoodBottomSheet';
 import { getQuickAddItems } from '../services/foodService';
@@ -15,8 +15,25 @@ const AddFoodContext = createContext<AddFoodContextType | undefined>(undefined);
 
 export const AddFoodProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [showSheet, setShowSheet] = useState(false);
+    const [quickAddItems, setQuickAddItems] = useState<FoodItem[]>([]);
     const handlerRef = useRef<((food: FoodItem) => void) | null>(null);
     const setSheetStateRef = useRef<((show: boolean) => void) | null>(null);
+
+    useEffect(() => {
+        let mounted = true;
+
+        const loadQuickAddItems = async () => {
+            const items = await getQuickAddItems();
+            if (mounted) {
+                setQuickAddItems(items);
+            }
+        };
+
+        loadQuickAddItems();
+        return () => {
+            mounted = false;
+        };
+    }, []);
 
     const showAddFoodSheet = useCallback(() => {
         setShowSheet(true);
@@ -73,7 +90,7 @@ export const AddFoodProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 visible={showSheet}
                 onClose={handleClose}
                 onAddFood={handleAddFood}
-                quickAddItems={getQuickAddItems()}
+                quickAddItems={quickAddItems}
             />
         </AddFoodContext.Provider>
     );

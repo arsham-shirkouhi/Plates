@@ -24,8 +24,9 @@ import { AddFoodBottomSheet } from '../components/AddFoodBottomSheet';
 import { MacroStatusCompact, MacroStatusCompactRef } from '../components/MacroStatusCompact';
 import { FoodLogHeaderSection } from '../components/FoodLogHeaderSection';
 import { UndoToast } from '../components/UndoToast';
-import { FoodItem, getQuickAddItems, searchFoods } from '../services/foodService';
+import { FoodItem, getQuickAddItems } from '../services/foodService';
 import { getDailyMacroLog, addToDailyMacroLog, subtractFromDailyMacroLog, getTodayDateString, getUserProfile, DailyMacroLog } from '../services/userService';
+import { createFoodLogEntry, deleteFoodLogEntry, getFoodLogEntriesForDate, MealType as DbMealType } from '../services/foodLogService';
 import { useAddFood } from '../context/AddFoodContext';
 import { useAuth } from '../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -51,6 +52,7 @@ export const FoodLogScreen: React.FC = () => {
     const { registerHandler, unregisterHandler, registerSheetState, unregisterSheetState } = useAddFood();
     const [loggedFoods, setLoggedFoods] = useState<LoggedFoodEntry[]>([]);
     const [showAddSheet, setShowAddSheet] = useState(false);
+    const [quickAddItems, setQuickAddItems] = useState<FoodItem[]>([]);
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [swipingId, setSwipingId] = useState<string | null>(null);
     const [targetMacros, setTargetMacros] = useState<{ calories?: number; protein?: number; carbs?: number; fats?: number } | null>(null);
@@ -210,17 +212,68 @@ export const FoodLogScreen: React.FC = () => {
         }
     }, [user]);
 
+    const isMealType = (value: string): value is MealType => {
+        return value === 'breakfast' || value === 'lunch' || value === 'dinner' || value === 'snack';
+    };
+
+    const loadFoodEntries = useCallback(async () => {
+        if (!user) {
+            setLoggedFoods([]);
+            return;
+        }
+
+        try {
+            const today = getTodayDateString();
+            const entries = await getFoodLogEntriesForDate(user, today);
+            const mappedEntries: LoggedFoodEntry[] = entries.map((entry) => ({
+                id: entry.id,
+                meal: isMealType(entry.meal) ? entry.meal : 'breakfast',
+                loggedAt: new Date(entry.created_at),
+                portion: entry.portion || '1 serving',
+                food: {
+                    id: entry.food_id || entry.id,
+                    name: entry.food_name,
+                    calories: Number(entry.calories) || 0,
+                    protein: Number(entry.protein) || 0,
+                    carbs: Number(entry.carbs) || 0,
+                    fats: Number(entry.fats) || 0,
+                },
+            }));
+            setLoggedFoods(mappedEntries);
+        } catch (error) {
+            console.error('Error loading food log entries:', error);
+        }
+    }, [user]);
+
     // Load daily log on mount and when screen comes into focus
     // This ensures we always read the latest values from the database (same as dashboard)
     useFocusEffect(
         useCallback(() => {
             loadDailyLog();
-        }, [loadDailyLog])
+            loadFoodEntries();
+        }, [loadDailyLog, loadFoodEntries])
     );
 
     // Also load on initial mount
     useEffect(() => {
         loadDailyLog();
+        loadFoodEntries();
+    }, [loadDailyLog, loadFoodEntries]);
+
+    useEffect(() => {
+        let mounted = true;
+
+        const loadQuickAddItems = async () => {
+            const items = await getQuickAddItems();
+            if (mounted) {
+                setQuickAddItems(items);
+            }
+        };
+
+        loadQuickAddItems();
+        return () => {
+            mounted = false;
+        };
     }, []);
 
     const [selectedMeal, setSelectedMeal] = useState<MealType | null>(null);
@@ -242,7 +295,7 @@ export const FoodLogScreen: React.FC = () => {
 
         const mealToUse = meal || selectedMeal || 'breakfast'; // Default to breakfast if no meal specified
         const newEntry: LoggedFoodEntry = {
-            id: Date.now().toString(),
+            id: `temp-${Date.now()}`,
             food,
             loggedAt: new Date(),
             meal: mealToUse,
@@ -269,8 +322,27 @@ export const FoodLogScreen: React.FC = () => {
         setLastAddedFood(newEntry);
         setShowUndoToast(true);
 
-        // Add to daily log in database
+        // Persist food entry + update daily macros in database
         try {
+            const createdEntry = await createFoodLogEntry(user, {
+                meal: mealToUse as DbMealType,
+                food,
+                portion: '1 serving',
+                loggedAt: new Date().toISOString(),
+            });
+
+            setLoggedFoods((prev) =>
+                prev.map((entry) =>
+                    entry.id === newEntry.id
+                        ? {
+                            ...entry,
+                            id: createdEntry.id,
+                            loggedAt: new Date(createdEntry.created_at),
+                        }
+                        : entry
+                )
+            );
+
             await addToDailyMacroLog(user, {
                 calories: food.calories,
                 protein: food.protein,
@@ -281,6 +353,9 @@ export const FoodLogScreen: React.FC = () => {
             await loadDailyLog();
         } catch (error) {
             console.error('Error adding food to daily log:', error);
+            setLoggedFoods((prev) => prev.filter((entry) => entry.id !== newEntry.id));
+            setShowUndoToast(false);
+            setLastAddedFood(null);
         }
     };
 
@@ -352,6 +427,10 @@ export const FoodLogScreen: React.FC = () => {
 
             // Subtract from daily log in database
             try {
+                if (!entry.id.startsWith('temp-')) {
+                    await deleteFoodLogEntry(user, entry.id);
+                }
+
                 await subtractFromDailyMacroLog(user, {
                     calories: entry.food.calories,
                     protein: entry.food.protein,
@@ -374,6 +453,10 @@ export const FoodLogScreen: React.FC = () => {
 
         // Subtract from daily log in database
         try {
+            if (!lastAddedFood.id.startsWith('temp-')) {
+                await deleteFoodLogEntry(user, lastAddedFood.id);
+            }
+
             await subtractFromDailyMacroLog(user, {
                 calories: lastAddedFood.food.calories,
                 protein: lastAddedFood.food.protein,
@@ -429,14 +512,7 @@ export const FoodLogScreen: React.FC = () => {
     // Use exact same logic as HomeScreen: baseConsumed = dailyLog || { calories: 0, protein: 0, carbs: 0, fats: 0 }
     const baseConsumed = dailyLog || { calories: 0, protein: 0, carbs: 0, fats: 0 };
 
-    // TEST VALUES - Remove this for production
-    const totals = {
-        protein: 156,
-        carbs: 234,
-        fats: 87,
-        calories: 2434,
-    };
-    // const totals = baseConsumed; // Uncomment this for production
+    const totals = baseConsumed;
 
 
     return (
@@ -721,7 +797,7 @@ export const FoodLogScreen: React.FC = () => {
                     setSelectedMeal(null);
                 }}
                 onAddFood={(food) => handleAddFood(food, selectedMeal || undefined)}
-                quickAddItems={getQuickAddItems()}
+                quickAddItems={quickAddItems}
                 initialMeal={selectedMeal}
                 onMealChange={(meal) => setSelectedMeal(meal)}
             />

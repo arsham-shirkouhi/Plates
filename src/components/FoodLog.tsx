@@ -15,11 +15,7 @@ interface FoodLogProps {
 }
 
 export const FoodLog: React.FC<FoodLogProps> = ({
-    items = [
-        { name: 'teh tarik', calories: 130, time: '5m' },
-        { name: 'roti canai', calories: 542, time: '15m' },
-        { name: 'kaya toast', calories: 230, time: '41m' },
-    ],
+    items = [],
     onPress
 }) => {
     return (
@@ -39,28 +35,32 @@ export const FoodLog: React.FC<FoodLogProps> = ({
 
             {/* Food items list */}
             <View style={styles.itemsContainer}>
-                {items.map((item, index) => (
-                    <View
-                        key={index}
-                        style={[
-                            styles.itemRow,
-                            index === 0 && styles.firstItemSpacing,
-                            index < items.length - 1 && styles.itemSpacing
-                        ]}
-                    >
-                        <Text style={styles.itemName}>{item.name}</Text>
-                        <View style={styles.itemRight}>
-                            <Text style={styles.itemCalories}>{item.calories} kcal</Text>
-                            <Image
-                                source={require('../../assets/images/icons/fire.png')}
-                                style={styles.flameIcon}
-                                resizeMode="contain"
-                            />
-                            <View style={styles.verticalSeparator} />
-                            <Text style={styles.itemTime}>{item.time}</Text>
+                {items.length > 0 ? (
+                    items.map((item, index) => (
+                        <View
+                            key={index}
+                            style={[
+                                styles.itemRow,
+                                index === 0 && styles.firstItemSpacing,
+                                index < items.length - 1 && styles.itemSpacing
+                            ]}
+                        >
+                            <Text style={styles.itemName}>{item.name}</Text>
+                            <View style={styles.itemRight}>
+                                <Text style={styles.itemCalories}>{item.calories} kcal</Text>
+                                <Image
+                                    source={require('../../assets/images/icons/fire.png')}
+                                    style={styles.flameIcon}
+                                    resizeMode="contain"
+                                />
+                                <View style={styles.verticalSeparator} />
+                                <Text style={styles.itemTime}>{item.time}</Text>
+                            </View>
                         </View>
-                    </View>
-                ))}
+                    ))
+                ) : (
+                    <Text style={styles.emptyText}>no meals logged yet</Text>
+                )}
             </View>
         </View>
     );
@@ -99,6 +99,14 @@ const styles = StyleSheet.create({
     },
     itemsContainer: {
         width: '100%',
+    },
+    emptyText: {
+        fontSize: 16,
+        fontFamily: fonts.regular,
+        color: '#9E9E9E',
+        textTransform: 'lowercase',
+        paddingTop: 20,
+        textAlign: 'center',
     },
     itemRow: {
         flexDirection: 'row',

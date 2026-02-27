@@ -40,6 +40,7 @@ import {
   copyDailyTasksFromYesterday,
   DailyTask,
 } from '../services/taskService';
+import { createFoodLogEntry, getFoodLogEntriesForDate, MealType as FoodLogMealType } from '../services/foodLogService';
 import { styles } from './HomeScreen.styles';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
@@ -49,10 +50,12 @@ const dataCache = {
   profile: null as UserProfile | null,
   dailyLog: null as DailyMacroLog | null,
   tasks: [] as DailyTask[],
+  foodLogPreview: [] as Array<{ name: string; calories: number; time: string }>,
   lastUpdate: {
     profile: 0,
     dailyLog: 0,
     tasks: 0,
+    foodLogPreview: 0,
   },
 };
 
@@ -74,11 +77,15 @@ export const HomeScreen: React.FC = () => {
   const [dailyLog, setDailyLog] = useState<DailyMacroLog | null>(dataCache.dailyLog);
   const [loadingLog, setLoadingLog] = useState(!dataCache.dailyLog);
   const [showAddFoodSheet, setShowAddFoodSheet] = useState(false);
+  const [quickAddItems, setQuickAddItems] = useState<FoodItem[]>([]);
   const [showGoalsOverlay, setShowGoalsOverlay] = useState(false);
 
   // Tasks state (loaded from database)
   const [tasks, setTasks] = useState<DailyTask[]>(dataCache.tasks);
   const [loadingTasks, setLoadingTasks] = useState(dataCache.tasks.length === 0);
+  const [foodLogPreview, setFoodLogPreview] = useState<Array<{ name: string; calories: number; time: string }>>(
+    dataCache.foodLogPreview
+  );
 
   // Aura overlay state
   const [showBorderRing, setShowBorderRing] = useState(false);
@@ -102,7 +109,8 @@ export const HomeScreen: React.FC = () => {
       dataCache.profile = null;
       dataCache.dailyLog = null;
       dataCache.tasks = [];
-      dataCache.lastUpdate = { profile: 0, dailyLog: 0, tasks: 0 };
+      dataCache.foodLogPreview = [];
+      dataCache.lastUpdate = { profile: 0, dailyLog: 0, tasks: 0, foodLogPreview: 0 };
 
       await logout();
       setTimeout(() => {
@@ -139,6 +147,50 @@ export const HomeScreen: React.FC = () => {
       console.error('Error loading user profile:', error);
     } finally {
       setLoadingProfile(false);
+    }
+  }, [user]);
+
+  const getTimeAgo = (createdAt: string) => {
+    const now = Date.now();
+    const loggedAt = new Date(createdAt).getTime();
+    const diffMins = Math.floor((now - loggedAt) / 60000);
+
+    if (diffMins < 1) return '0m';
+    if (diffMins < 60) return `${diffMins}m`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d`;
+  };
+
+  const getMealByTime = (): FoodLogMealType => {
+    const hour = new Date().getHours();
+    if (hour >= 6 && hour < 11) return 'breakfast';
+    if (hour >= 11 && hour < 15) return 'lunch';
+    if (hour >= 17 && hour < 22) return 'dinner';
+    return 'snack';
+  };
+
+  const loadFoodLogPreview = useCallback(async () => {
+    if (!user) {
+      setFoodLogPreview([]);
+      return;
+    }
+
+    try {
+      const today = getTodayDateString();
+      const entries = await getFoodLogEntriesForDate(user, today);
+      const previewItems = entries.slice(0, 3).map((entry) => ({
+        name: entry.food_name,
+        calories: Math.round(Number(entry.calories) || 0),
+        time: getTimeAgo(entry.created_at),
+      }));
+
+      dataCache.foodLogPreview = previewItems;
+      dataCache.lastUpdate.foodLogPreview = Date.now();
+      setFoodLogPreview(previewItems);
+    } catch (error) {
+      console.error('Error loading food log preview:', error);
     }
   }, [user]);
 
@@ -210,7 +262,11 @@ export const HomeScreen: React.FC = () => {
       if (dataCache.tasks.length === 0) setLoadingTasks(true);
 
       const today = getTodayDateString();
-      const [profile, log] = await Promise.all([getUserProfile(user), getDailyMacroLog(user, today)]);
+      const [profile, log, entries] = await Promise.all([
+        getUserProfile(user),
+        getDailyMacroLog(user, today),
+        getFoodLogEntriesForDate(user, today),
+      ]);
 
       if (profile) {
         dataCache.profile = profile;
@@ -221,6 +277,15 @@ export const HomeScreen: React.FC = () => {
       dataCache.dailyLog = log;
       dataCache.lastUpdate.dailyLog = Date.now();
       setDailyLog(log);
+
+      const previewItems = entries.slice(0, 3).map((entry) => ({
+        name: entry.food_name,
+        calories: Math.round(Number(entry.calories) || 0),
+        time: getTimeAgo(entry.created_at),
+      }));
+      dataCache.foodLogPreview = previewItems;
+      dataCache.lastUpdate.foodLogPreview = Date.now();
+      setFoodLogPreview(previewItems);
 
       try {
         await copyDailyTasksFromYesterday(user);
@@ -266,19 +331,25 @@ export const HomeScreen: React.FC = () => {
           carbs: food.carbs,
           fats: food.fats,
         });
+        await createFoodLogEntry(user, {
+          meal: getMealByTime(),
+          food,
+          portion: '1 serving',
+        });
 
         const today = getTodayDateString();
         const log = await getDailyMacroLog(user, today);
         dataCache.dailyLog = log;
         dataCache.lastUpdate.dailyLog = Date.now();
         setDailyLog(log);
+        await loadFoodLogPreview();
       } catch (error) {
         console.error('Error adding food:', error);
         Alert.alert('Error', 'Failed to add food. Please try again.');
         await loadDailyLog();
       }
     },
-    [user, dailyLog, loadDailyLog]
+    [user, dailyLog, loadDailyLog, loadFoodLogPreview]
   );
 
   const handleRemoveFood = useCallback(
@@ -309,13 +380,14 @@ export const HomeScreen: React.FC = () => {
         dataCache.dailyLog = log;
         dataCache.lastUpdate.dailyLog = Date.now();
         setDailyLog(log);
+        await loadFoodLogPreview();
       } catch (error) {
         console.error('Error removing food:', error);
         Alert.alert('Error', 'Failed to remove food. Please try again.');
         await loadDailyLog();
       }
     },
-    [user, dailyLog, loadDailyLog]
+    [user, dailyLog, loadDailyLog, loadFoodLogPreview]
   );
 
   useEffect(() => {
@@ -392,6 +464,22 @@ export const HomeScreen: React.FC = () => {
   useEffect(() => {
     loadAllData();
   }, [loadAllData]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadQuickAddItems = async () => {
+      const items = await getQuickAddItems();
+      if (mounted) {
+        setQuickAddItems(items);
+      }
+    };
+
+    loadQuickAddItems();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -579,7 +667,7 @@ export const HomeScreen: React.FC = () => {
 
           <MacrosCard macros={macros} consumed={consumed} loading={loadingProfile} />
 
-          <FoodLog onPress={() => navigation.navigate('FoodLog')} />
+          <FoodLog items={foodLogPreview} onPress={() => navigation.navigate('FoodLog')} />
 
           <AIWidget />
 
@@ -647,7 +735,7 @@ export const HomeScreen: React.FC = () => {
         onClose={() => setShowAddFoodSheet(false)}
         onAddFood={handleAddFood}
         onRemoveFood={handleRemoveFood}
-        quickAddItems={getQuickAddItems()}
+        quickAddItems={quickAddItems}
       />
     </View>
   );

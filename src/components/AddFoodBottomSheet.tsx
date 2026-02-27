@@ -442,12 +442,18 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
 
 
 
-    const handleSearch = (query: string) => {
+    const searchRequestIdRef = useRef(0);
+
+    const handleSearch = async (query: string) => {
         setSearchQuery(query);
         if (query.trim() === '') {
             setSearchResults([]);
         } else {
-            const results = searchFoods(query);
+            const requestId = ++searchRequestIdRef.current;
+            const results = await searchFoods(query);
+            if (requestId !== searchRequestIdRef.current) {
+                return;
+            }
             setSearchResults(results);
         }
     };
