@@ -11,7 +11,7 @@ import {
     Easing,
     TextInput,
     Alert,
-    Image,
+    // Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -524,15 +524,6 @@ export const FoodLogScreen: React.FC = () => {
                 alwaysBounceVertical={false}
                 decelerationRate="normal"
             >
-                {/* Gradient Background - Scrolls with content, extends into status bar */}
-                <View style={[styles.gradientContainer, { height: 300 + insets.top }]}>
-                    <Image
-                        source={require('../../assets/images/top_gradient.png')}
-                        style={styles.gradientImage}
-                        resizeMode="cover"
-                    />
-                </View>
-
                 {/* Header Section with Macros - Scrolls with content, positioned over gradient */}
                 <FoodLogHeaderSection
                     key={`${totals.protein}-${totals.carbs}-${totals.fats}-${totals.calories}`}
@@ -541,13 +532,10 @@ export const FoodLogScreen: React.FC = () => {
                     fats={totals.fats}
                     calories={totals.calories}
                     topInset={insets.top}
-                    onProfilePress={() => {
-                        // TODO: Navigate to profile screen
-                        Alert.alert('Profile', 'Profile screen coming soon');
-                    }}
                     onMacrosPress={() => {
                         setShowDailyMacrosOverlay(true);
                     }}
+                    onClosePress={() => navigation.goBack()}
                 />
                 {meals.map((meal, mealIndex) => {
                     const mealFoods = foodsByMeal[meal];
@@ -930,11 +918,6 @@ const FoodItemRow: React.FC<FoodItemRowProps> = ({ entry, timeAgo, index, isNewl
                 <Text style={styles.foodItemName}>{entry.food.name}</Text>
                 <View style={styles.foodItemRight}>
                     <Text style={styles.foodItemCalories}>{entry.food.calories}kcal</Text>
-                    <Image
-                        source={require('../../assets/images/icons/fire.png')}
-                        style={styles.foodItemFireIcon}
-                        resizeMode="contain"
-                    />
                     <View style={styles.foodItemVerticalSeparator} />
                     <Text style={styles.foodItemTime}>{timeAgo}</Text>
                 </View>

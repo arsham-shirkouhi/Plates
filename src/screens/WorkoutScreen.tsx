@@ -8,7 +8,7 @@ import {
     Animated,
     Dimensions,
     Easing,
-    Image,
+    // Image,
     TextInput,
     Modal,
     Alert,
@@ -90,7 +90,7 @@ export const WorkoutScreen: React.FC = () => {
     const screenHeight = Dimensions.get('window').height;
     const headerHeight = 200; // Header section height (gradient + header)
     const finishButtonHeight = 60; // Finish workout button height + margin
-    const navigationBarHeight = 80; // Navigation bar height + bottom inset + padding
+    const navigationBarHeight = 0; // Nav bar hidden
     const workoutBoxHeight = screenHeight - insets.top - headerHeight - finishButtonHeight - 50; // Minimal padding
 
     // Calculate available height for dashed box (accounting for navbar - browse button is commented out)
@@ -186,6 +186,17 @@ export const WorkoutScreen: React.FC = () => {
 
             // Clear params after handling to prevent re-triggering
             navigation.setParams({ startWorkoutType: undefined, workoutId: undefined });
+        }
+    }, [route.params, navigation]);
+
+    useEffect(() => {
+        if (route.params?.startWorkoutPrompt) {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            setShowCountdown(true);
+            setTimeout(() => {
+                startCountdown();
+            }, 50);
+            navigation.setParams({ startWorkoutPrompt: undefined });
         }
     }, [route.params, navigation]);
 
@@ -874,21 +885,12 @@ export const WorkoutScreen: React.FC = () => {
                 nestedScrollEnabled={true}
                 keyboardShouldPersistTaps="handled"
                 removeClippedSubviews={false}
-                scrollEnabled={false}
+                scrollEnabled={true}
                 bounces={false}
                 overScrollMode="never"
                 alwaysBounceVertical={false}
                 decelerationRate="normal"
             >
-                {/* Gradient Background */}
-                <View style={[styles.gradientContainer, { height: 300 + insets.top }]}>
-                    <Image
-                        source={require('../../assets/images/top_gradient.png')}
-                        style={styles.gradientImage}
-                        resizeMode="cover"
-                    />
-                </View>
-
                 {/* Header Section */}
                 <WorkoutHeaderSection
                     exerciseCount={exerciseCount}
@@ -903,6 +905,7 @@ export const WorkoutScreen: React.FC = () => {
                     totalReps={totalReps}
                     workoutDuration={workoutTimer}
                     hasNeverLoggedWorkout={hasNeverLoggedWorkout}
+                    onClosePress={() => navigation.goBack()}
                 />
 
                 {/* Empty State or Active Workout */}
@@ -1081,22 +1084,6 @@ export const WorkoutScreen: React.FC = () => {
                 onRequestClose={handleReceiptContinue}
             >
                 <View style={styles.receiptPage}>
-                    <Animated.Image
-                        source={require('../../assets/images/aura_ball.png')}
-                        style={[
-                            styles.receiptAuraTopRight,
-                            { transform: [{ rotate: '0deg' }] },
-                        ]}
-                        resizeMode="contain"
-                    />
-                    <Animated.Image
-                        source={require('../../assets/images/aura_ball.png')}
-                        style={[
-                            styles.receiptAuraBottomLeft,
-                            { transform: [{ rotate: '0deg' }] },
-                        ]}
-                        resizeMode="contain"
-                    />
                     <ScrollView
                         contentContainerStyle={[
                             styles.receiptScrollContent,

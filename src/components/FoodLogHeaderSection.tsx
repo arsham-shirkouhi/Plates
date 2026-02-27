@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { fonts } from '../constants/fonts';
 import * as Haptics from 'expo-haptics';
@@ -11,8 +11,8 @@ interface FoodLogHeaderSectionProps {
     fats: number;
     calories: number;
     topInset?: number;
-    onProfilePress?: () => void;
     onMacrosPress?: () => void;
+    onClosePress?: () => void;
 }
 
 export const FoodLogHeaderSection: React.FC<FoodLogHeaderSectionProps> = ({
@@ -21,13 +21,9 @@ export const FoodLogHeaderSection: React.FC<FoodLogHeaderSectionProps> = ({
     fats,
     calories,
     topInset = 0,
-    onProfilePress,
     onMacrosPress,
+    onClosePress,
 }) => {
-    // Animation values for circle positions
-    const profileCircleLeft = useRef(new Animated.Value(0)).current;
-    const greenCircleLeft = useRef(new Animated.Value(10)).current;
-
     // Animation values for count-up
     const proteinAnim = useRef(new Animated.Value(0)).current;
     const carbsAnim = useRef(new Animated.Value(0)).current;
@@ -49,38 +45,6 @@ export const FoodLogHeaderSection: React.FC<FoodLogHeaderSectionProps> = ({
     const [displayCarbs, setDisplayCarbs] = useState(0);
     const [displayFats, setDisplayFats] = useState(0);
     const [displayCalories, setDisplayCalories] = useState(0);
-
-    const handlePressIn = () => {
-        // Animate circles to stack on blue circle (at left: 20)
-        Animated.parallel([
-            Animated.timing(profileCircleLeft, {
-                toValue: 20,
-                duration: 150,
-                useNativeDriver: false,
-            }),
-            Animated.timing(greenCircleLeft, {
-                toValue: 20,
-                duration: 150,
-                useNativeDriver: false,
-            }),
-        ]).start();
-    };
-
-    const handlePressOut = () => {
-        // Animate circles back to original inline positions
-        Animated.parallel([
-            Animated.timing(profileCircleLeft, {
-                toValue: 0,
-                duration: 150,
-                useNativeDriver: false,
-            }),
-            Animated.timing(greenCircleLeft, {
-                toValue: 10,
-                duration: 150,
-                useNativeDriver: false,
-            }),
-        ]).start();
-    };
 
     // Animate values with haptic feedback
     useEffect(() => {
@@ -231,7 +195,7 @@ export const FoodLogHeaderSection: React.FC<FoodLogHeaderSectionProps> = ({
                     activeOpacity={0.7}
                     disabled={!onMacrosPress}
                 >
-                    <View style={styles.macroRow}>
+                    <View style={styles.macroRowWithClose}>
                         <View style={styles.macroItem}>
                             <View style={[styles.macroDot, styles.proteinDot]} />
                             <Text style={styles.macroLabel}><Text style={styles.macroLetter}>P</Text> {formatNumber(displayProtein)}g</Text>
@@ -251,25 +215,13 @@ export const FoodLogHeaderSection: React.FC<FoodLogHeaderSectionProps> = ({
                         <Text style={styles.caloriesText}>{formatNumber(displayCalories)}kcal</Text>
                     </View>
                 </TouchableOpacity>
-
-                {/* User icon */}
                 <TouchableOpacity
-                    onPress={onProfilePress}
-                    onPressIn={handlePressIn}
-                    onPressOut={handlePressOut}
-                    style={styles.profileButton}
+                    onPress={onClosePress}
+                    style={styles.closeInlineButton}
+                    activeOpacity={0.7}
+                    disabled={!onClosePress}
                 >
-                    <View style={styles.profileContainer}>
-                        <Animated.View style={[styles.profileCircle, { left: profileCircleLeft }]}>
-                            <Image
-                                source={require('../../assets/images/temp_pfp.png')}
-                                style={styles.profileImage}
-                                resizeMode="cover"
-                            />
-                        </Animated.View>
-                        <Animated.View style={[styles.profileCircleGreen, { left: greenCircleLeft }]} />
-                        <View style={styles.profileCircleBlue} />
-                    </View>
+                    <Ionicons name="close" size={26} color="#252525" />
                 </TouchableOpacity>
             </View>
         </View>
@@ -284,17 +236,18 @@ const styles = StyleSheet.create({
         paddingBottom: 20,
         zIndex: 1,
         elevation: 1, // Android elevation
-        marginTop: -300,
+        marginTop: 50,
     },
     topRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
+        alignItems: 'flex-start',
+        position: 'relative',
     },
     macroSection: {
         flex: 1,
     },
-    macroRow: {
+    macroRowWithClose: {
         flexDirection: 'row',
         alignItems: 'center',
         marginBottom: -4,
@@ -321,7 +274,7 @@ const styles = StyleSheet.create({
     macroLabel: {
         fontSize: 22,
         fontFamily: fonts.regular,
-        color: '#fff',
+        color: '#252525',
         textTransform: 'lowercase',
         marginBottom: 0,
     },
@@ -331,7 +284,7 @@ const styles = StyleSheet.create({
     separator: {
         fontSize: 16,
         fontFamily: fonts.regular,
-        color: 'rgba(255, 255, 255, 0.5)',
+        color: 'rgba(37, 37, 37, 0.5)',
         marginHorizontal: 12,
     },
     caloriesRow: {
@@ -342,56 +295,17 @@ const styles = StyleSheet.create({
     caloriesText: {
         fontSize: 32,
         fontFamily: fonts.bold,
-        color: '#fff',
+        color: '#252525',
         textTransform: 'lowercase',
     },
-    profileButton: {
-        marginLeft: 16,
-    },
-    profileContainer: {
-        flexDirection: 'row',
+    closeInlineButton: {
+        position: 'absolute',
+        top: -2,
+        right: 0,
+        width: 32,
+        height: 32,
         alignItems: 'center',
-        position: 'relative',
-        width: 80, // Main circle (60px) + blue circle extends to 80px
-    },
-    profileCircle: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: '#fff',
-        borderWidth: 2,
-        borderColor: '#252525',
         justifyContent: 'center',
-        alignItems: 'center',
-        position: 'absolute',
-        zIndex: 3,
-        overflow: 'hidden',
-    },
-    profileImage: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-    },
-    profileCircleGreen: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: '#26F170',
-        borderWidth: 2,
-        borderColor: '#252525',
-        position: 'absolute',
-        zIndex: 2,
-    },
-    profileCircleBlue: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: '#4463F7',
-        borderWidth: 2,
-        borderColor: '#252525',
-        position: 'absolute',
-        left: 20,
-        zIndex: 1,
     },
 });
 

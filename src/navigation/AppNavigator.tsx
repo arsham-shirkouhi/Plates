@@ -72,6 +72,7 @@ export type RootStackParamList = {
             sets: Array<{ id: string; reps: string; weight: string; completed?: boolean }>;
         }>;
         newlyCompletedExerciseIds?: string[];
+        startWorkoutPrompt?: boolean;
     } | undefined;
     StartWorkout: { selectedWorkoutId?: string } | undefined;
     BrowseWorkouts: undefined;

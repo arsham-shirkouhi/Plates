@@ -22,24 +22,32 @@ export const FoodLog: React.FC<FoodLogProps> = ({
     const { showAddFoodSheet } = useAddFood();
     const isEmpty = !items || items.length === 0;
     const lastTapRef = useRef<number>(0);
+    const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const DOUBLE_TAP_DELAY = 300;
 
     const handlePress = () => {
-        if (isEmpty) {
-            // Double tap detection for empty state
-            const now = Date.now();
-            if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
-                // Double tap detected - open the add food sheet
-                showAddFoodSheet();
-                lastTapRef.current = 0; // Reset to prevent triple tap
-            } else {
-                // First tap - just record it
-                lastTapRef.current = now;
+        const now = Date.now();
+
+        if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
+            if (tapTimeoutRef.current) {
+                clearTimeout(tapTimeoutRef.current);
+                tapTimeoutRef.current = null;
             }
-        } else if (onPress) {
-            // If has items, navigate to FoodLog page (single tap)
-            onPress();
+            lastTapRef.current = 0;
+            showAddFoodSheet();
+            return;
         }
+
+        lastTapRef.current = now;
+        if (tapTimeoutRef.current) {
+            clearTimeout(tapTimeoutRef.current);
+        }
+        tapTimeoutRef.current = setTimeout(() => {
+            tapTimeoutRef.current = null;
+            if (onPress) {
+                onPress();
+            }
+        }, DOUBLE_TAP_DELAY);
     };
 
     return (
@@ -60,7 +68,7 @@ export const FoodLog: React.FC<FoodLogProps> = ({
             {/* Food items list or empty state */}
             {isEmpty ? (
                 <View style={styles.emptyStateContainer}>
-                    <Text style={styles.emptyStateText}>double tap to log meal!</Text>
+                    <Text style={styles.emptyStateText}>tap to view, double tap to log meal!</Text>
                 </View>
             ) : (
             <View style={styles.itemsContainer}>

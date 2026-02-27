@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { fonts } from '../constants/fonts';
 import * as Haptics from 'expo-haptics';
@@ -10,7 +10,6 @@ interface WorkoutHeaderSectionProps {
     setCount: number;
     duration: number; // in minutes
     topInset?: number;
-    onProfilePress?: () => void;
     isEmpty?: boolean; // Show empty state text when true
     isActive?: boolean; // Show active workout stats (sets/reps) when true
     completedSets?: number;
@@ -19,6 +18,7 @@ interface WorkoutHeaderSectionProps {
     totalReps?: number; // Total reps across all sets
     workoutDuration?: number; // in seconds for timer
     hasNeverLoggedWorkout?: boolean; // True if user has never logged a workout
+    onClosePress?: () => void;
 }
 
 export const WorkoutHeaderSection: React.FC<WorkoutHeaderSectionProps> = ({
@@ -26,7 +26,6 @@ export const WorkoutHeaderSection: React.FC<WorkoutHeaderSectionProps> = ({
     setCount,
     duration,
     topInset = 0,
-    onProfilePress,
     isEmpty = false,
     isActive = false,
     completedSets = 0,
@@ -35,11 +34,8 @@ export const WorkoutHeaderSection: React.FC<WorkoutHeaderSectionProps> = ({
     totalReps = 0,
     workoutDuration = 0,
     hasNeverLoggedWorkout = false,
+    onClosePress,
 }) => {
-    // Animation values for circle positions
-    const profileCircleLeft = useRef(new Animated.Value(0)).current;
-    const greenCircleLeft = useRef(new Animated.Value(10)).current;
-
     // Animation values for count-up
     const exerciseAnim = useRef(new Animated.Value(0)).current;
     const setAnim = useRef(new Animated.Value(0)).current;
@@ -62,36 +58,6 @@ export const WorkoutHeaderSection: React.FC<WorkoutHeaderSectionProps> = ({
     const [displayCompletedReps, setDisplayCompletedReps] = useState(0);
     const [displayTotalSets, setDisplayTotalSets] = useState(0);
     const [displayTotalReps, setDisplayTotalReps] = useState(0);
-
-    const handlePressIn = () => {
-        Animated.parallel([
-            Animated.timing(profileCircleLeft, {
-                toValue: 20,
-                duration: 150,
-                useNativeDriver: false,
-            }),
-            Animated.timing(greenCircleLeft, {
-                toValue: 20,
-                duration: 150,
-                useNativeDriver: false,
-            }),
-        ]).start();
-    };
-
-    const handlePressOut = () => {
-        Animated.parallel([
-            Animated.timing(profileCircleLeft, {
-                toValue: 0,
-                duration: 150,
-                useNativeDriver: false,
-            }),
-            Animated.timing(greenCircleLeft, {
-                toValue: 10,
-                duration: 150,
-                useNativeDriver: false,
-            }),
-        ]).start();
-    };
 
     // Animate completed sets/reps and exercise count when in active mode
     useEffect(() => {
@@ -242,7 +208,7 @@ export const WorkoutHeaderSection: React.FC<WorkoutHeaderSectionProps> = ({
                         </View>
                     ) : isActive ? (
                         <>
-                            <View style={styles.statsRow}>
+                            <View style={styles.statsRowWithClose}>
                                 <View style={styles.statItem}>
                                     <Text style={styles.statLabel}>sets</Text>
                                     <Text style={styles.statValue}>{displayCompletedSets}</Text>
@@ -258,7 +224,7 @@ export const WorkoutHeaderSection: React.FC<WorkoutHeaderSectionProps> = ({
                             </View>
                         </>
                     ) : (
-                        <View style={styles.statsRow}>
+                        <View style={styles.statsRowWithClose}>
                             <View style={styles.statItem}>
                                 <Text style={styles.statLabel}>exercises</Text>
                                 <Text style={styles.statValue}>{displayExercise}</Text>
@@ -276,25 +242,13 @@ export const WorkoutHeaderSection: React.FC<WorkoutHeaderSectionProps> = ({
                         </View>
                     )}
                 </View>
-
-                {/* User icon */}
                 <TouchableOpacity
-                    onPress={onProfilePress}
-                    onPressIn={handlePressIn}
-                    onPressOut={handlePressOut}
-                    style={styles.profileButton}
+                    onPress={onClosePress}
+                    style={styles.closeInlineButton}
+                    activeOpacity={0.7}
+                    disabled={!onClosePress}
                 >
-                    <View style={styles.profileContainer}>
-                        <Animated.View style={[styles.profileCircle, { left: profileCircleLeft }]}>
-                            <Image
-                                source={require('../../assets/images/temp_pfp.png')}
-                                style={styles.profileImage}
-                                resizeMode="cover"
-                            />
-                        </Animated.View>
-                        <Animated.View style={[styles.profileCircleGreen, { left: greenCircleLeft }]} />
-                        <View style={styles.profileCircleBlue} />
-                    </View>
+                    <Ionicons name="close" size={26} color="#252525" />
                 </TouchableOpacity>
             </View>
         </View>
@@ -308,17 +262,18 @@ const styles = StyleSheet.create({
         paddingBottom: 20,
         zIndex: 1,
         elevation: 1,
-        marginTop: -300,
+        marginTop: 50,
     },
     topRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
+        alignItems: 'flex-start',
+        position: 'relative',
     },
     statsSection: {
         flex: 1,
     },
-    statsRow: {
+    statsRowWithClose: {
         flexDirection: 'row',
         alignItems: 'center',
         marginBottom: -4,
@@ -331,69 +286,21 @@ const styles = StyleSheet.create({
     statLabel: {
         fontSize: 22,
         fontFamily: fonts.regular,
-        color: '#fff',
+        color: '#252525',
         textTransform: 'lowercase',
         marginRight: 6,
     },
     statValue: {
         fontSize: 22,
         fontFamily: fonts.regular,
-        color: '#fff',
+        color: '#252525',
         textTransform: 'lowercase',
     },
     separator: {
         fontSize: 16,
         fontFamily: fonts.regular,
-        color: 'rgba(255, 255, 255, 0.5)',
+        color: 'rgba(37, 37, 37, 0.5)',
         marginHorizontal: 12,
-    },
-    profileButton: {
-        marginLeft: 16,
-    },
-    profileContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        position: 'relative',
-        width: 80,
-    },
-    profileCircle: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: '#fff',
-        borderWidth: 2,
-        borderColor: '#252525',
-        justifyContent: 'center',
-        alignItems: 'center',
-        position: 'absolute',
-        zIndex: 3,
-        overflow: 'hidden',
-    },
-    profileImage: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-    },
-    profileCircleGreen: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: '#26F170',
-        borderWidth: 2,
-        borderColor: '#252525',
-        position: 'absolute',
-        zIndex: 2,
-    },
-    profileCircleBlue: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: '#4463F7',
-        borderWidth: 2,
-        borderColor: '#252525',
-        position: 'absolute',
-        left: 20,
-        zIndex: 1,
     },
     emptyStateTextContainer: {
         flexDirection: 'column',
@@ -402,14 +309,14 @@ const styles = StyleSheet.create({
     emptyStateTextSmall: {
         fontSize: 22,
         fontFamily: fonts.regular,
-        color: '#fff',
+        color: '#252525',
         textTransform: 'lowercase',
         marginBottom: -3,
     },
     emptyStateTextLarge: {
         fontSize: 32,
         fontFamily: fonts.bold,
-        color: '#fff',
+        color: '#252525',
         textTransform: 'lowercase',
     },
     timerRow: {
@@ -420,8 +327,17 @@ const styles = StyleSheet.create({
     timerText: {
         fontSize: 32,
         fontFamily: fonts.bold,
-        color: '#fff',
+        color: '#252525',
         textTransform: 'lowercase',
+    },
+    closeInlineButton: {
+        position: 'absolute',
+        top: -2,
+        right: 0,
+        width: 32,
+        height: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
 });
 

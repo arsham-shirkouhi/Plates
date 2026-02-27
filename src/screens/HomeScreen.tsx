@@ -18,7 +18,7 @@ import { QuickActionsWidget } from '../components/QuickActionsWidget';
 import { TestControls } from '../components/TestControls';
 import { GradientBackground } from '../components/GradientBackground';
 import { AuraOverlay } from '../components/AuraOverlay';
-import { AddFoodBottomSheet } from '../components/AddFoodBottomSheet';
+import { ScrollingGridBackground } from '../components/ScrollingGridBackground';
 import {
   resetOnboarding,
   getUserProfile,
@@ -60,7 +60,13 @@ export const HomeScreen: React.FC = () => {
   const { user, logout } = useAuth();
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const insets = useSafeAreaInsets();
-  const { registerHandler, unregisterHandler, registerSheetState, unregisterSheetState } = useAddFood();
+  const {
+    registerHandler,
+    unregisterHandler,
+    registerSheetState,
+    unregisterSheetState,
+    showAddFoodSheet: openAddFoodSheet,
+  } = useAddFood();
   const [loggingOut, setLoggingOut] = useState(false);
   const [resettingOnboarding, setResettingOnboarding] = useState(false);
 
@@ -520,6 +526,8 @@ export const HomeScreen: React.FC = () => {
   useEffect(() => {
     if (showAddFoodSheet || showGoalsOverlay) {
       setShowBorderRing(false);
+      // Lock scroll while overlays are open
+      setScrollEnabled(false);
       if (longPressTimerRef.current) {
         clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = null;
@@ -528,6 +536,9 @@ export const HomeScreen: React.FC = () => {
         clearInterval(hapticIntervalRef.current);
         hapticIntervalRef.current = null;
       }
+    } else {
+      // Restore scroll once overlays are closed
+      setScrollEnabled(!scrollLockRef.current);
     }
   }, [showAddFoodSheet, showGoalsOverlay]);
 
@@ -555,6 +566,7 @@ export const HomeScreen: React.FC = () => {
         style={{ flex: 1 }}
         pointerEvents={showAddFoodSheet || showGoalsOverlay ? 'none' : 'auto'}
       >
+        <ScrollingGridBackground />
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
@@ -591,8 +603,21 @@ export const HomeScreen: React.FC = () => {
             />
 
             <QuickActionsWidget
-              onLogFoodPress={() => navigation.navigate('FoodLog')}
-              onLogExercisePress={() => navigation.navigate('Workout')}
+              onLogFoodPress={() => openAddFoodSheet()}
+              onLogExercisePress={() => {
+                Alert.alert(
+                  'Start Workout',
+                  'Do you want to start a workout?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Start',
+                      onPress: () => navigation.navigate('Workout', { startWorkoutPrompt: true }),
+                    },
+                  ],
+                  { cancelable: true }
+                );
+              }}
             />
           </View>
 
@@ -631,13 +656,6 @@ export const HomeScreen: React.FC = () => {
 
       {showBorderRing && <AuraOverlay isActive={showBorderRing} />}
 
-      <AddFoodBottomSheet
-        visible={showAddFoodSheet}
-        onClose={() => setShowAddFoodSheet(false)}
-        onAddFood={handleAddFood}
-        onRemoveFood={handleRemoveFood}
-        quickAddItems={getQuickAddItems()}
-      />
     </View>
   );
 };
