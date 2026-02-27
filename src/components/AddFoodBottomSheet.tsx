@@ -8,10 +8,8 @@ import {
     Animated,
     Dimensions,
     Keyboard,
-    Platform,
     ScrollView,
     PanResponder,
-    KeyboardAvoidingView,
     Easing,
     Image,
     Modal,
@@ -102,7 +100,6 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
     const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT + TOASTER_OFFSET)).current;
     const backdropOpacity = useRef(new Animated.Value(0)).current;
     const searchInputRef = useRef<TextInput>(null);
-    const keyboardHeightAnim = useRef(new Animated.Value(0)).current;
     const sheetHeightAnim = useRef(new Animated.Value(SHEET_HEIGHT)).current;
     const aiSuggestionOpacity = useRef(new Animated.Value(0)).current;
     const aiSuggestionTranslateY = useRef(new Animated.Value(20)).current;
@@ -294,7 +291,6 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
                 setSelectedFoodDetail(null);
                 setShowUnitSelector(false);
                 sheetHeightAnim.setValue(SHEET_HEIGHT);
-                keyboardHeightAnim.setValue(0);
                 aiSuggestionOpacity.setValue(0);
                 aiSuggestionTranslateY.setValue(20);
                 skeletonAnim.setValue(0);
@@ -320,45 +316,6 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
         }).start();
     }, [searchQuery, searchResults.length]);
 
-    // Handle keyboard show/hide - animate at same speed as keyboard
-    useEffect(() => {
-        const keyboardWillShow = Keyboard.addListener(
-            Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-            (e) => {
-                // Use the keyboard's animation duration to match its speed
-                const duration = Platform.OS === 'ios'
-                    ? (e.duration || 250)
-                    : 250; // Android doesn't provide duration, use default
-
-                Animated.timing(keyboardHeightAnim, {
-                    toValue: -e.endCoordinates.height, // Negative to move up (translateY)
-                    duration: duration,
-                    useNativeDriver: true, // Use native driver for translateY
-                }).start();
-            }
-        );
-        const keyboardWillHide = Keyboard.addListener(
-            Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-            (e) => {
-                // Use the keyboard's animation duration to match its speed
-                const duration = Platform.OS === 'ios'
-                    ? (e.duration || 250)
-                    : 250;
-
-                Animated.timing(keyboardHeightAnim, {
-                    toValue: 0,
-                    duration: duration,
-                    useNativeDriver: true,
-                }).start();
-            }
-        );
-
-        return () => {
-            keyboardWillShow.remove();
-            keyboardWillHide.remove();
-        };
-    }, []);
-
     const handleClose = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -374,7 +331,6 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
         setSelectedFoodDetail(null);
         setShowUnitSelector(false);
         sheetHeightAnim.setValue(SHEET_HEIGHT);
-        keyboardHeightAnim.setValue(0);
         aiSuggestionOpacity.setValue(0);
         aiSuggestionTranslateY.setValue(20);
         skeletonAnim.setValue(0);
@@ -645,7 +601,7 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
                         {
                             transform: [
                                 {
-                                    translateY: Animated.add(slideAnim, keyboardHeightAnim)
+                                    translateY: slideAnim
                                 },
                             ],
                         },
