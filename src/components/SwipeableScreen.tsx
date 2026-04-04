@@ -4,6 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useOverlay } from '../contexts/OverlayContext';
+import { useWorkoutOverlay } from '../contexts/WorkoutOverlayContext';
 import * as Haptics from 'expo-haptics';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -19,6 +20,7 @@ const VELOCITY_THRESHOLD = 0.5; // Minimum velocity to trigger swipe
 
 export const SwipeableScreen: React.FC<SwipeableScreenProps> = ({ children, screenName }) => {
     const navigation = useNavigation<NavigationProp>();
+    const { open: openWorkoutOverlay } = useWorkoutOverlay();
     const { isAnyOverlayOpen } = useOverlay();
     const isAnyOverlayOpenRef = useRef(isAnyOverlayOpen);
 
@@ -52,22 +54,33 @@ export const SwipeableScreen: React.FC<SwipeableScreenProps> = ({ children, scre
                 const isSwipeLeft = dx > SWIPE_THRESHOLD || (vx > VELOCITY_THRESHOLD && dx > 20);
 
                 if (isSwipeRight && currentIndex < SCREEN_ORDER.length - 1) {
-                    // Swipe right - go to next screen
                     const nextScreen = SCREEN_ORDER[currentIndex + 1];
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    navigation.navigate(nextScreen);
+                    if (nextScreen === 'Workout') {
+                        openWorkoutOverlay();
+                    } else {
+                        navigation.navigate(nextScreen);
+                    }
                 } else if (isSwipeLeft && currentIndex > 0) {
-                    // Swipe left - go to previous screen
                     const prevScreen = SCREEN_ORDER[currentIndex - 1];
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    navigation.navigate(prevScreen);
+                    if (prevScreen === 'Workout') {
+                        openWorkoutOverlay();
+                    } else {
+                        navigation.navigate(prevScreen);
+                    }
                 }
             },
         })
     ).current;
 
     return (
-        <View style={{ flex: 1 }} {...panResponder.panHandlers}>
+        <View
+            style={{ flex: 1, backgroundColor: 'transparent' }}
+            /** Workout tab content is an overlay; `box-none` keeps empty areas from stealing touches from the dashboard below */
+            pointerEvents={screenName === 'Workout' ? 'box-none' : 'auto'}
+            {...panResponder.panHandlers}
+        >
             {children}
         </View>
     );

@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { useWorkoutOverlay } from '../contexts/WorkoutOverlayContext';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../constants/fonts';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -24,6 +25,7 @@ type StartWorkoutScreenRouteProp = RouteProp<RootStackParamList, 'StartWorkout'>
 export const StartWorkoutScreen: React.FC = () => {
     const navigation = useNavigation<StartWorkoutScreenNavigationProp>();
     const route = useRoute<StartWorkoutScreenRouteProp>();
+    const { open: openWorkoutOverlay } = useWorkoutOverlay();
     const insets = useSafeAreaInsets();
     
     // Get selected workout ID if coming from BrowseWorkouts
@@ -82,10 +84,11 @@ export const StartWorkoutScreen: React.FC = () => {
 
         // For other options, navigate back to Workout screen with workout started
         // The Workout screen will handle starting the workout based on the type
-        navigation.navigate('Workout', {
+        openWorkoutOverlay({
             startWorkoutType: type === 'previous' ? 'previous' : type,
-            workoutId: workoutId
+            workoutId: workoutId,
         });
+        navigation.goBack();
     };
 
     return (

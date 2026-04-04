@@ -31,6 +31,7 @@ import {
 } from '../services/userService';
 import { getQuickAddItems, FoodItem } from '../services/foodService';
 import { useAddFood } from '../context/AddFoodContext';
+import { useWorkoutOverlay } from '../contexts/WorkoutOverlayContext';
 import {
   getDailyTasks,
   createDailyTask,
@@ -67,6 +68,7 @@ export const HomeScreen: React.FC = () => {
     unregisterSheetState,
     showAddFoodSheet: openAddFoodSheet,
   } = useAddFood();
+  const { open: openWorkoutOverlay } = useWorkoutOverlay();
   const [loggingOut, setLoggingOut] = useState(false);
   const [resettingOnboarding, setResettingOnboarding] = useState(false);
 
@@ -612,7 +614,7 @@ export const HomeScreen: React.FC = () => {
                     { text: 'Cancel', style: 'cancel' },
                     {
                       text: 'Start',
-                      onPress: () => navigation.navigate('Workout', { startWorkoutPrompt: true }),
+                      onPress: () => openWorkoutOverlay({ startWorkoutPrompt: true }),
                     },
                   ],
                   { cancelable: true }

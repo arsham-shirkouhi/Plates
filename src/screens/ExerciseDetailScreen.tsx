@@ -24,6 +24,7 @@ import { fonts } from '../constants/fonts';
 import { PlateSlider } from '../components/PlateSlider';
 import { Slider } from '../components/Slider';
 import { getExerciseDetails } from '../services/exerciseService';
+import { useWorkoutOverlay } from '../contexts/WorkoutOverlayContext';
 
 type ExerciseDetailScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'ExerciseDetail'>;
 type ExerciseDetailScreenRouteProp = RouteProp<RootStackParamList, 'ExerciseDetail'>;
@@ -76,6 +77,7 @@ const getMiniPlateSize = (weightValue: number): number => {
 export const ExerciseDetailScreen: React.FC = () => {
     const navigation = useNavigation<ExerciseDetailScreenNavigationProp>();
     const route = useRoute<ExerciseDetailScreenRouteProp>();
+    const { mergeParams: mergeWorkoutOverlayParams } = useWorkoutOverlay();
     const insets = useSafeAreaInsets();
 
     const { exercise: initialExercise, exerciseId, allExercises, currentExerciseIndex } = route.params;
@@ -407,10 +409,11 @@ export const ExerciseDetailScreen: React.FC = () => {
             }
         });
 
-        navigation.navigate('Workout', {
+        mergeWorkoutOverlayParams({
             updatedExercises: updatedExercises,
             newlyCompletedExerciseIds: newlyCompletedExercises,
-        } as any);
+        });
+        navigation.goBack();
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     };
 
@@ -456,10 +459,11 @@ export const ExerciseDetailScreen: React.FC = () => {
                             };
                         });
 
-                        navigation.navigate('Workout', {
+                        mergeWorkoutOverlayParams({
                             updatedExercises: exercisesToReturn,
                             newlyCompletedExerciseIds: [],
-                        } as any);
+                        });
+                        navigation.goBack();
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                     },
                 },

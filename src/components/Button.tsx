@@ -11,6 +11,8 @@ interface ButtonProps extends Omit<TouchableOpacityProps, 'style'> {
     icon?: ImageSourcePropType;
     containerStyle?: ViewStyle;
     textStyle?: TextStyle;
+    /** Merged over variant body styles (e.g. compact margins for toolbars) */
+    buttonBodyStyle?: ViewStyle;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -21,6 +23,7 @@ export const Button: React.FC<ButtonProps> = ({
     disabled,
     containerStyle,
     textStyle,
+    buttonBodyStyle,
     ...props
 }) => {
     const isDisabled = disabled || loading;
@@ -279,17 +282,27 @@ export const Button: React.FC<ButtonProps> = ({
     // Link variant returns early above, so we know variant is not 'link' here
     if (variant === 'primary' || variant === 'google' || variant === 'secondary') {
         const buttonStyle = getButtonStyle();
+        const mergedBody = { ...buttonStyle, ...buttonBodyStyle };
         
         // Allow width override from containerStyle (supports both number and string like '100%')
         const containerWidth = containerStyle?.width;
-        const effectiveWidth = containerWidth !== undefined ? containerWidth : buttonStyle.width;
-        const buttonWidth = containerWidth !== undefined ? containerWidth : buttonStyle.width;
+        const effectiveWidth = containerWidth !== undefined ? containerWidth : mergedBody.width;
+        const buttonWidth = containerWidth !== undefined ? containerWidth : mergedBody.width;
+
+        const shadowH =
+            typeof mergedBody.height === 'number' ? mergedBody.height : (buttonStyle.height as number);
+        const shadowMarginTop =
+            typeof mergedBody.marginTop === 'number'
+                ? mergedBody.marginTop
+                : typeof buttonStyle.marginTop === 'number'
+                  ? buttonStyle.marginTop
+                  : 0;
 
         // Extract dimensions for shadow (without margins)
         const shadowStyle: ViewStyle = {
             width: typeof effectiveWidth === 'number' ? effectiveWidth : '100%',
-            height: buttonStyle.height,
-            borderRadius: buttonStyle.borderRadius || 12,
+            height: shadowH,
+            borderRadius: mergedBody.borderRadius || buttonStyle.borderRadius || 12,
             backgroundColor: '#252525',
         };
 
@@ -301,7 +314,7 @@ export const Button: React.FC<ButtonProps> = ({
                         shadowStyle,
                         {
                             position: 'absolute',
-                            top: ((typeof buttonStyle.marginTop === 'number' ? buttonStyle.marginTop : 0) + 4), // Account for button margin + 4px offset
+                            top: shadowMarginTop + 4, // Account for button margin + 4px offset
                             alignSelf: 'center',
                             transform: [
                                 {
@@ -331,6 +344,7 @@ export const Button: React.FC<ButtonProps> = ({
                     <Animated.View
                         style={[
                             buttonStyle,
+                            buttonBodyStyle,
                             isDisabled && styles.disabledButton,
                             {
                                 transform: [{ translateY }],

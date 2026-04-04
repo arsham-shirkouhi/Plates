@@ -9,7 +9,7 @@ import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { MacroResultsScreen } from '../screens/MacroResultsScreen';
 import { MealDetailScreen } from '../screens/MealDetailScreen';
-import { PreloadedHomeScreen, PreloadedFoodLogScreen, PreloadedWorkoutScreen } from './PreloadedScreens';
+import { PreloadedHomeScreen, PreloadedFoodLogScreen } from './PreloadedScreens';
 import { StartWorkoutScreen } from '../screens/StartWorkoutScreen';
 import { BrowseWorkoutsScreen } from '../screens/BrowseWorkoutsScreen';
 import { ExerciseDetailScreen } from '../screens/ExerciseDetailScreen';
@@ -18,92 +18,12 @@ import { ExerciseLogScreen } from '../screens/ExerciseLogScreen';
 import { UniversalNavBar } from '../components/UniversalNavBar';
 import { SimpleNavBar } from '../components/SimpleNavBar';
 import { ScreenPreloader } from '../components/ScreenPreloader';
+import { rootNavigationRef } from './rootNavigationRef';
+import { WorkoutOverlayProvider } from '../contexts/WorkoutOverlayContext';
+import { WorkoutOverlayHost } from '../components/WorkoutOverlayHost';
 
-export type RootStackParamList = {
-    Login: undefined;
-    Signup: undefined;
-    Home: undefined;
-    Verification: { email?: string };
-    ForgotPassword: undefined;
-    Onboarding: undefined;
-    MacroResults: {
-        macros: {
-            calories: number;
-            protein: number;
-            carbs: number;
-            fats: number;
-            baseTDEE?: number;
-        };
-        goal: 'lose' | 'maintain' | 'build';
-        goalIntensity: 'mild' | 'moderate' | 'aggressive';
-    };
-    FoodLog: undefined;
-    ExerciseLog: undefined;
-    MealDetail: {
-        meal: 'breakfast' | 'lunch' | 'dinner' | 'snack';
-        foods: Array<{
-            id: string;
-            food: {
-                name: string;
-                calories: number;
-                protein: number;
-                carbs: number;
-                fats: number;
-            };
-            loggedAt: string; // ISO string
-            meal: 'breakfast' | 'lunch' | 'dinner' | 'snack';
-            portion?: string;
-        }>;
-        mealTotal: {
-            calories: number;
-            protein: number;
-            carbs: number;
-            fats: number;
-        };
-    };
-    Workout: {
-        startWorkoutType?: 'pick-as-you-go' | 'previous' | 'new' | 'schedule';
-        workoutId?: string;
-        updatedExerciseId?: string;
-        updatedSets?: Array<{ id: string; reps: string; weight: string; completed?: boolean }>;
-        updatedExercises?: Array<{
-            id: string;
-            name: string;
-            sets: Array<{ id: string; reps: string; weight: string; completed?: boolean }>;
-        }>;
-        newlyCompletedExerciseIds?: string[];
-        startWorkoutPrompt?: boolean;
-    } | undefined;
-    StartWorkout: { selectedWorkoutId?: string } | undefined;
-    BrowseWorkouts: undefined;
-    ExerciseDetail: {
-        exercise: {
-            id: string;
-            name: string;
-            sets: Array<{
-                id: string;
-                reps: string;
-                weight: string;
-                completed?: boolean;
-            }>;
-        };
-        exerciseId: string;
-        allExercises?: Array<{
-            id: string;
-            name: string;
-            sets: Array<{
-                id: string;
-                reps: string;
-                weight: string;
-                completed?: boolean;
-            }>;
-        }>;
-        currentExerciseIndex?: number;
-    };
-    ExerciseInfo: {
-        exerciseId: string;
-    };
-};
+export type { RootStackParamList } from './navigationParamList';
+import type { RootStackParamList } from './navigationParamList';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -159,7 +79,8 @@ const NavigatorWithNavBar: React.FC = () => {
                         gestureEnabled: true,
                         animation: 'slide_from_right',
                         animationDuration: 200,
-                        // Screen is preloaded and ready for smooth swiping
+                        /** Stay unfrozen when Workout `transparentModal` is on top so the dashboard can scroll */
+                        freezeOnBlur: false,
                     }}
                 />
                 <Stack.Screen
@@ -169,7 +90,7 @@ const NavigatorWithNavBar: React.FC = () => {
                         gestureEnabled: true,
                         animation: 'slide_from_right',
                         animationDuration: 200,
-                        // Screen is preloaded and ready for smooth swiping
+                        freezeOnBlur: false,
                     }}
                 />
                 <Stack.Screen
@@ -178,16 +99,6 @@ const NavigatorWithNavBar: React.FC = () => {
                     options={{
                         animation: 'slide_from_right',
                         animationDuration: 300,
-                    }}
-                />
-                <Stack.Screen
-                    name="Workout"
-                    component={PreloadedWorkoutScreen}
-                    options={{
-                        gestureEnabled: true,
-                        animation: 'slide_from_right',
-                        animationDuration: 200,
-                        // Screen is preloaded and ready for smooth swiping
                     }}
                 />
                 <Stack.Screen
@@ -243,9 +154,12 @@ const NavigatorWithNavBar: React.FC = () => {
 
 export const AppNavigator: React.FC<AppNavigatorProps> = ({ user }) => {
     return (
-        <NavigationContainer>
-            <NavigatorWithNavBar />
-        </NavigationContainer>
+        <WorkoutOverlayProvider>
+            <NavigationContainer ref={rootNavigationRef}>
+                <NavigatorWithNavBar />
+                <WorkoutOverlayHost />
+            </NavigationContainer>
+        </WorkoutOverlayProvider>
     );
 };
 

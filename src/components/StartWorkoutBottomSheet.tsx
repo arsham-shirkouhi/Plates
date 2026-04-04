@@ -13,10 +13,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { fonts } from '../constants/fonts';
 import * as Haptics from 'expo-haptics';
-import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../navigation/AppNavigator';
 import { useOverlay } from '../contexts/OverlayContext';
+import { useWorkoutOverlay } from '../contexts/WorkoutOverlayContext';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -29,13 +27,11 @@ interface StartWorkoutBottomSheetProps {
     onClose: () => void;
 }
 
-type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
-
 export const StartWorkoutBottomSheet: React.FC<StartWorkoutBottomSheetProps> = ({
     visible,
     onClose,
 }) => {
-    const navigation = useNavigation<NavigationProp>();
+    const { open: openWorkoutOverlay } = useWorkoutOverlay();
     const { registerOverlay } = useOverlay();
     const OVERLAY_ID = 'StartWorkoutBottomSheet';
     const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT + TOASTER_OFFSET)).current;
@@ -112,7 +108,7 @@ export const StartWorkoutBottomSheet: React.FC<StartWorkoutBottomSheetProps> = (
 
         // For other options, navigate to Workout screen with workout started
         handleClose();
-        navigation.navigate('Workout', {
+        openWorkoutOverlay({
             startWorkoutType: type,
         });
     };

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -16,9 +16,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../navigation/AppNavigator';
+import { rootNavigationRef } from '../navigation/rootNavigationRef';
+import { useWorkoutOverlay } from '../contexts/WorkoutOverlayContext';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../constants/fonts';
 import { WorkoutHeaderSection } from '../components/WorkoutHeaderSection';
@@ -28,8 +27,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StartWorkoutBottomSheet } from '../components/StartWorkoutBottomSheet';
 import { AddExerciseOverlay } from '../components/AddExerciseOverlay';
 import { useOverlay } from '../contexts/OverlayContext';
-
-type WorkoutScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Workout'>;
 
 interface Exercise {
     id: string;
@@ -68,8 +65,47 @@ interface WorkoutSummary {
     exercises: WorkoutSummaryItem[];
 }
 
+function getWidgetCurrentExerciseLabel(workout: ActiveWorkout): string {
+    if (workout.exercises.length === 0) {
+        return 'no exercise';
+    }
+    const incomplete = workout.exercises.find(
+        (ex) => ex.sets.length === 0 || !ex.sets.every((set) => set.completed)
+    );
+    const pick = incomplete ?? workout.exercises[workout.exercises.length - 1];
+    return pick.name.toLowerCase();
+}
+
+/** Compact elapsed time for the minimized bar (e.g. 43s, 4m 12s, 1h 2m) */
+function formatWorkoutDurationShort(totalSeconds: number): string {
+    const t = Math.max(0, Math.floor(totalSeconds));
+    if (t < 60) {
+        return `${t}s`;
+    }
+    if (t < 3600) {
+        const m = Math.floor(t / 60);
+        const s = t % 60;
+        return s > 0 ? `${m}m ${s}s` : `${m}m`;
+    }
+    const h = Math.floor(t / 3600);
+    const rem = t % 3600;
+    const m = Math.floor(rem / 60);
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
+/** Inset “card” on a dimmed backdrop — not edge-to-edge */
+const WORKOUT_SHEET_MARGIN_H = 20;
+const WORKOUT_SHEET_MARGIN_V = 4;
+const WORKOUT_SHEET_MAX_WIDTH = 540;
+/** Floating widget (minimized) — match sheet horizontal inset */
+const WIDGET_FLOAT_BOTTOM = 10;
+const WIDGET_BAR_HEIGHT = 62;
+/** Minimized bar is a pill; radius animates down to the expanded card */
+const WIDGET_SHELL_CORNER_RADIUS = 31;
+const EXPANDED_SHELL_CORNER_RADIUS = 22;
+/** Same offset as primary `Button` harsh drop shadow */
+const WIDGET_HARSH_SHADOW_OFFSET_Y = 4;
 const PLATE_WEIGHTS = [25, 20, 15, 10, 5, 2.5, 1.25];
 const PLATE_COLORS: Record<number, string> = {
     25: '#D32F2F',
@@ -82,23 +118,40 @@ const PLATE_COLORS: Record<number, string> = {
 };
 
 export const WorkoutScreen: React.FC = () => {
-    const navigation = useNavigation<WorkoutScreenNavigationProp>();
-    const route = useRoute<RouteProp<RootStackParamList, 'Workout'>>();
+    const { params: workoutRouteParams, mergeParams, close: closeWorkoutOverlay } = useWorkoutOverlay();
     const insets = useSafeAreaInsets();
     const { registerOverlay } = useOverlay();
     const [hasCompletedWorkout, setHasCompletedWorkout] = useState(false);
     const screenHeight = Dimensions.get('window').height;
-    const headerHeight = 200; // Header section height (gradient + header)
-    const finishButtonHeight = 60; // Finish workout button height + margin
+    const headerHeight = 228; // Title bar + divider + stats row (tighter top padding)
     const navigationBarHeight = 0; // Nav bar hidden
-    const workoutBoxHeight = screenHeight - insets.top - headerHeight - finishButtonHeight - 50; // Minimal padding
+    const sheetPaddingTop = insets.top + WORKOUT_SHEET_MARGIN_V;
+    const sheetPaddingBottom = insets.bottom + WORKOUT_SHEET_MARGIN_V;
+    const sheetInnerHeight = screenHeight - sheetPaddingTop - sheetPaddingBottom;
+    const workoutBoxHeight = Math.max(160, sheetInnerHeight - headerHeight - 48);
 
     // Calculate available height for dashed box (accounting for navbar - browse button is commented out)
     const browseButtonHeight = 0; // Browse workouts button is commented out, so no height needed
     const headerActualHeight = 120; // Actual header section height (gradient overlaps, so smaller)
     const bottomSpacing = 30; // Minimal spacing to prevent going behind navbar
-    const availableHeight = screenHeight - insets.top - headerActualHeight - navigationBarHeight - browseButtonHeight - bottomSpacing;
+    const availableHeight = Math.max(
+        200,
+        sheetInnerHeight - headerActualHeight - navigationBarHeight - browseButtonHeight - bottomSpacing
+    );
+    /** Lay out card in safe area so nothing clips past screen edges */
+    const innerWidth = SCREEN_WIDTH - insets.left - insets.right;
+    const workoutSheetMaxWidth = Math.min(
+        WORKOUT_SHEET_MAX_WIDTH,
+        innerWidth - 2 * WORKOUT_SHEET_MARGIN_H
+    );
+    const expandedCardWidth = workoutSheetMaxWidth;
+    const expandedCardLeft = insets.left + (innerWidth - expandedCardWidth) / 2;
+    const widgetBarWidth = innerWidth - 2 * WORKOUT_SHEET_MARGIN_H;
+    const widgetBarLeft = insets.left + WORKOUT_SHEET_MARGIN_H;
     const [activeWorkout, setActiveWorkout] = useState<ActiveWorkout | null>(null);
+    /** Full workout sheet vs bottom mini bar (active workout only) */
+    const [workoutSheetExpanded, setWorkoutSheetExpanded] = useState(true);
+    const workoutExpandProgress = useRef(new Animated.Value(1)).current;
     const [showStartWorkoutSheet, setShowStartWorkoutSheet] = useState(false);
     const [showCountdown, setShowCountdown] = useState(false);
     const [showAddExerciseOverlay, setShowAddExerciseOverlay] = useState(false);
@@ -153,18 +206,16 @@ export const WorkoutScreen: React.FC = () => {
         return mockWorkouts[workoutId] || { exercises: [], name: '' };
     };
 
-    // Handle workout start from StartWorkout screen
+    // Handle workout start from StartWorkout screen / bottom sheet (overlay params)
     useEffect(() => {
-        const params = route.params;
+        const params = workoutRouteParams;
         if (params?.startWorkoutType) {
             const { startWorkoutType, workoutId } = params;
 
             if (startWorkoutType === 'schedule') {
-                // Schedule workout - don't start, just return
                 return;
             }
 
-            // Start a new workout
             if (workoutId) {
                 const savedWorkout = loadSavedWorkout(workoutId);
                 const newWorkout: ActiveWorkout = {
@@ -184,21 +235,20 @@ export const WorkoutScreen: React.FC = () => {
             }
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-            // Clear params after handling to prevent re-triggering
-            navigation.setParams({ startWorkoutType: undefined, workoutId: undefined });
+            mergeParams({ startWorkoutType: undefined, workoutId: undefined });
         }
-    }, [route.params, navigation]);
+    }, [workoutRouteParams, mergeParams]);
 
     useEffect(() => {
-        if (route.params?.startWorkoutPrompt) {
+        if (workoutRouteParams?.startWorkoutPrompt) {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             setShowCountdown(true);
             setTimeout(() => {
                 startCountdown();
             }, 50);
-            navigation.setParams({ startWorkoutPrompt: undefined });
+            mergeParams({ startWorkoutPrompt: undefined });
         }
-    }, [route.params, navigation]);
+    }, [workoutRouteParams, mergeParams]);
 
     // Calculate workout stats
     const exerciseCount = activeWorkout?.exercises.length || 0;
@@ -241,6 +291,12 @@ export const WorkoutScreen: React.FC = () => {
         }
     }, [activeWorkout]);
 
+    useEffect(() => {
+        if (!activeWorkout) {
+            workoutExpandProgress.setValue(1);
+            setWorkoutSheetExpanded(true);
+        }
+    }, [activeWorkout, workoutExpandProgress]);
 
     const handleAddExercise = () => {
         if (!activeWorkout) return;
@@ -282,13 +338,14 @@ export const WorkoutScreen: React.FC = () => {
         setActiveWorkout(updatedWorkout);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-        // Navigate to ExerciseDetail screen with all exercises
-        navigation.navigate('ExerciseDetail', {
-            exercise: createdExercise,
-            exerciseId: createdExercise.id,
-            allExercises: updatedExercises,
-            currentExerciseIndex: updatedExercises.length - 1, // Index of the newly added exercise
-        });
+        if (rootNavigationRef.isReady()) {
+            rootNavigationRef.navigate('ExerciseDetail', {
+                exercise: createdExercise,
+                exerciseId: createdExercise.id,
+                allExercises: updatedExercises,
+                currentExerciseIndex: updatedExercises.length - 1,
+            });
+        }
     };
 
 
@@ -296,12 +353,14 @@ export const WorkoutScreen: React.FC = () => {
         if (!activeWorkout) return;
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         const exerciseIndex = activeWorkout.exercises.findIndex(ex => ex.id === exercise.id);
-        navigation.navigate('ExerciseDetail', {
-            exercise: exercise,
-            exerciseId: exercise.id,
-            allExercises: activeWorkout.exercises,
-            currentExerciseIndex: exerciseIndex,
-        });
+        if (rootNavigationRef.isReady()) {
+            rootNavigationRef.navigate('ExerciseDetail', {
+                exercise: exercise,
+                exerciseId: exercise.id,
+                allExercises: activeWorkout.exercises,
+                currentExerciseIndex: exerciseIndex,
+            });
+        }
     };
 
     const handleDeleteExercise = (exercise: Exercise) => {
@@ -413,93 +472,76 @@ export const WorkoutScreen: React.FC = () => {
         };
     }, [showCountdown, registerOverlay]);
 
-    // Listen for navigation focus to handle exercise updates
+    // ExerciseDetail returns updates via overlay mergeParams (replaces stack focus listener)
     useEffect(() => {
-        const unsubscribe = navigation.addListener('focus', () => {
-            const params = route.params as any;
+        const params = workoutRouteParams as Record<string, unknown> | undefined;
+        if (!params) return;
 
-            // Handle multiple updated exercises (from ExerciseDetailScreen)
-            if (params?.updatedExercises && Array.isArray(params.updatedExercises)) {
-                if (!activeWorkout) return;
+        if (params.updatedExercises && Array.isArray(params.updatedExercises)) {
+            if (!activeWorkout) return;
 
-                // Store previous completion states
-                const previousCompletionStates = new Map<string, boolean>();
-                activeWorkout.exercises.forEach(ex => {
-                    const wasComplete = ex.sets.length > 0 && ex.sets.every(set => set.completed);
-                    previousCompletionStates.set(ex.id, wasComplete);
-                });
+            const updatedExercises = params.updatedExercises as Exercise[];
 
-                // Replace with the updated list (supports deletions)
-                const updatedExercises = params.updatedExercises;
+            setActiveWorkout({
+                ...activeWorkout,
+                exercises: updatedExercises,
+            });
 
-                setActiveWorkout({
-                    ...activeWorkout,
-                    exercises: updatedExercises,
-                });
+            const newlyCompletedIds = (params.newlyCompletedExerciseIds as string[]) || [];
+            newlyCompletedIds.forEach((exerciseId: string) => {
+                const exercise = updatedExercises.find((ex: Exercise) => ex.id === exerciseId);
+                if (exercise) {
+                    const itemRef = exerciseItemRefs.current.get(exerciseId);
+                    if (itemRef) {
+                        setTimeout(() => {
+                            itemRef.measureInWindow((x: number, y: number, width: number, height: number) => {
+                                const textStartX = x + 15;
+                                const actualTextWidth = itemRef.getTextWidth ? itemRef.getTextWidth() : exercise.name.length * 10;
+                                const centerY = y + height / 2;
 
-                // Trigger confetti for newly completed exercises
-                const newlyCompletedIds = params.newlyCompletedExerciseIds || [];
-                newlyCompletedIds.forEach((exerciseId: string) => {
-                    const exercise = updatedExercises.find((ex: Exercise) => ex.id === exerciseId);
-                    if (exercise) {
-                        const itemRef = exerciseItemRefs.current.get(exerciseId);
-                        if (itemRef) {
-                            // Delay slightly to ensure layout is updated
-                            setTimeout(() => {
-                                itemRef.measureInWindow((x: number, y: number, width: number, height: number) => {
-                                    const textStartX = x + 15;
-                                    const actualTextWidth = itemRef.getTextWidth ? itemRef.getTextWidth() : exercise.name.length * 10;
-                                    const centerY = y + height / 2;
-
-                                    const particleCount = 10;
-                                    const particles = Array.from({ length: particleCount }, (_, i) => {
-                                        const xOffset = actualTextWidth > 0 ? (i / (particleCount - 1)) * actualTextWidth : (i / particleCount) * width;
-                                        return {
-                                            id: Date.now() + i + Math.random(),
-                                            originX: textStartX + xOffset,
-                                            originY: centerY,
-                                            angle: (i / particleCount) * 360 + (Math.random() * 30 - 15),
-                                            color: '#252525',
-                                        };
-                                    });
-                                    setConfettiParticles(prev => [...prev, ...particles]);
-                                    setTimeout(() => {
-                                        setConfettiParticles(prev => {
-                                            const particleIds = new Set(particles.map(p => p.id));
-                                            return prev.filter(p => !particleIds.has(p.id));
-                                        });
-                                    }, 500);
-                                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                const particleCount = 10;
+                                const particles = Array.from({ length: particleCount }, (_, i) => {
+                                    const xOffset = actualTextWidth > 0 ? (i / (particleCount - 1)) * actualTextWidth : (i / particleCount) * width;
+                                    return {
+                                        id: Date.now() + i + Math.random(),
+                                        originX: textStartX + xOffset,
+                                        originY: centerY,
+                                        angle: (i / particleCount) * 360 + (Math.random() * 30 - 15),
+                                        color: '#252525',
+                                    };
                                 });
-                            }, 100);
-                        }
+                                setConfettiParticles(prev => [...prev, ...particles]);
+                                setTimeout(() => {
+                                    setConfettiParticles(prev => {
+                                        const particleIds = new Set(particles.map(p => p.id));
+                                        return prev.filter(p => !particleIds.has(p.id));
+                                    });
+                                }, 500);
+                                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                            });
+                        }, 100);
                     }
-                });
+                }
+            });
 
-                // Clear params after handling
-                navigation.setParams({
-                    startWorkoutType: undefined,
-                    workoutId: undefined,
-                    updatedExerciseId: undefined,
-                    updatedSets: undefined,
-                    updatedExercises: undefined,
-                    newlyCompletedExerciseIds: undefined,
-                } as any);
-            } else if (params?.updatedExerciseId && params?.updatedSets) {
-                // Handle single exercise update (legacy)
-                handleUpdateExerciseSets(params.updatedExerciseId, params.updatedSets);
-                // Clear params after handling
-                navigation.setParams({
-                    startWorkoutType: undefined,
-                    workoutId: undefined,
-                    updatedExerciseId: undefined,
-                    updatedSets: undefined
-                } as any);
-            }
-        });
-
-        return unsubscribe;
-    }, [navigation, route.params, activeWorkout]);
+            mergeParams({
+                startWorkoutType: undefined,
+                workoutId: undefined,
+                updatedExerciseId: undefined,
+                updatedSets: undefined,
+                updatedExercises: undefined,
+                newlyCompletedExerciseIds: undefined,
+            });
+        } else if (params.updatedExerciseId && params.updatedSets) {
+            handleUpdateExerciseSets(params.updatedExerciseId as string, params.updatedSets as Set[]);
+            mergeParams({
+                startWorkoutType: undefined,
+                workoutId: undefined,
+                updatedExerciseId: undefined,
+                updatedSets: undefined,
+            });
+        }
+    }, [workoutRouteParams, activeWorkout, mergeParams]);
 
     // Recalculate completed sets/reps when workout changes
     useEffect(() => {
@@ -526,6 +568,7 @@ export const WorkoutScreen: React.FC = () => {
             setWorkoutSummary(null);
             setActiveWorkout(null);
             setHasCompletedWorkout(true);
+            closeWorkoutOverlay();
         });
     };
 
@@ -558,7 +601,9 @@ export const WorkoutScreen: React.FC = () => {
     };
 
     const handleBrowseWorkouts = () => {
-        navigation.navigate('BrowseWorkouts');
+        if (rootNavigationRef.isReady()) {
+            rootNavigationRef.navigate('BrowseWorkouts');
+        }
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     };
 
@@ -568,6 +613,28 @@ export const WorkoutScreen: React.FC = () => {
         const mins = minutes % 60;
         return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
     };
+
+    const formatWorkoutClock = (totalSeconds: number): string => {
+        const hours = Math.floor(totalSeconds / 3600);
+        const mins = Math.floor((totalSeconds % 3600) / 60);
+        const secs = totalSeconds % 60;
+        return `${hours.toString().padStart(2, '0')}h ${mins.toString().padStart(2, '0')}m ${secs.toString().padStart(2, '0')}s`;
+    };
+
+    const handleWorkoutSheetExpandToggle = useCallback(() => {
+        if (!activeWorkout) return;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setWorkoutSheetExpanded((prev) => {
+            const next = !prev;
+            Animated.timing(workoutExpandProgress, {
+                toValue: next ? 1 : 0,
+                duration: 280,
+                easing: Easing.out(Easing.cubic),
+                useNativeDriver: false,
+            }).start();
+            return next;
+        });
+    }, [activeWorkout, workoutExpandProgress]);
 
     const formatReceiptDate = (date: Date): string => {
         const dayPart = date.toLocaleDateString('en-US', {
@@ -874,45 +941,173 @@ export const WorkoutScreen: React.FC = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     };
 
-    return (
-        <View style={styles.container}>
-            <ScrollView
-                ref={scrollViewRef}
-                style={styles.scrollView}
-                contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
-                showsVerticalScrollIndicator={false}
-                scrollEventThrottle={16}
-                nestedScrollEnabled={true}
-                keyboardShouldPersistTaps="handled"
-                removeClippedSubviews={false}
-                scrollEnabled={true}
-                bounces={false}
-                overScrollMode="never"
-                alwaysBounceVertical={false}
-                decelerationRate="normal"
-            >
-                {/* Header Section */}
-                <WorkoutHeaderSection
-                    exerciseCount={exerciseCount}
-                    setCount={setCount}
-                    duration={workoutDuration}
-                    topInset={insets.top}
-                    isEmpty={!activeWorkout}
-                    isActive={!!activeWorkout}
-                    completedSets={completedSets}
-                    completedReps={completedReps}
-                    totalSets={totalSets}
-                    totalReps={totalReps}
-                    workoutDuration={workoutTimer}
-                    hasNeverLoggedWorkout={hasNeverLoggedWorkout}
-                    onClosePress={() => navigation.goBack()}
-                />
+    const widgetBottomInset = insets.bottom + WIDGET_FLOAT_BOTTOM;
+    const expandedSheetHeight = screenHeight - sheetPaddingTop - sheetPaddingBottom;
 
-                {/* Empty State or Active Workout */}
-                {!activeWorkout ? (
-                    <View style={styles.emptyStateContainer}>
-                        {/* Browse Workouts Button - Commented out */}
-                        {/* <View style={styles.browseWorkoutsButtonContainer}>
+    const shellTop = workoutExpandProgress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [screenHeight - WIDGET_BAR_HEIGHT - widgetBottomInset, sheetPaddingTop],
+    });
+    const shellLeft = workoutExpandProgress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [widgetBarLeft, expandedCardLeft],
+    });
+    const shellWidth = workoutExpandProgress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [widgetBarWidth, expandedCardWidth],
+    });
+    const shellHeight = workoutExpandProgress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [WIDGET_BAR_HEIGHT, expandedSheetHeight],
+    });
+    const shellRadius = workoutExpandProgress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [WIDGET_SHELL_CORNER_RADIUS, EXPANDED_SHELL_CORNER_RADIUS],
+    });
+    /** No full-screen dim when minimized */
+    const backdropDimOpacity = workoutExpandProgress.interpolate({
+        inputRange: [0, 0.15, 1],
+        outputRange: [0, 1, 1],
+    });
+    /** Soft shadow on expanded card only; minimized uses harsh duplicate like `Button` */
+    const widgetLiftShadowOpacity = workoutExpandProgress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, 0.14],
+    });
+    const widgetLiftShadowRadius = workoutExpandProgress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, 11],
+    });
+    const widgetLiftElevation = workoutExpandProgress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, 9],
+    });
+    const widgetHarshShadowOpacity = workoutExpandProgress.interpolate({
+        inputRange: [0, 0.18, 0.42, 1],
+        outputRange: [1, 0.35, 0, 0],
+    });
+    const expandedLayerOpacity = workoutExpandProgress.interpolate({
+        inputRange: [0, 0.22, 1],
+        outputRange: [0, 1, 1],
+    });
+    const widgetLayerOpacity = workoutExpandProgress.interpolate({
+        inputRange: [0, 0.3, 1],
+        outputRange: [1, 0, 0],
+    });
+    /** Bottom black wash behind the floating pill — fades in as the sheet collapses */
+    const widgetBottomDepthOpacity = workoutExpandProgress.interpolate({
+        inputRange: [0, 0.12, 0.35, 0.65, 1],
+        outputRange: [1, 0.88, 0.45, 0.08, 0],
+    });
+
+    return (
+        <>
+            <Animated.View
+                pointerEvents={workoutSheetExpanded ? 'auto' : 'none'}
+                style={[StyleSheet.absoluteFillObject, { opacity: backdropDimOpacity, zIndex: 0 }]}
+            >
+                <View style={styles.workoutDimLayer} />
+            </Animated.View>
+
+            {activeWorkout ? (
+                <Animated.View
+                    pointerEvents="none"
+                    style={[
+                        styles.workoutBottomDepthGradient,
+                        {
+                            top: shellTop,
+                            opacity: widgetBottomDepthOpacity,
+                            zIndex: 6,
+                        },
+                    ]}
+                >
+                    <LinearGradient
+                        colors={['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0.42)']}
+                        locations={[0.2, 1]}
+                        start={{ x: 0.5, y: 0 }}
+                        end={{ x: 0.5, y: 1 }}
+                        style={StyleSheet.absoluteFillObject}
+                    />
+                </Animated.View>
+            ) : null}
+
+            <Animated.View
+                pointerEvents="none"
+                style={[
+                    styles.workoutWidgetHarshShadow,
+                    {
+                        top: shellTop,
+                        left: shellLeft,
+                        width: shellWidth,
+                        height: shellHeight,
+                        borderRadius: shellRadius,
+                        opacity: widgetHarshShadowOpacity,
+                        transform: [{ translateY: WIDGET_HARSH_SHADOW_OFFSET_Y }],
+                        zIndex: 9,
+                    },
+                ]}
+            />
+            <Animated.View
+                pointerEvents="box-none"
+                style={[
+                    styles.workoutFloatingShell,
+                    {
+                        top: shellTop,
+                        left: shellLeft,
+                        width: shellWidth,
+                        height: shellHeight,
+                        borderRadius: shellRadius,
+                        shadowOpacity: widgetLiftShadowOpacity,
+                        shadowRadius: widgetLiftShadowRadius,
+                        shadowOffset: { width: 0, height: 6 },
+                        elevation: widgetLiftElevation,
+                    },
+                ]}
+            >
+                <Animated.View
+                    style={[styles.workoutExpandedLayer, { opacity: expandedLayerOpacity }]}
+                    pointerEvents={workoutSheetExpanded ? 'auto' : 'none'}
+                >
+                    <ScrollView
+                        ref={scrollViewRef}
+                        style={styles.scrollView}
+                        contentContainerStyle={[styles.scrollContent, { paddingBottom: 28 }]}
+                        showsVerticalScrollIndicator={false}
+                        scrollEventThrottle={16}
+                        nestedScrollEnabled={true}
+                        keyboardShouldPersistTaps="handled"
+                        removeClippedSubviews={false}
+                        scrollEnabled={workoutSheetExpanded}
+                        bounces={false}
+                        overScrollMode="never"
+                        alwaysBounceVertical={false}
+                        decelerationRate="normal"
+                    >
+                        {/* Header Section */}
+                        <WorkoutHeaderSection
+                            exerciseCount={exerciseCount}
+                            setCount={setCount}
+                            duration={workoutDuration}
+                            topInset={12}
+                            isEmpty={!activeWorkout}
+                            isActive={!!activeWorkout}
+                            completedSets={completedSets}
+                            completedReps={completedReps}
+                            totalSets={totalSets}
+                            totalReps={totalReps}
+                            workoutDuration={workoutTimer}
+                            hasNeverLoggedWorkout={hasNeverLoggedWorkout}
+                            onClosePress={() => closeWorkoutOverlay()}
+                            sheetExpanded={workoutSheetExpanded}
+                            onSheetExpandToggle={activeWorkout ? handleWorkoutSheetExpandToggle : undefined}
+                            onFinishPress={activeWorkout ? handleFinishWorkout : undefined}
+                        />
+
+                        {/* Empty State or Active Workout */}
+                        {!activeWorkout ? (
+                            <View style={styles.emptyStateContainer}>
+                                {/* Browse Workouts Button - Commented out */}
+                                {/* <View style={styles.browseWorkoutsButtonContainer}>
                             <Button
                                 variant={!hasCompletedWorkout ? "primary" : "secondary"}
                                 title="Need inspiration?"
@@ -921,141 +1116,169 @@ export const WorkoutScreen: React.FC = () => {
                             />
                         </View> */}
 
-                        <Animated.View
-                            style={[
-                                styles.startWorkoutCard,
-                                styles.startWorkoutCardWithButton,
-                                {
-                                    height: availableHeight - 10,
-                                    transform: [{ scale: dashedBoxScale }],
-                                    opacity: dashedBoxOpacity,
-                                }
-                            ]}
-                        >
-                            <TouchableOpacity
-                                style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center' }]}
-                                onPress={handleStartWorkoutPress}
-                                activeOpacity={0.7}
-                            >
-                                <Text style={styles.startWorkoutTextLarge} numberOfLines={1}>Start today's workout!</Text>
-                                <Text style={styles.startWorkoutTextSmall}>tap to start</Text>
-                            </TouchableOpacity>
-                        </Animated.View>
-                    </View>
-                ) : (
-                    <Animated.View
-                        style={[
-                            styles.activeWorkoutContainer,
-                            { opacity: workoutFadeIn }
-                        ]}
-                    >
-                        {/* Finish Workout Button */}
-                        <View style={styles.actionButtons}>
-                            <Button
-                                variant="primary"
-                                title="finish workout"
-                                onPress={handleFinishWorkout}
-                                containerStyle={styles.finishWorkoutButton}
-                            />
-                        </View>
-
-                        {/* Workout Box with Title and Exercises */}
-                        <View style={[styles.workoutBox, { height: workoutBoxHeight }]}>
-                            {/* Workout Name with Plus Icon */}
-                            <View style={styles.workoutBoxHeader}>
-                                {activeWorkout.workoutName && (
-                                    <Text style={styles.workoutName}>{activeWorkout.workoutName}</Text>
-                                )}
-                                {!activeWorkout.workoutName && (
-                                    <Text style={styles.workoutName}>workout</Text>
-                                )}
-                                <TouchableOpacity
-                                    style={styles.addExerciseIconButton}
-                                    onPress={handleAddExercise}
-                                    activeOpacity={0.7}
-                                >
-                                    <Ionicons name="add" size={24} color="#526EFF" />
-                                </TouchableOpacity>
-                            </View>
-
-                            {/* Exercise List */}
-                            <View
-                                onStartShouldSetResponder={() => true}
-                                onResponderRelease={() => {
-                                    const now = Date.now();
-                                    const DOUBLE_TAP_DELAY = 300;
-
-                                    if (now - lastTapRef.current.time < DOUBLE_TAP_DELAY) {
-                                        // Double tap detected - open add exercise overlay
-                                        setShowAddExerciseOverlay(true);
-                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                        lastTapRef.current = { time: 0 };
-                                    } else {
-                                        // First tap - just record it
-                                        lastTapRef.current = { time: now };
-                                    }
-                                }}
-                                style={{ flex: 1 }}
-                            >
-                                <ScrollView
-                                    style={styles.exercisesScrollView}
-                                    contentContainerStyle={[
-                                        styles.exercisesScrollContent,
-                                        activeWorkout.exercises.length === 0 && styles.exercisesScrollContentEmpty
+                                <Animated.View
+                                    style={[
+                                        styles.startWorkoutCard,
+                                        styles.startWorkoutCardWithButton,
+                                        {
+                                            height: availableHeight - 10,
+                                            transform: [{ scale: dashedBoxScale }],
+                                            opacity: dashedBoxOpacity,
+                                        }
                                     ]}
-                                    showsVerticalScrollIndicator={false}
-                                    scrollEnabled={true}
                                 >
-                                    {activeWorkout.exercises.length === 0 ? (
-                                        <View style={styles.emptyWorkoutPlaceholder}>
-                                            <Text style={styles.emptyWorkoutText}>double tap to add workout</Text>
-                                        </View>
-                                    ) : (
-                                        activeWorkout.exercises.map((exercise, index) => {
-                                            const isComplete = exercise.sets.length > 0 && exercise.sets.every((set) => set.completed);
-                                            return (
-                                                <ExerciseItem
-                                                    key={exercise.id}
-                                                    exercise={exercise}
-                                                    isComplete={isComplete}
-                                                    onPress={() => handleExercisePress(exercise)}
-                                                    onLongPress={() => handleDeleteExercise(exercise)}
-                                                    onLayout={(ref) => {
-                                                        exerciseItemRefs.current.set(exercise.id, ref);
-                                                    }}
-                                                    isLast={index === activeWorkout.exercises.length - 1}
-                                                />
-                                            );
-                                        })
-                                    )}
-                                </ScrollView>
+                                    <TouchableOpacity
+                                        style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center' }]}
+                                        onPress={handleStartWorkoutPress}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Text style={styles.startWorkoutTextLarge} numberOfLines={1}>Start today's workout!</Text>
+                                        <Text style={styles.startWorkoutTextSmall}>tap to start</Text>
+                                    </TouchableOpacity>
+                                </Animated.View>
                             </View>
-                        </View>
+                        ) : (
+                            <Animated.View
+                                style={[
+                                    styles.activeWorkoutContainer,
+                                    { opacity: workoutFadeIn }
+                                ]}
+                            >
+                                <View style={[styles.workoutBox, { height: workoutBoxHeight }]}>
+                                    <View style={styles.workoutBoxHeader}>
+                                        {activeWorkout.workoutName ? (
+                                            <Text style={styles.workoutName} numberOfLines={1}>
+                                                {activeWorkout.workoutName}
+                                            </Text>
+                                        ) : (
+                                            <Text style={styles.workoutName}>workout</Text>
+                                        )}
+                                        <TouchableOpacity
+                                            style={styles.addExerciseIconButton}
+                                            onPress={handleAddExercise}
+                                            activeOpacity={0.7}
+                                            accessibilityLabel="Add exercise"
+                                        >
+                                            <Ionicons name="add" size={24} color="#526EFF" />
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    {/* Exercise List */}
+                                    <View
+                                        onStartShouldSetResponder={() => true}
+                                        onResponderRelease={() => {
+                                            const now = Date.now();
+                                            const DOUBLE_TAP_DELAY = 300;
+
+                                            if (now - lastTapRef.current.time < DOUBLE_TAP_DELAY) {
+                                                // Double tap detected - open add exercise overlay
+                                                setShowAddExerciseOverlay(true);
+                                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                                lastTapRef.current = { time: 0 };
+                                            } else {
+                                                // First tap - just record it
+                                                lastTapRef.current = { time: now };
+                                            }
+                                        }}
+                                        style={{ flex: 1 }}
+                                    >
+                                        <ScrollView
+                                            style={styles.exercisesScrollView}
+                                            contentContainerStyle={[
+                                                styles.exercisesScrollContent,
+                                                activeWorkout.exercises.length === 0 && styles.exercisesScrollContentEmpty
+                                            ]}
+                                            showsVerticalScrollIndicator={false}
+                                            scrollEnabled={true}
+                                        >
+                                            {activeWorkout.exercises.length === 0 ? (
+                                                <View style={styles.emptyWorkoutPlaceholder}>
+                                                    <Text style={styles.emptyWorkoutText}>double tap to add workout</Text>
+                                                </View>
+                                            ) : (
+                                                activeWorkout.exercises.map((exercise, index) => {
+                                                    const isComplete = exercise.sets.length > 0 && exercise.sets.every((set) => set.completed);
+                                                    return (
+                                                        <ExerciseItem
+                                                            key={exercise.id}
+                                                            exercise={exercise}
+                                                            isComplete={isComplete}
+                                                            onPress={() => handleExercisePress(exercise)}
+                                                            onLongPress={() => handleDeleteExercise(exercise)}
+                                                            onLayout={(ref) => {
+                                                                exerciseItemRefs.current.set(exercise.id, ref);
+                                                            }}
+                                                            isLast={index === activeWorkout.exercises.length - 1}
+                                                        />
+                                                    );
+                                                })
+                                            )}
+                                        </ScrollView>
+                                    </View>
+                                </View>
+                            </Animated.View>
+                        )}
+                    </ScrollView>
+
+                    <LinearGradient
+                        colors={['rgba(255, 255, 255, 0)', 'rgba(255, 255, 255, 1)']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 0, y: 1 }}
+                        style={styles.sheetBottomFade}
+                        pointerEvents="none"
+                    />
+                </Animated.View>
+
+                {activeWorkout ? (
+                    <Animated.View
+                        pointerEvents={workoutSheetExpanded ? 'none' : 'box-none'}
+                        style={[styles.workoutWidgetRow, { opacity: widgetLayerOpacity }]}
+                    >
+                        <TouchableOpacity
+                            style={styles.workoutWidgetSideIcon}
+                            onPress={handleWorkoutSheetExpandToggle}
+                            activeOpacity={0.65}
+                            hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+                            accessibilityLabel="Maximize workout"
+                        >
+                            <Ionicons name="expand-outline" size={24} color="#252525" />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.workoutWidgetCenter}
+                            onPress={handleWorkoutSheetExpandToggle}
+                            activeOpacity={0.88}
+                            accessibilityRole="button"
+                            accessibilityLabel="Expand workout"
+                        >
+                            <View style={styles.workoutWidgetPrimaryRow}>
+                                <View style={styles.workoutWidgetDotWrap}>
+                                    <View style={styles.workoutWidgetDotGlow} />
+                                    <View style={styles.workoutWidgetDotCore} />
+                                </View>
+                                <Text style={styles.workoutWidgetDuration}>
+                                    {formatWorkoutDurationShort(workoutTimer)}
+                                </Text>
+                            </View>
+                            <Text style={styles.workoutWidgetExercise} numberOfLines={1}>
+                                {getWidgetCurrentExerciseLabel(activeWorkout)}
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.workoutWidgetSideIcon}
+                            onPress={handleFinishWorkout}
+                            activeOpacity={0.65}
+                            hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+                            accessibilityLabel="Delete workout"
+                        >
+                            <Ionicons name="trash-outline" size={22} color="#E53935" />
+                        </TouchableOpacity>
                     </Animated.View>
-                )}
-            </ScrollView>
+                ) : null}
+            </Animated.View>
 
-            {/* Confetti */}
-            <Confetti particles={confettiParticles} />
-
-            {/* White to transparent gradient behind buttons */}
-            <LinearGradient
-                colors={['rgba(255, 255, 255, 0)', 'rgba(255, 255, 255, 1)']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-                style={[
-                    {
-                        position: 'absolute',
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        height: 150,
-                        zIndex: 99, // Behind buttons but above content
-                    },
-                    { paddingBottom: insets.bottom }
-                ]}
-                pointerEvents="none"
-            />
+            <View style={styles.confettiLayer} pointerEvents="none">
+                <Confetti particles={confettiParticles} />
+            </View>
 
             {/* Start Workout Bottom Sheet */}
             <StartWorkoutBottomSheet
@@ -1238,7 +1461,7 @@ export const WorkoutScreen: React.FC = () => {
                     </Animated.View>
                 </View>
             </Modal>
-        </View>
+        </>
     );
 };
 
@@ -1339,11 +1562,112 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isComplete, onPre
 };
 
 const styles = StyleSheet.create({
-    container: {
+    workoutDimLayer: {
         flex: 1,
-        width: '100%',
-        height: '100%',
-        backgroundColor: '#fff',
+        backgroundColor: 'rgba(37, 37, 37, 0.38)',
+    },
+    workoutBottomDepthGradient: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
+    },
+    /** Offset #252525 slab — matches primary `Button` floating shadow */
+    workoutWidgetHarshShadow: {
+        position: 'absolute',
+        backgroundColor: '#252525',
+    },
+    workoutFloatingShell: {
+        position: 'absolute',
+        backgroundColor: '#ffffff',
+        borderWidth: 2.5,
+        borderColor: '#252525',
+        overflow: 'hidden',
+        zIndex: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+    },
+    workoutExpandedLayer: {
+        flex: 1,
+    },
+    workoutWidgetRow: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: WIDGET_BAR_HEIGHT,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        overflow: 'hidden',
+    },
+    workoutWidgetSideIcon: {
+        width: 40,
+        height: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'transparent',
+    },
+    workoutWidgetCenter: {
+        flex: 1,
+        minWidth: 0,
+        paddingHorizontal: 10,
+        justifyContent: 'center',
+    },
+    workoutWidgetPrimaryRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    workoutWidgetDotWrap: {
+        width: 14,
+        height: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 8,
+    },
+    workoutWidgetDotGlow: {
+        position: 'absolute',
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        backgroundColor: 'rgba(82, 110, 255, 0.45)',
+        shadowColor: '#526EFF',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.85,
+        shadowRadius: 6,
+        elevation: 4,
+    },
+    workoutWidgetDotCore: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#526EFF',
+    },
+    workoutWidgetDuration: {
+        fontSize: 15,
+        fontFamily: fonts.bold,
+        color: '#252525',
+        textTransform: 'lowercase',
+    },
+    workoutWidgetExercise: {
+        fontSize: 12,
+        fontFamily: fonts.regular,
+        color: '#757575',
+        textTransform: 'lowercase',
+        marginTop: 1,
+    },
+    confettiLayer: {
+        ...StyleSheet.absoluteFillObject,
+        zIndex: 50,
+        pointerEvents: 'none',
+    },
+    sheetBottomFade: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        height: 130,
+        zIndex: 5,
     },
     gradientContainer: {
         width: Dimensions.get('window').width,
@@ -1361,7 +1685,6 @@ const styles = StyleSheet.create({
     scrollView: {
         flex: 1,
         width: '100%',
-        height: '100%',
     },
     scrollContent: {
         flexGrow: 1,
@@ -1443,6 +1766,7 @@ const styles = StyleSheet.create({
         textTransform: 'lowercase',
         textAlign: 'left',
         flex: 1,
+        marginRight: 8,
     },
     addExerciseIconButton: {
         padding: 4,
@@ -1563,16 +1887,6 @@ const styles = StyleSheet.create({
         height: 24,
         backgroundColor: '#E0E0E0',
         marginHorizontal: 12,
-    },
-    actionButtons: {
-        marginTop: 0,
-        marginBottom: 16,
-        gap: 12,
-        width: '100%',
-    },
-    finishWorkoutButton: {
-        width: Dimensions.get('window').width - 50, // Match workout box width (screen width - 25px padding on each side)
-        alignSelf: 'stretch',
     },
     activeWorkoutContainer: {
         width: '100%',
