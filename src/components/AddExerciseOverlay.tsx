@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../constants/fonts';
+import { Button } from './Button';
 import { getExercisesList, searchExercises, Exercise, getExerciseDetails, ExerciseDetails } from '../services/exerciseService';
 import { useOverlay } from '../contexts/OverlayContext';
 import { useNavigation } from '@react-navigation/native';
@@ -26,11 +27,16 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
+function createUniqueId(): string {
+    return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 interface AddExerciseOverlayProps {
     visible: boolean;
     onClose: () => void;
     onSelectExercise: (exercise: Exercise) => void;
     onSelectExerciseAndNavigate?: (exercise: Exercise, createdExercise: { id: string; name: string; sets: Array<{ id: string; reps: string; weight: string }> }, allExercises: Array<{ id: string; name: string; sets: Array<{ id: string; reps: string; weight: string }> }>, exerciseIndex: number) => void;
+    onSelectionCommitted?: (count: number) => void;
     currentExerciseIds?: string[];
     currentExerciseNames?: string[];
     onRemoveExercise?: (exercise: Exercise) => void;
@@ -41,6 +47,7 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
     onClose,
     onSelectExercise,
     onSelectExerciseAndNavigate,
+    onSelectionCommitted,
     currentExerciseIds = [],
     currentExerciseNames = [],
     onRemoveExercise,
@@ -65,6 +72,7 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
     const [exerciseDetails, setExerciseDetails] = useState<ExerciseDetails | null>(null);
     const [loadingDetails, setLoadingDetails] = useState(false);
     const [hasLoadedInitial, setHasLoadedInitial] = useState(false);
+    const [selectedExerciseNames, setSelectedExerciseNames] = useState<Set<string>>(new Set());
 
     // Load exercises from Supabase when overlay becomes visible
     // Only load when the overlay first opens, not when detail overlay opens/closes
@@ -87,6 +95,7 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
             setSelectedExercise(null);
             setExerciseDetails(null);
             setHasLoadedInitial(false);
+            setSelectedExerciseNames(new Set());
         }
     }, [visible, hasLoadedInitial]);
 
@@ -263,8 +272,8 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
         // Create the exercise object (same structure as WorkoutScreen uses)
-        const exerciseId = Date.now().toString();
-        const setId = (Date.now() + 1).toString();
+        const exerciseId = createUniqueId();
+        const setId = createUniqueId();
         const newExercise = {
             id: exerciseId,
             name: selectedExercise.name,
@@ -283,6 +292,7 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
         } else {
             onSelectExercise(selectedExercise);
         }
+        onSelectionCommitted?.(1);
 
         // Animate out before closing
         Animated.parallel([
@@ -313,32 +323,20 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
     };
 
     const handleAddExercise = (exercise: Exercise) => {
+        const key = exercise.name.trim().toLowerCase();
+        setSelectedExerciseNames((prev) => {
+            const next = new Set(prev);
+            if (next.has(key)) {
+                next.delete(key);
+            } else {
+                next.add(key);
+            }
+            return next;
+        });
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    };
 
-        // Create the exercise object (same structure as WorkoutScreen uses)
-        const exerciseId = Date.now().toString();
-        const setId = (Date.now() + 1).toString(); // Slightly different to ensure unique ID
-        const newExercise = {
-            id: exerciseId,
-            name: exercise.name,
-            sets: [
-                {
-                    id: setId,
-                    reps: '10',
-                    weight: '0',
-                },
-            ],
-        };
-
-        // If there's a navigation callback, use it; otherwise just add the exercise
-        if (onSelectExerciseAndNavigate) {
-            // Pass the new exercise - WorkoutScreen will handle adding it and navigating with all exercises
-            onSelectExerciseAndNavigate(exercise, newExercise, [newExercise], 0);
-        } else {
-            onSelectExercise(exercise);
-        }
-
-        // Animate out before closing
+    const animateOutAndClose = () => {
         Animated.parallel([
             Animated.timing(slideAnim, {
                 toValue: SCREEN_HEIGHT,
@@ -357,12 +355,34 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
         });
     };
 
+    const handleConfirmSelectedExercises = () => {
+        if (selectedExerciseNames.size === 0) return;
+
+        const selectedItems = displayedExercises.filter((exercise) =>
+            selectedExerciseNames.has(exercise.name.trim().toLowerCase())
+        );
+
+        if (selectedItems.length === 0) {
+            return;
+        }
+
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        selectedItems.forEach((exercise) => {
+            onSelectExercise(exercise);
+        });
+        onSelectionCommitted?.(selectedItems.length);
+
+        animateOutAndClose();
+    };
+
     // Use exercises directly from Supabase (already filtered server-side when searching)
     const displayedExercises = exercises;
     const currentExerciseIdSet = new Set(currentExerciseIds);
     const currentExerciseNameSet = new Set(
         currentExerciseNames.map((name) => name.trim().toLowerCase())
     );
+    const selectedCount = selectedExerciseNames.size;
+    const floatingButtonBottom = Math.max(insets.bottom - 15, 4);
 
     return (
         <>
@@ -537,7 +557,10 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
                                         <ScrollView
                                             ref={scrollViewRef}
                                             style={styles.scrollView}
-                                            contentContainerStyle={styles.scrollContent}
+                                            contentContainerStyle={[
+                                                styles.scrollContent,
+                                                selectedCount > 0 ? { paddingBottom: 88 + floatingButtonBottom } : null,
+                                            ]}
                                             showsVerticalScrollIndicator={false}
                                             onScroll={handleScroll}
                                             scrollEventThrottle={400}
@@ -552,6 +575,8 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
                                                         const exerciseNameKey = exercise.name?.trim().toLowerCase();
                                                         const isAlreadyAdded = (!!exercise.id && currentExerciseIdSet.has(exercise.id))
                                                             || (!!exerciseNameKey && currentExerciseNameSet.has(exerciseNameKey));
+                                                        const isSelected =
+                                                            !!exerciseNameKey && selectedExerciseNames.has(exerciseNameKey);
                                                         return (
                                                             <View
                                                                 key={`exercise-${index}-${exercise.id || exercise.name || 'item'}`}
@@ -585,7 +610,11 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
                                                                         onPress={() => handleAddExercise(exercise)}
                                                                         activeOpacity={0.7}
                                                                     >
-                                                                        <Ionicons name="add" size={24} color="#526EFF" />
+                                                                        <Ionicons
+                                                                            name={isSelected ? 'checkmark-circle' : 'add'}
+                                                                            size={24}
+                                                                            color={isSelected ? '#34A853' : '#526EFF'}
+                                                                        />
                                                                     </TouchableOpacity>
                                                                 )}
                                                             </View>
@@ -600,6 +629,23 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
                                                 </>
                                             )}
                                         </ScrollView>
+                                    )}
+                                    {selectedCount > 0 && !loading && (
+                                        <View
+                                            style={[
+                                                styles.floatingAddSelectedContainer,
+                                                { bottom: floatingButtonBottom },
+                                            ]}
+                                            pointerEvents="box-none"
+                                        >
+                                            <Button
+                                                title={`add selected (${selectedCount})`}
+                                                onPress={handleConfirmSelectedExercises}
+                                                containerStyle={styles.floatingAddSelectedButtonContainer}
+                                                buttonBodyStyle={styles.floatingAddSelectedButtonBody}
+                                                textStyle={styles.floatingAddSelectedButtonText}
+                                            />
+                                        </View>
                                     )}
                                 </View>
                             )}
@@ -682,6 +728,22 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         borderWidth: 2,
         borderColor: '#252525',
+    },
+    floatingAddSelectedContainer: {
+        position: 'absolute',
+        left: 20,
+        right: 20,
+    },
+    floatingAddSelectedButtonContainer: {
+        width: '100%',
+    },
+    floatingAddSelectedButtonBody: {
+        width: '100%',
+        marginTop: 0,
+        marginBottom: 0,
+    },
+    floatingAddSelectedButtonText: {
+        color: '#FFFFFF',
     },
     searchIcon: {
         marginRight: 12,

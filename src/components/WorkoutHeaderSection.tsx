@@ -23,6 +23,9 @@ interface WorkoutHeaderSectionProps {
     sheetExpanded?: boolean;
     onSheetExpandToggle?: () => void;
     onFinishPress?: () => void;
+    /** Animate header chrome out when inline editor is open */
+    inlineEditorActive?: boolean;
+    onInlineBackPress?: () => void;
 }
 
 export const WorkoutHeaderSection: React.FC<WorkoutHeaderSectionProps> = ({
@@ -42,6 +45,8 @@ export const WorkoutHeaderSection: React.FC<WorkoutHeaderSectionProps> = ({
     sheetExpanded = true,
     onSheetExpandToggle,
     onFinishPress,
+    inlineEditorActive = false,
+    onInlineBackPress,
 }) => {
     const [bodyAreaModalVisible, setBodyAreaModalVisible] = useState(false);
 
@@ -67,6 +72,7 @@ export const WorkoutHeaderSection: React.FC<WorkoutHeaderSectionProps> = ({
     const [displayCompletedReps, setDisplayCompletedReps] = useState(0);
     const [displayTotalSets, setDisplayTotalSets] = useState(0);
     const [displayTotalReps, setDisplayTotalReps] = useState(0);
+    const chromeSwapAnim = useRef(new Animated.Value(0)).current;
 
     // Animate completed sets/reps and exercise count when in active mode
     useEffect(() => {
@@ -120,6 +126,16 @@ export const WorkoutHeaderSection: React.FC<WorkoutHeaderSectionProps> = ({
             };
         }
     }, [exerciseCount, completedSets, completedReps, totalSets, totalReps, isActive]);
+
+    useEffect(() => {
+        if (!isActive) return;
+        Animated.timing(chromeSwapAnim, {
+            toValue: inlineEditorActive ? 1 : 0,
+            duration: 220,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: false,
+        }).start();
+    }, [inlineEditorActive, isActive, chromeSwapAnim]);
 
     // Animate values (only when not in active mode)
     useEffect(() => {
@@ -217,39 +233,81 @@ export const WorkoutHeaderSection: React.FC<WorkoutHeaderSectionProps> = ({
                         </View>
                     ) : isActive ? (
                         <View style={styles.activeHeaderColumn}>
-                            <View style={styles.titleBarRow}>
-                                {onSheetExpandToggle ? (
-                                    <TouchableOpacity
-                                        onPress={onSheetExpandToggle}
-                                        style={styles.titleBarExpandButton}
-                                        activeOpacity={0.7}
-                                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                                        accessibilityLabel={
-                                            sheetExpanded
-                                                ? 'Minimize workout view'
-                                                : 'Expand workout view'
-                                        }
-                                    >
-                                        <Ionicons
-                                            name={sheetExpanded ? 'contract-outline' : 'expand-outline'}
-                                            size={24}
-                                            color="#252525"
-                                        />
-                                    </TouchableOpacity>
-                                ) : (
-                                    <View style={styles.titleBarExpandButton} />
-                                )}
-                                <View style={styles.titleBarSpacer} />
-                                {onFinishPress ? (
-                                    <Button
-                                        variant="primary"
-                                        title="finish"
-                                        onPress={onFinishPress}
-                                        containerStyle={styles.titleBarFinishButton}
-                                        buttonBodyStyle={styles.toolbarFinishButtonBody}
-                                        textStyle={styles.toolbarFinishButtonText}
-                                    />
-                                ) : null}
+                            <View style={styles.titleBarRowWrap}>
+                                <View style={styles.titleBarRow}>
+                                    {(onSheetExpandToggle || onInlineBackPress) ? (
+                                        <TouchableOpacity
+                                            onPress={inlineEditorActive ? onInlineBackPress : onSheetExpandToggle}
+                                            style={styles.titleBarExpandButton}
+                                            activeOpacity={0.7}
+                                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                            accessibilityLabel={
+                                                inlineEditorActive
+                                                    ? 'Back to workout list'
+                                                    : sheetExpanded
+                                                      ? 'Minimize workout view'
+                                                      : 'Expand workout view'
+                                            }
+                                        >
+                                            <Animated.View
+                                                style={[
+                                                    styles.iconSwapLayer,
+                                                    {
+                                                        opacity: chromeSwapAnim.interpolate({
+                                                            inputRange: [0, 1],
+                                                            outputRange: [1, 0],
+                                                        }),
+                                                    },
+                                                ]}
+                                            >
+                                                <Ionicons
+                                                    name={sheetExpanded ? 'contract-outline' : 'expand-outline'}
+                                                    size={24}
+                                                    color="#252525"
+                                                />
+                                            </Animated.View>
+                                            <Animated.View
+                                                style={[
+                                                    styles.iconSwapLayer,
+                                                    {
+                                                        opacity: chromeSwapAnim,
+                                                    },
+                                                ]}
+                                            >
+                                                <Ionicons name="chevron-back" size={24} color="#252525" />
+                                            </Animated.View>
+                                        </TouchableOpacity>
+                                    ) : (
+                                        <View style={styles.titleBarExpandButton} />
+                                    )}
+                                    <View style={styles.titleBarSpacer} />
+                                    {onFinishPress ? (
+                                        <Animated.View
+                                            style={{
+                                                opacity: chromeSwapAnim.interpolate({
+                                                    inputRange: [0, 1],
+                                                    outputRange: [1, 0],
+                                                }),
+                                                transform: [{
+                                                    scale: chromeSwapAnim.interpolate({
+                                                        inputRange: [0, 1],
+                                                        outputRange: [1, 0.96],
+                                                    }),
+                                                }],
+                                            }}
+                                            pointerEvents={inlineEditorActive ? 'none' : 'auto'}
+                                        >
+                                            <Button
+                                                variant="primary"
+                                                title="finish"
+                                                onPress={onFinishPress}
+                                                containerStyle={styles.titleBarFinishButton}
+                                                buttonBodyStyle={styles.toolbarFinishButtonBody}
+                                                textStyle={styles.toolbarFinishButtonText}
+                                            />
+                                        </Animated.View>
+                                    ) : null}
+                                </View>
                             </View>
                             <View style={styles.activeMetricsToolbarRow}>
                                 <View style={styles.activeMetricsInline}>
@@ -356,6 +414,14 @@ const styles = StyleSheet.create({
         minHeight: 44,
         paddingBottom: 6,
         marginBottom: 6,
+    },
+    titleBarRowWrap: {
+        minHeight: 50,
+    },
+    iconSwapLayer: {
+        position: 'absolute',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     titleBarSpacer: {
         flex: 1,

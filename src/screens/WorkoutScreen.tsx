@@ -24,9 +24,11 @@ import { WorkoutHeaderSection } from '../components/WorkoutHeaderSection';
 import { Button } from '../components/Button';
 import { Confetti, ConfettiParticle } from '../components/Confetti';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { StartWorkoutBottomSheet } from '../components/StartWorkoutBottomSheet';
 import { AddExerciseOverlay } from '../components/AddExerciseOverlay';
 import { useOverlay } from '../contexts/OverlayContext';
+import { PlateSlider } from '../components/PlateSlider';
 
 interface Exercise {
     id: string;
@@ -74,6 +76,10 @@ function getWidgetCurrentExerciseLabel(workout: ActiveWorkout): string {
     );
     const pick = incomplete ?? workout.exercises[workout.exercises.length - 1];
     return pick.name.toLowerCase();
+}
+
+function createUniqueId(): string {
+    return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 /** Compact elapsed time for the minimized bar (e.g. 43s, 4m 12s, 1h 2m) */
@@ -128,7 +134,7 @@ export const WorkoutScreen: React.FC = () => {
     const sheetPaddingTop = insets.top + WORKOUT_SHEET_MARGIN_V;
     const sheetPaddingBottom = insets.bottom + WORKOUT_SHEET_MARGIN_V;
     const sheetInnerHeight = screenHeight - sheetPaddingTop - sheetPaddingBottom;
-    const workoutBoxHeight = Math.max(160, sheetInnerHeight - headerHeight - 48);
+    const workoutBoxHeight = Math.max(160, sheetInnerHeight - headerHeight - 20);
 
     // Calculate available height for dashed box (accounting for navbar - browse button is commented out)
     const browseButtonHeight = 0; // Browse workouts button is commented out, so no height needed
@@ -171,9 +177,15 @@ export const WorkoutScreen: React.FC = () => {
     const receiptOpacity = useRef(new Animated.Value(0)).current;
     const receiptTranslateY = useRef(new Animated.Value(40)).current;
     const scrollViewRef = useRef<ScrollView>(null);
+    const lastAddedExerciseIdsRef = useRef<string[]>([]);
     const lastTapRef = useRef<{ time: number }>({ time: 0 });
     const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const [confettiParticles, setConfettiParticles] = useState<ConfettiParticle[]>([]);
+    const [editingExerciseId, setEditingExerciseId] = useState<string | null>(null);
+    const [editorReps, setEditorReps] = useState('10');
+    const [editorWeight, setEditorWeight] = useState(20);
+    const [recentlyAddedExerciseIds, setRecentlyAddedExerciseIds] = useState<string[]>([]);
+    const editorEntryAnim = useRef(new Animated.Value(0)).current;
     const exerciseItemRefs = useRef<Map<string, { measureInWindow: (callback: (x: number, y: number, width: number, height: number) => void) => void; getTextWidth: () => number }>>(new Map());
 
     // Mock function to load saved workout - in real app, this would fetch from database
@@ -298,69 +310,63 @@ export const WorkoutScreen: React.FC = () => {
         }
     }, [activeWorkout, workoutExpandProgress]);
 
-    const handleAddExercise = () => {
-        if (!activeWorkout) return;
-        // Open the add exercise overlay instead of directly adding
-        setShowAddExerciseOverlay(true);
-    };
-
     const handleSelectExercise = (exercise: { id: string; name: string }) => {
         if (!activeWorkout) return;
+        const exerciseId = createUniqueId();
 
         const newExercise: Exercise = {
-            id: Date.now().toString(),
+            id: exerciseId,
             name: exercise.name,
             sets: [
                 {
-                    id: Date.now().toString(),
+                    id: createUniqueId(),
                     reps: '10',
                     weight: '0',
                 },
             ],
         };
 
-        setActiveWorkout({
-            ...activeWorkout,
-            exercises: [...activeWorkout.exercises, newExercise],
+        setActiveWorkout((prev) => {
+            if (!prev) {
+                return prev;
+            }
+            return {
+                ...prev,
+                exercises: [newExercise, ...prev.exercises],
+            };
         });
+        lastAddedExerciseIdsRef.current.push(newExercise.id);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     };
 
-    const handleSelectExerciseAndNavigate = (exercise: { id: string; name: string }, createdExercise: Exercise, allExercises: Exercise[], exerciseIndex: number) => {
+    const handleOpenAddExerciseOverlay = () => {
         if (!activeWorkout) return;
-
-        // Add the exercise to the workout
-        const updatedExercises = [...activeWorkout.exercises, createdExercise];
-        const updatedWorkout = {
-            ...activeWorkout,
-            exercises: updatedExercises,
-        };
-        setActiveWorkout(updatedWorkout);
+        lastAddedExerciseIdsRef.current = [];
+        setShowAddExerciseOverlay(true);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-        if (rootNavigationRef.isReady()) {
-            rootNavigationRef.navigate('ExerciseDetail', {
-                exercise: createdExercise,
-                exerciseId: createdExercise.id,
-                allExercises: updatedExercises,
-                currentExerciseIndex: updatedExercises.length - 1,
-            });
-        }
     };
 
+    const handleSelectionCommitted = useCallback((_count: number) => {
+        const addedIds = lastAddedExerciseIdsRef.current;
+        if (addedIds.length > 0) {
+            setRecentlyAddedExerciseIds((prev) => [...new Set([...prev, ...addedIds])]);
+            setTimeout(() => {
+                scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+            }, 30);
+            setTimeout(() => {
+                setRecentlyAddedExerciseIds((prev) => prev.filter((id) => !addedIds.includes(id)));
+            }, 2400);
+        }
+        lastAddedExerciseIdsRef.current = [];
+    }, [setRecentlyAddedExerciseIds]);
 
     const handleExercisePress = (exercise: Exercise) => {
         if (!activeWorkout) return;
+        const lastCompleted = [...exercise.sets].reverse().find((set) => set.completed);
+        setEditorReps(lastCompleted?.reps ?? '10');
+        setEditorWeight(parseFloat(lastCompleted?.weight ?? '20') || 20);
+        setEditingExerciseId(exercise.id);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        const exerciseIndex = activeWorkout.exercises.findIndex(ex => ex.id === exercise.id);
-        if (rootNavigationRef.isReady()) {
-            rootNavigationRef.navigate('ExerciseDetail', {
-                exercise: exercise,
-                exerciseId: exercise.id,
-                allExercises: activeWorkout.exercises,
-                currentExerciseIndex: exerciseIndex,
-            });
-        }
     };
 
     const handleDeleteExercise = (exercise: Exercise) => {
@@ -548,6 +554,77 @@ export const WorkoutScreen: React.FC = () => {
         // This will trigger a re-render with updated completedSets and completedReps
     }, [activeWorkout]);
 
+    useEffect(() => {
+        if (!activeWorkout || !editingExerciseId) return;
+        const exists = activeWorkout.exercises.some((exercise) => exercise.id === editingExerciseId);
+        if (!exists) {
+            setEditingExerciseId(null);
+        }
+    }, [activeWorkout, editingExerciseId]);
+
+    const handleBackFromInlineEditor = () => {
+        setEditingExerciseId(null);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    };
+
+    const handleInlineAddSet = () => {
+        if (!activeWorkout || !editingExerciseId) return;
+        const repsValue = (parseInt(editorReps, 10) || 0).toString();
+        const safeWeight = Number.isFinite(editorWeight) ? editorWeight : 0;
+        const newSet: Set = {
+            id: createUniqueId(),
+            reps: repsValue,
+            weight: safeWeight.toFixed(2),
+            completed: true,
+        };
+
+        setActiveWorkout((prev) => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                exercises: prev.exercises.map((exercise) =>
+                    exercise.id === editingExerciseId
+                        ? { ...exercise, sets: [...exercise.sets, newSet] }
+                        : exercise
+                ),
+            };
+        });
+
+        setEditorReps('10');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    };
+
+    const handleInlineRemoveSet = (setId: string) => {
+        if (!activeWorkout || !editingExerciseId) return;
+        setActiveWorkout((prev) => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                exercises: prev.exercises.map((exercise) =>
+                    exercise.id === editingExerciseId
+                        ? { ...exercise, sets: exercise.sets.filter((set) => set.id !== setId) }
+                        : exercise
+                ),
+            };
+        });
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    };
+
+    const editingExercise = activeWorkout?.exercises.find((exercise) => exercise.id === editingExerciseId) ?? null;
+
+    useEffect(() => {
+        if (editingExercise) {
+            editorEntryAnim.setValue(0);
+            Animated.spring(editorEntryAnim, {
+                toValue: 1,
+                tension: 120,
+                friction: 12,
+                useNativeDriver: true,
+            }).start();
+        } else {
+            editorEntryAnim.setValue(0);
+        }
+    }, [editingExercise, editorEntryAnim]);
 
     const handleReceiptContinue = () => {
         Animated.parallel([
@@ -1006,7 +1083,7 @@ export const WorkoutScreen: React.FC = () => {
                 pointerEvents={workoutSheetExpanded ? 'auto' : 'none'}
                 style={[StyleSheet.absoluteFillObject, { opacity: backdropDimOpacity, zIndex: 0 }]}
             >
-                <View style={styles.workoutDimLayer} />
+                <BlurView intensity={52} tint="default" style={StyleSheet.absoluteFillObject} />
             </Animated.View>
 
             {activeWorkout ? (
@@ -1101,6 +1178,8 @@ export const WorkoutScreen: React.FC = () => {
                             sheetExpanded={workoutSheetExpanded}
                             onSheetExpandToggle={activeWorkout ? handleWorkoutSheetExpandToggle : undefined}
                             onFinishPress={activeWorkout ? handleFinishWorkout : undefined}
+                            inlineEditorActive={!!editingExercise}
+                            onInlineBackPress={editingExercise ? handleBackFromInlineEditor : undefined}
                         />
 
                         {/* Empty State or Active Workout */}
@@ -1145,76 +1224,176 @@ export const WorkoutScreen: React.FC = () => {
                                 ]}
                             >
                                 <View style={[styles.workoutBox, { height: workoutBoxHeight }]}>
-                                    <View style={styles.workoutBoxHeader}>
-                                        {activeWorkout.workoutName ? (
-                                            <Text style={styles.workoutName} numberOfLines={1}>
-                                                {activeWorkout.workoutName}
-                                            </Text>
-                                        ) : (
-                                            <Text style={styles.workoutName}>workout</Text>
-                                        )}
-                                        <TouchableOpacity
-                                            style={styles.addExerciseIconButton}
-                                            onPress={handleAddExercise}
-                                            activeOpacity={0.7}
-                                            accessibilityLabel="Add exercise"
-                                        >
-                                            <Ionicons name="add" size={24} color="#526EFF" />
-                                        </TouchableOpacity>
-                                    </View>
-
-                                    {/* Exercise List */}
-                                    <View
-                                        onStartShouldSetResponder={() => true}
-                                        onResponderRelease={() => {
-                                            const now = Date.now();
-                                            const DOUBLE_TAP_DELAY = 300;
-
-                                            if (now - lastTapRef.current.time < DOUBLE_TAP_DELAY) {
-                                                // Double tap detected - open add exercise overlay
-                                                setShowAddExerciseOverlay(true);
-                                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                                lastTapRef.current = { time: 0 };
-                                            } else {
-                                                // First tap - just record it
-                                                lastTapRef.current = { time: now };
-                                            }
-                                        }}
-                                        style={{ flex: 1 }}
-                                    >
-                                        <ScrollView
-                                            style={styles.exercisesScrollView}
-                                            contentContainerStyle={[
-                                                styles.exercisesScrollContent,
-                                                activeWorkout.exercises.length === 0 && styles.exercisesScrollContentEmpty
+                                    {editingExercise ? (
+                                        <Animated.View
+                                            style={[
+                                                styles.inlineEditorContainer,
+                                                {
+                                                    opacity: editorEntryAnim,
+                                                    transform: [
+                                                        {
+                                                            translateY: editorEntryAnim.interpolate({
+                                                                inputRange: [0, 1],
+                                                                outputRange: [20, 0],
+                                                            }),
+                                                        },
+                                                        {
+                                                            scale: editorEntryAnim.interpolate({
+                                                                inputRange: [0, 1],
+                                                                outputRange: [0.97, 1],
+                                                            }),
+                                                        },
+                                                    ],
+                                                },
                                             ]}
-                                            showsVerticalScrollIndicator={false}
-                                            scrollEnabled={true}
                                         >
-                                            {activeWorkout.exercises.length === 0 ? (
-                                                <View style={styles.emptyWorkoutPlaceholder}>
-                                                    <Text style={styles.emptyWorkoutText}>double tap to add workout</Text>
+                                            <View style={styles.inlineEditorHeader}>
+                                                <TouchableOpacity
+                                                    style={styles.inlineEditorBackButton}
+                                                    onPress={handleBackFromInlineEditor}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <Ionicons name="chevron-back" size={20} color="#526EFF" />
+                                                    <Text style={styles.inlineEditorBackText}>back</Text>
+                                                </TouchableOpacity>
+                                                <Text style={styles.inlineEditorTitle} numberOfLines={1}>
+                                                    {editingExercise.name.toLowerCase()}
+                                                </Text>
+                                            </View>
+                                            <ScrollView
+                                                style={styles.inlineEditorSetsScroll}
+                                                contentContainerStyle={styles.inlineEditorSetsContent}
+                                                showsVerticalScrollIndicator={false}
+                                            >
+                                                {editingExercise.sets.filter((set) => set.completed).length === 0 ? (
+                                                    <Text style={styles.inlineEditorEmptyText}>no sets yet, add your first set</Text>
+                                                ) : (
+                                                    editingExercise.sets
+                                                        .filter((set) => set.completed)
+                                                        .map((set, index) => (
+                                                            <View key={set.id} style={styles.inlineEditorSetCard}>
+                                                                <View style={styles.inlineEditorSetCardLeft}>
+                                                                    <Text style={styles.inlineEditorSetCardTitle}>set {index + 1}</Text>
+                                                                    <Text style={styles.inlineEditorSetCardMeta}>
+                                                                        {(parseFloat(set.weight) || 0).toFixed(1)}kg x {set.reps}
+                                                                    </Text>
+                                                                </View>
+                                                                <TouchableOpacity
+                                                                    onPress={() => handleInlineRemoveSet(set.id)}
+                                                                    activeOpacity={0.7}
+                                                                >
+                                                                    <Ionicons name="trash-outline" size={20} color="#E53935" />
+                                                                </TouchableOpacity>
+                                                            </View>
+                                                        ))
+                                                )}
+                                            </ScrollView>
+                                            <View style={styles.inlineEditorControls}>
+                                                <PlateSlider
+                                                    value={editorWeight}
+                                                    onValueChange={setEditorWeight}
+                                                    min={2.5}
+                                                    max={250}
+                                                    step={2.5}
+                                                />
+                                                <View style={styles.inlineEditorRepsRow}>
+                                                    <TouchableOpacity
+                                                        style={styles.inlineEditorRepsAdjust}
+                                                        onPress={() => {
+                                                            const next = Math.max(0, (parseInt(editorReps, 10) || 0) - 1);
+                                                            setEditorReps(next.toString());
+                                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                                        }}
+                                                    >
+                                                        <Text style={styles.inlineEditorRepsAdjustText}>-</Text>
+                                                    </TouchableOpacity>
+                                                    <TextInput
+                                                        style={styles.inlineEditorRepsInput}
+                                                        value={editorReps}
+                                                        onChangeText={setEditorReps}
+                                                        keyboardType="numeric"
+                                                        placeholder="10"
+                                                        placeholderTextColor="#9E9E9E"
+                                                    />
+                                                    <TouchableOpacity
+                                                        style={styles.inlineEditorRepsAdjust}
+                                                        onPress={() => {
+                                                            const next = (parseInt(editorReps, 10) || 0) + 1;
+                                                            setEditorReps(next.toString());
+                                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                                        }}
+                                                    >
+                                                        <Text style={styles.inlineEditorRepsAdjustText}>+</Text>
+                                                    </TouchableOpacity>
                                                 </View>
-                                            ) : (
-                                                activeWorkout.exercises.map((exercise, index) => {
-                                                    const isComplete = exercise.sets.length > 0 && exercise.sets.every((set) => set.completed);
-                                                    return (
-                                                        <ExerciseItem
-                                                            key={exercise.id}
-                                                            exercise={exercise}
-                                                            isComplete={isComplete}
-                                                            onPress={() => handleExercisePress(exercise)}
-                                                            onLongPress={() => handleDeleteExercise(exercise)}
-                                                            onLayout={(ref) => {
-                                                                exerciseItemRefs.current.set(exercise.id, ref);
-                                                            }}
-                                                            isLast={index === activeWorkout.exercises.length - 1}
-                                                        />
-                                                    );
-                                                })
-                                            )}
-                                        </ScrollView>
-                                    </View>
+                                                <Button
+                                                    variant="primary"
+                                                    title="add set"
+                                                    onPress={handleInlineAddSet}
+                                                    containerStyle={styles.inlineEditorAddSetButton}
+                                                />
+                                            </View>
+                                        </Animated.View>
+                                    ) : (
+                                        <>
+                                            <TouchableOpacity
+                                                style={styles.fixedAddExerciseButton}
+                                                onPress={handleOpenAddExerciseOverlay}
+                                                activeOpacity={0.8}
+                                                accessibilityRole="button"
+                                                accessibilityLabel="Add exercise"
+                                            >
+                                                <Text style={styles.emptyWorkoutText}>tap to add exercise</Text>
+                                            </TouchableOpacity>
+
+                                            {/* Exercise List */}
+                                            <View
+                                                onStartShouldSetResponder={() => (activeWorkout.exercises.length > 0 ? true : false)}
+                                                onResponderRelease={() => {
+                                                    if (activeWorkout.exercises.length === 0) {
+                                                        return;
+                                                    }
+                                                    const now = Date.now();
+                                                    const DOUBLE_TAP_DELAY = 300;
+
+                                                    if (now - lastTapRef.current.time < DOUBLE_TAP_DELAY) {
+                                                        // Double tap detected - open add exercise overlay
+                                                        handleOpenAddExerciseOverlay();
+                                                        lastTapRef.current = { time: 0 };
+                                                    } else {
+                                                        // First tap - just record it
+                                                        lastTapRef.current = { time: now };
+                                                    }
+                                                }}
+                                                style={{ flex: 1 }}
+                                            >
+                                                <ScrollView
+                                                    style={styles.exercisesScrollView}
+                                                    contentContainerStyle={styles.exercisesScrollContent}
+                                                    showsVerticalScrollIndicator={false}
+                                                    scrollEnabled={true}
+                                                >
+                                                    {activeWorkout.exercises.map((exercise, index) => {
+                                                        const isComplete = exercise.sets.length > 0 && exercise.sets.every((set) => set.completed);
+                                                        return (
+                                                            <ExerciseItem
+                                                                key={exercise.id}
+                                                                exercise={exercise}
+                                                                isComplete={isComplete}
+                                                                isNew={recentlyAddedExerciseIds.includes(exercise.id)}
+                                                                onPress={() => handleExercisePress(exercise)}
+                                                                onLongPress={() => handleDeleteExercise(exercise)}
+                                                                onLayout={(ref) => {
+                                                                    exerciseItemRefs.current.set(exercise.id, ref);
+                                                                }}
+                                                                isLast={index === activeWorkout.exercises.length - 1}
+                                                            />
+                                                        );
+                                                    })}
+                                                </ScrollView>
+                                            </View>
+                                        </>
+                                    )}
                                 </View>
                             </Animated.View>
                         )}
@@ -1291,7 +1470,7 @@ export const WorkoutScreen: React.FC = () => {
                 visible={showAddExerciseOverlay}
                 onClose={() => setShowAddExerciseOverlay(false)}
                 onSelectExercise={handleSelectExercise}
-                onSelectExerciseAndNavigate={handleSelectExerciseAndNavigate}
+                onSelectionCommitted={handleSelectionCommitted}
                 currentExerciseIds={activeWorkout?.exercises.map((exercise) => exercise.id) ?? []}
                 currentExerciseNames={activeWorkout?.exercises.map((exercise) => exercise.name) ?? []}
                 onRemoveExercise={handleRemoveExerciseFromOverlay}
@@ -1469,16 +1648,18 @@ export const WorkoutScreen: React.FC = () => {
 interface ExerciseItemProps {
     exercise: Exercise;
     isComplete: boolean;
+    isNew?: boolean;
     onPress: () => void;
     onLongPress: () => void;
     onLayout: (ref: { measureInWindow: (callback: (x: number, y: number, width: number, height: number) => void) => void; getTextWidth: () => number }) => void;
     isLast?: boolean;
 }
 
-const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isComplete, onPress, onLongPress, onLayout, isLast }) => {
+const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isComplete, isNew = false, onPress, onLongPress, onLayout, isLast }) => {
     const itemRef = useRef<View>(null);
     const textRef = useRef<Text>(null);
     const [textWidth, setTextWidth] = useState(0);
+    const newBadgeOpacity = useRef(new Animated.Value(0)).current;
     const completedSets = exercise.sets.filter(set => set.completed);
     const totalSets = exercise.sets.length;
     const lastCompletedSet = completedSets[completedSets.length - 1];
@@ -1501,6 +1682,27 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isComplete, onPre
             });
         }
     }, [onLayout, textWidth]);
+
+    useEffect(() => {
+        if (!isNew) {
+            newBadgeOpacity.setValue(0);
+            return;
+        }
+        newBadgeOpacity.setValue(1);
+        Animated.sequence([
+            Animated.timing(newBadgeOpacity, {
+                toValue: 1,
+                duration: 200,
+                useNativeDriver: true,
+            }),
+            Animated.delay(1500),
+            Animated.timing(newBadgeOpacity, {
+                toValue: 0,
+                duration: 600,
+                useNativeDriver: true,
+            }),
+        ]).start();
+    }, [isNew, newBadgeOpacity]);
 
     return (
         <TouchableOpacity
@@ -1527,6 +1729,9 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isComplete, onPre
                                 {exercise.name}
                             </Text>
                         </Pressable>
+                        <Animated.View style={[styles.newSetHintBadge, { opacity: newBadgeOpacity }]}>
+                            <Text style={styles.newSetHintText}>new - add weight & reps</Text>
+                        </Animated.View>
                     </View>
                     <Ionicons
                         name={isComplete ? "checkmark-sharp" : "chevron-forward"}
@@ -1562,10 +1767,6 @@ const ExerciseItem: React.FC<ExerciseItemProps> = ({ exercise, isComplete, onPre
 };
 
 const styles = StyleSheet.create({
-    workoutDimLayer: {
-        flex: 1,
-        backgroundColor: 'rgba(37, 37, 37, 0.38)',
-    },
     workoutBottomDepthGradient: {
         position: 'absolute',
         left: 0,
@@ -1688,8 +1889,8 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         flexGrow: 1,
-        paddingLeft: 25,
-        paddingRight: 25,
+        paddingLeft: 16,
+        paddingRight: 16,
     },
     emptyStateContainer: {
         flex: 1,
@@ -1744,55 +1945,36 @@ const styles = StyleSheet.create({
     workoutBox: {
         backgroundColor: '#fff',
         borderRadius: 12,
-        borderWidth: 2.5,
-        borderColor: '#252525',
-        marginBottom: 16,
+        marginBottom: 0,
         overflow: 'hidden',
-    },
-    workoutBoxHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingTop: 8,
-        paddingBottom: 6,
-        paddingHorizontal: 15,
-        borderBottomWidth: 2,
-        borderBottomColor: '#F0F0F0',
-    },
-    workoutName: {
-        fontSize: 18,
-        fontFamily: fonts.bold,
-        color: '#252525',
-        textTransform: 'lowercase',
-        textAlign: 'left',
-        flex: 1,
-        marginRight: 8,
-    },
-    addExerciseIconButton: {
-        padding: 4,
     },
     exercisesScrollView: {
         flex: 1,
     },
     exercisesScrollContent: {
-        paddingTop: 12,
-        paddingHorizontal: 12,
-        paddingBottom: 14,
+        paddingTop: 4,
+        paddingHorizontal: 4,
+        paddingBottom: 12,
     },
-    exercisesScrollContentEmpty: {
-        flexGrow: 1,
+    fixedAddExerciseButton: {
+        width: '100%',
+        minHeight: 72,
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    emptyWorkoutPlaceholder: {
-        justifyContent: 'center',
-        alignItems: 'center',
-        flex: 1,
+        borderRadius: 12,
+        borderWidth: 2,
+        borderStyle: 'dashed',
+        borderColor: 'rgba(37, 37, 37, 0.28)',
+        paddingVertical: 12,
+        paddingHorizontal: 15,
+        backgroundColor: 'rgba(82, 110, 255, 0.03)',
+        marginTop: 2,
+        marginBottom: 12,
     },
     emptyWorkoutText: {
-        fontSize: 16,
+        fontSize: 15,
         fontFamily: fonts.regular,
-        color: 'rgba(37, 37, 37, 0.3)',
+        color: 'rgba(37, 37, 37, 0.55)',
         textTransform: 'lowercase',
         textAlign: 'center',
     },
@@ -1851,6 +2033,23 @@ const styles = StyleSheet.create({
         flex: 1,
         position: 'relative',
     },
+    newSetHintBadge: {
+        position: 'absolute',
+        right: 0,
+        top: -8,
+        backgroundColor: '#EEF3FF',
+        borderWidth: 1.5,
+        borderColor: '#526EFF',
+        borderRadius: 999,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+    },
+    newSetHintText: {
+        fontSize: 10,
+        fontFamily: fonts.bold,
+        color: '#526EFF',
+        textTransform: 'lowercase',
+    },
     exerciseItemName: {
         fontSize: 18,
         fontFamily: fonts.regular,
@@ -1890,6 +2089,124 @@ const styles = StyleSheet.create({
     },
     activeWorkoutContainer: {
         width: '100%',
+    },
+    inlineEditorContainer: {
+        flex: 1,
+        paddingHorizontal: 0,
+        paddingBottom: 8,
+    },
+    inlineEditorHeader: {
+        height: 44,
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    inlineEditorBackButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingRight: 12,
+    },
+    inlineEditorBackText: {
+        fontSize: 14,
+        fontFamily: fonts.bold,
+        color: '#526EFF',
+        textTransform: 'lowercase',
+    },
+    inlineEditorTitle: {
+        flex: 1,
+        fontSize: 17,
+        fontFamily: fonts.bold,
+        color: '#252525',
+        textTransform: 'lowercase',
+    },
+    inlineEditorSetsScroll: {
+        flex: 1,
+    },
+    inlineEditorSetsContent: {
+        paddingBottom: 8,
+        gap: 8,
+    },
+    inlineEditorEmptyText: {
+        fontSize: 14,
+        fontFamily: fonts.regular,
+        color: '#9E9E9E',
+        textTransform: 'lowercase',
+        textAlign: 'center',
+        marginTop: 18,
+    },
+    inlineEditorSetCard: {
+        minHeight: 52,
+        borderRadius: 12,
+        borderWidth: 2,
+        borderColor: '#252525',
+        backgroundColor: '#fff',
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    inlineEditorSetCardLeft: {
+        flex: 1,
+        marginRight: 10,
+    },
+    inlineEditorSetCardTitle: {
+        fontSize: 13,
+        fontFamily: fonts.bold,
+        color: '#252525',
+        textTransform: 'lowercase',
+        marginBottom: 2,
+    },
+    inlineEditorSetCardMeta: {
+        fontSize: 13,
+        fontFamily: fonts.regular,
+        color: '#666',
+        textTransform: 'lowercase',
+    },
+    inlineEditorControls: {
+        borderTopWidth: 2,
+        borderTopColor: '#F1F1F1',
+        paddingTop: 8,
+    },
+    inlineEditorRepsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 8,
+        marginBottom: 8,
+    },
+    inlineEditorRepsAdjust: {
+        width: 42,
+        height: 42,
+        borderRadius: 10,
+        borderWidth: 2,
+        borderColor: '#252525',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#fff',
+    },
+    inlineEditorRepsAdjustText: {
+        fontSize: 24,
+        lineHeight: 24,
+        fontFamily: fonts.bold,
+        color: '#252525',
+    },
+    inlineEditorRepsInput: {
+        flex: 1,
+        height: 42,
+        borderRadius: 10,
+        borderWidth: 2,
+        borderColor: '#252525',
+        paddingHorizontal: 12,
+        backgroundColor: '#fff',
+        fontSize: 16,
+        fontFamily: fonts.bold,
+        color: '#252525',
+        textAlign: 'center',
+    },
+    inlineEditorAddSetButton: {
+        width: '100%',
+        marginTop: 0,
     },
     receiptPage: {
         flex: 1,
