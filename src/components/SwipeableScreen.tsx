@@ -5,6 +5,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useOverlay } from '../contexts/OverlayContext';
 import { useWorkoutOverlay } from '../contexts/WorkoutOverlayContext';
+import { useActiveWorkout } from '../contexts/ActiveWorkoutContext';
 import * as Haptics from 'expo-haptics';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -20,29 +21,32 @@ const VELOCITY_THRESHOLD = 0.5; // Minimum velocity to trigger swipe
 
 export const SwipeableScreen: React.FC<SwipeableScreenProps> = ({ children, screenName }) => {
     const navigation = useNavigation<NavigationProp>();
-    const { open: openWorkoutOverlay } = useWorkoutOverlay();
+    const { open: openWorkoutOverlay, isOpen: isWorkoutOverlayOpen } = useWorkoutOverlay();
+    const { state, expand } = useActiveWorkout();
     const { isAnyOverlayOpen } = useOverlay();
     const isAnyOverlayOpenRef = useRef(isAnyOverlayOpen);
+    const isMuscleSelectOpen = isWorkoutOverlayOpen && !state.workout;
+    const isMuscleSelectOpenRef = useRef(isMuscleSelectOpen);
 
-    // Keep ref in sync with state
     useEffect(() => {
         isAnyOverlayOpenRef.current = isAnyOverlayOpen;
     }, [isAnyOverlayOpen]);
+
+    useEffect(() => {
+        isMuscleSelectOpenRef.current = isMuscleSelectOpen;
+    }, [isMuscleSelectOpen]);
 
     const panResponder = useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => false,
             onMoveShouldSetPanResponder: (evt: GestureResponderEvent, gestureState: PanResponderGestureState) => {
-                // Don't respond to swipes if any overlay is open
-                if (isAnyOverlayOpenRef.current) {
+                if (isAnyOverlayOpenRef.current || isMuscleSelectOpenRef.current) {
                     return false;
                 }
-                // Only respond to horizontal swipes
                 return Math.abs(gestureState.dx) > Math.abs(gestureState.dy) && Math.abs(gestureState.dx) > 10;
             },
             onPanResponderRelease: (evt: GestureResponderEvent, gestureState: PanResponderGestureState) => {
-                // Don't handle swipe if any overlay is open
-                if (isAnyOverlayOpenRef.current) {
+                if (isAnyOverlayOpenRef.current || isMuscleSelectOpenRef.current) {
                     return;
                 }
 
@@ -58,6 +62,9 @@ export const SwipeableScreen: React.FC<SwipeableScreenProps> = ({ children, scre
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     if (nextScreen === 'Workout') {
                         openWorkoutOverlay();
+                        if (state.workout) {
+                            expand();
+                        }
                     } else {
                         navigation.navigate(nextScreen);
                     }
@@ -66,6 +73,9 @@ export const SwipeableScreen: React.FC<SwipeableScreenProps> = ({ children, scre
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     if (prevScreen === 'Workout') {
                         openWorkoutOverlay();
+                        if (state.workout) {
+                            expand();
+                        }
                     } else {
                         navigation.navigate(prevScreen);
                     }
@@ -74,11 +84,12 @@ export const SwipeableScreen: React.FC<SwipeableScreenProps> = ({ children, scre
         })
     ).current;
 
+    const blockWorkoutPassThrough = screenName === 'Workout' && isMuscleSelectOpen;
+
     return (
         <View
             style={{ flex: 1, backgroundColor: 'transparent' }}
-            /** Workout tab content is an overlay; `box-none` keeps empty areas from stealing touches from the dashboard below */
-            pointerEvents={screenName === 'Workout' ? 'box-none' : 'auto'}
+            pointerEvents={blockWorkoutPassThrough ? 'auto' : screenName === 'Workout' ? 'box-none' : 'auto'}
             {...panResponder.panHandlers}
         >
             {children}

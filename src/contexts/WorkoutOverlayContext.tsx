@@ -28,7 +28,16 @@ export const WorkoutOverlayProvider: React.FC<{ children: React.ReactNode }> = (
     }, []);
 
     const mergeParams = useCallback((p: Partial<NonNullable<WorkoutOverlayParams>>) => {
-        setParams((prev) => ({ ...(prev ?? {}), ...p } as WorkoutOverlayParams));
+        setParams((prev) => {
+            const base = prev ?? {};
+            const hasChange = (Object.keys(p) as Array<keyof typeof p>).some(
+                (key) => base[key as keyof typeof base] !== p[key]
+            );
+            if (!hasChange) {
+                return prev;
+            }
+            return { ...base, ...p } as WorkoutOverlayParams;
+        });
     }, []);
 
     const value = useMemo(

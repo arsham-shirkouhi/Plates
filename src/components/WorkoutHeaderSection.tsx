@@ -17,6 +17,7 @@ interface WorkoutHeaderSectionProps {
     totalSets?: number; // Total sets across all exercises
     totalReps?: number; // Total reps across all sets
     workoutDuration?: number; // in seconds for timer
+    workoutStartedAt?: Date; // preferred: keeps timer updates local to header
     hasNeverLoggedWorkout?: boolean; // True if user has never logged a workout
     onClosePress?: () => void;
     /** When active: full sheet vs mini bar (driven by parent for animation) */
@@ -40,6 +41,7 @@ export const WorkoutHeaderSection: React.FC<WorkoutHeaderSectionProps> = ({
     totalSets = 0,
     totalReps = 0,
     workoutDuration = 0,
+    workoutStartedAt,
     hasNeverLoggedWorkout = false,
     onClosePress,
     sheetExpanded = true,
@@ -73,6 +75,21 @@ export const WorkoutHeaderSection: React.FC<WorkoutHeaderSectionProps> = ({
     const [displayTotalSets, setDisplayTotalSets] = useState(0);
     const [displayTotalReps, setDisplayTotalReps] = useState(0);
     const chromeSwapAnim = useRef(new Animated.Value(0)).current;
+    const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+    useEffect(() => {
+        if (!isActive || !workoutStartedAt) {
+            return;
+        }
+        const tick = () => {
+            setElapsedSeconds(Math.floor((Date.now() - workoutStartedAt.getTime()) / 1000));
+        };
+        tick();
+        const intervalId = setInterval(tick, 1000);
+        return () => clearInterval(intervalId);
+    }, [isActive, workoutStartedAt]);
+
+    const activeTimerSeconds = workoutStartedAt ? elapsedSeconds : workoutDuration;
 
     // Animate completed sets/reps and exercise count when in active mode
     useEffect(() => {
@@ -321,7 +338,7 @@ export const WorkoutHeaderSection: React.FC<WorkoutHeaderSectionProps> = ({
                                         <Text style={styles.statValue}>{displayCompletedReps}</Text>
                                     </View>
                                     <Text style={styles.timerTextInline} numberOfLines={1}>
-                                        {formatTimer(workoutDuration)}
+                                        {formatTimer(activeTimerSeconds)}
                                     </Text>
                                 </View>
                                 <TouchableOpacity

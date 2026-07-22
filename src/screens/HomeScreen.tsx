@@ -608,10 +608,10 @@ export const HomeScreen: React.FC = () => {
               onLogFoodPress={() => openAddFoodSheet()}
               onLogExercisePress={() => {
                 Alert.alert(
-                  'Start Workout',
-                  'Do you want to start a workout?',
+                  'Start a workout?',
+                  'Ready to log your exercises and track your session?',
                   [
-                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Not now', style: 'cancel' },
                     {
                       text: 'Start',
                       onPress: () => openWorkoutOverlay({ startWorkoutPrompt: true }),

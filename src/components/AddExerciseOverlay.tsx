@@ -64,28 +64,31 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
     const [loadingMore, setLoadingMore] = useState(false);
     const [hasMore, setHasMore] = useState(true);
     const [offset, setOffset] = useState(0);
-    const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
     const scrollViewRef = useRef<ScrollView>(null);
     const [showDetailView, setShowDetailView] = useState(false);
     const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null);
     const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null); // Store the original exercise for adding
     const [exerciseDetails, setExerciseDetails] = useState<ExerciseDetails | null>(null);
     const [loadingDetails, setLoadingDetails] = useState(false);
-    const [hasLoadedInitial, setHasLoadedInitial] = useState(false);
     const [selectedExerciseNames, setSelectedExerciseNames] = useState<Set<string>>(new Set());
+    const loadedForOpenRef = useRef(false);
+    const wasVisibleRef = useRef(false);
 
-    // Load exercises from Supabase when overlay becomes visible
-    // Only load when the overlay first opens, not when detail overlay opens/closes
+    // Load exercises once when the overlay opens; reset local state when it closes.
     useEffect(() => {
-        if (visible && !hasLoadedInitial) {
-            // Only load on initial open
-            setExercises([]);
-            setOffset(0);
-            setHasMore(true);
-            loadExercises(0, true);
-            setHasLoadedInitial(true);
-        } else if (!visible) {
-            // Reset everything when closing the entire overlay
+        if (visible) {
+            if (!loadedForOpenRef.current) {
+                loadedForOpenRef.current = true;
+                setExercises([]);
+                setOffset(0);
+                setHasMore(true);
+                loadExercises(0, true);
+            }
+            wasVisibleRef.current = true;
+            return;
+        }
+
+        if (wasVisibleRef.current) {
             setSearchQuery('');
             setExercises([]);
             setOffset(0);
@@ -94,31 +97,22 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
             setSelectedExerciseId(null);
             setSelectedExercise(null);
             setExerciseDetails(null);
-            setHasLoadedInitial(false);
             setSelectedExerciseNames(new Set());
         }
-    }, [visible, hasLoadedInitial]);
 
-    // Search exercises when search query changes
+        loadedForOpenRef.current = false;
+        wasVisibleRef.current = false;
+    }, [visible]);
+
+    // Search exercises when search query changes (skip the initial empty query on open).
     useEffect(() => {
-        if (!visible) return;
+        if (!visible || searchQuery.trim().length === 0) return;
 
         const timeout = setTimeout(() => {
-            if (searchQuery.trim().length > 0) {
-                // Reset pagination for search
-                setOffset(0);
-                setHasMore(true);
-                searchExercisesFromDB(searchQuery);
-            } else {
-                // Reset pagination when clearing search
-                setOffset(0);
-                setHasMore(true);
-                setExercises([]);
-                loadExercises(0, true);
-            }
-        }, 300); // Debounce search by 300ms
-
-        setSearchTimeout(timeout);
+            setOffset(0);
+            setHasMore(true);
+            searchExercisesFromDB(searchQuery);
+        }, 300);
 
         return () => {
             clearTimeout(timeout);

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
     View,
     Text,
@@ -16,6 +16,12 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { useWorkoutOverlay } from '../contexts/WorkoutOverlayContext';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../constants/fonts';
+import {
+    buildWorkoutExercisesFromTemplate,
+    getMockSavedWorkoutSummaries,
+    getMockWorkoutTemplate,
+} from '../workout/mockWorkoutData';
+import { useActiveWorkout } from '../contexts/ActiveWorkoutContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Button } from '../components/Button';
 
@@ -26,20 +32,32 @@ export const StartWorkoutScreen: React.FC = () => {
     const navigation = useNavigation<StartWorkoutScreenNavigationProp>();
     const route = useRoute<StartWorkoutScreenRouteProp>();
     const { open: openWorkoutOverlay } = useWorkoutOverlay();
+    const { startWorkout, expand } = useActiveWorkout();
     const insets = useSafeAreaInsets();
-    
+
     // Get selected workout ID if coming from BrowseWorkouts
     const selectedWorkoutId = route.params?.selectedWorkoutId;
 
-    // Mock saved workouts - in real app, this would come from database
-    const savedWorkouts: Array<{
-        id: string;
-        name: string;
-        lastCompleted: string;
-        exerciseCount: number;
-        duration: string;
-    }> = []; // Empty array for initial state - no saved workouts
+    const savedWorkouts = getMockSavedWorkoutSummaries();
     const hasSavedWorkouts = savedWorkouts.length > 0;
+    const handledWorkoutIdRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        if (!selectedWorkoutId || handledWorkoutIdRef.current === selectedWorkoutId) return;
+
+        const template = getMockWorkoutTemplate(selectedWorkoutId);
+        if (!template) return;
+
+        handledWorkoutIdRef.current = selectedWorkoutId;
+        startWorkout({
+            title: template.title,
+            exercises: buildWorkoutExercisesFromTemplate(template),
+        });
+        expand();
+        openWorkoutOverlay();
+        navigation.setParams({ selectedWorkoutId: undefined });
+        navigation.goBack();
+    }, [selectedWorkoutId, startWorkout, expand, openWorkoutOverlay, navigation]);
 
     // Animation refs for option cards (like onboarding buttons)
     const pickAsYouGoTranslateY = useRef(new Animated.Value(0)).current;

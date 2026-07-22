@@ -20,6 +20,7 @@ import { SimpleNavBar } from '../components/SimpleNavBar';
 import { ScreenPreloader } from '../components/ScreenPreloader';
 import { rootNavigationRef } from './rootNavigationRef';
 import { WorkoutOverlayProvider } from '../contexts/WorkoutOverlayContext';
+import { ActiveWorkoutProvider } from '../contexts/ActiveWorkoutContext';
 import { WorkoutOverlayHost } from '../components/WorkoutOverlayHost';
 
 export type { RootStackParamList } from './navigationParamList';
@@ -154,12 +155,14 @@ const NavigatorWithNavBar: React.FC = () => {
 
 export const AppNavigator: React.FC<AppNavigatorProps> = ({ user }) => {
     return (
-        <WorkoutOverlayProvider>
-            <NavigationContainer ref={rootNavigationRef}>
-                <NavigatorWithNavBar />
-                <WorkoutOverlayHost />
-            </NavigationContainer>
-        </WorkoutOverlayProvider>
+        <ActiveWorkoutProvider>
+            <WorkoutOverlayProvider>
+                <NavigationContainer ref={rootNavigationRef}>
+                    <NavigatorWithNavBar />
+                    <WorkoutOverlayHost />
+                </NavigationContainer>
+            </WorkoutOverlayProvider>
+        </ActiveWorkoutProvider>
     );
 };
 
