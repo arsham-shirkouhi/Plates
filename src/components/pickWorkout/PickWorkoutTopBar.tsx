@@ -11,6 +11,7 @@ interface PickWorkoutTopBarProps {
     side: BodySide;
     onSideChange: (side: BodySide) => void;
     onClose: () => void;
+    onPresets: () => void;
 }
 
 const TOGGLE_PADDING = 3;
@@ -19,6 +20,7 @@ export const PickWorkoutTopBar: React.FC<PickWorkoutTopBarProps> = ({
     side,
     onSideChange,
     onClose,
+    onPresets,
 }) => {
     const [toggleWidth, setToggleWidth] = useState(0);
     const slideAnim = useRef(new Animated.Value(side === 'front' ? 0 : 1)).current;
@@ -68,14 +70,16 @@ export const PickWorkoutTopBar: React.FC<PickWorkoutTopBarProps> = ({
 
     return (
         <View style={styles.bar}>
-            <TouchableOpacity
-                style={styles.sideSlot}
-                onPress={onClose}
-                accessibilityRole="button"
-                accessibilityLabel="Close pick workout"
-            >
-                <Ionicons name="close" size={22} color={WORKOUT_COLORS.text} />
-            </TouchableOpacity>
+            <View style={styles.sideLeft}>
+                <TouchableOpacity
+                    style={styles.sideSlot}
+                    onPress={onClose}
+                    accessibilityRole="button"
+                    accessibilityLabel="Close pick workout"
+                >
+                    <Ionicons name="close" size={22} color={WORKOUT_COLORS.text} />
+                </TouchableOpacity>
+            </View>
 
             <Animated.View
                 style={[styles.toggleRow, { transform: [{ scale: scaleAnim }] }]}
@@ -117,12 +121,22 @@ export const PickWorkoutTopBar: React.FC<PickWorkoutTopBarProps> = ({
                 </TouchableOpacity>
             </Animated.View>
 
-            <View style={styles.sideSlot} />
+            <View style={styles.sideRight}>
+                <TouchableOpacity
+                    style={styles.presetsButton}
+                    onPress={onPresets}
+                    accessibilityRole="button"
+                    accessibilityLabel="Browse presets"
+                >
+                    <Text style={styles.presetsText}>presets</Text>
+                </TouchableOpacity>
+            </View>
         </View>
     );
 };
 
-const { topBarHeight, padding, touchTarget, borderWidth } = PICK_WORKOUT_LAYOUT;
+const { topBarHeight, padding, borderWidth } = PICK_WORKOUT_LAYOUT;
+const SIDE_SLOT = 44;
 
 const styles = StyleSheet.create({
     bar: {
@@ -134,11 +148,33 @@ const styles = StyleSheet.create({
         paddingVertical: padding,
         backgroundColor: WORKOUT_COLORS.background,
     },
+    sideLeft: {
+        flex: 1,
+        alignItems: 'flex-start',
+        justifyContent: 'center',
+    },
+    sideRight: {
+        flex: 1,
+        alignItems: 'flex-end',
+        justifyContent: 'center',
+    },
     sideSlot: {
-        width: touchTarget,
-        height: touchTarget,
+        width: SIDE_SLOT,
+        height: SIDE_SLOT,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    presetsButton: {
+        height: SIDE_SLOT,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 4,
+    },
+    presetsText: {
+        fontFamily: fonts.bold,
+        fontSize: 14,
+        color: WORKOUT_COLORS.muted,
+        textTransform: 'lowercase',
     },
     toggleRow: {
         flexDirection: 'row',

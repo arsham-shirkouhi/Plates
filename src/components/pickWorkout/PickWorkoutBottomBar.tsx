@@ -1,37 +1,42 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing } from 'react-native';
 import { fonts } from '../../constants/fonts';
 import { PICK_WORKOUT_LAYOUT, WORKOUT_COLORS } from '../../workout/constants';
 import { MuscleGroup } from '../../workout/muscleGroups';
-import { StartWorkoutRoutine } from '../../workout/startWorkoutTypes';
 
 const HINT_LINE =
     'Tap muscles to build a workout, or pick up where you left off.';
 
 interface PickWorkoutBottomBarProps {
     selectedMuscles: MuscleGroup[];
-    hasUserRoutines: boolean;
-    suggestedRoutine: StartWorkoutRoutine | null;
     onPrimaryPress: () => void;
-    onPresets: () => void;
-    onNewWorkout: () => void;
 }
 
 export const PickWorkoutBottomBar: React.FC<PickWorkoutBottomBarProps> = ({
     selectedMuscles,
-    hasUserRoutines,
-    suggestedRoutine,
     onPrimaryPress,
-    onPresets,
-    onNewWorkout,
 }) => {
     const hasSelection = selectedMuscles.length > 0;
 
-    const primaryLabel = hasSelection
-        ? 'review workout'
-        : hasUserRoutines && suggestedRoutine
-          ? `start ${suggestedRoutine.name.toLowerCase()}`
-          : 'browse presets';
+    const pressAnim = useRef(new Animated.Value(0)).current;
+    const animatePress = (toValue: number) => {
+        Animated.timing(pressAnim, {
+            toValue,
+            duration: 120,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+        }).start();
+    };
+    const primaryTranslateY = pressAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, 4],
+    });
+    const primaryShadowOpacity = pressAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [1, 0],
+    });
+
+    const primaryLabel = hasSelection ? 'start workout' : 'start routine';
 
     return (
         <View style={styles.bar}>
@@ -45,31 +50,27 @@ export const PickWorkoutBottomBar: React.FC<PickWorkoutBottomBarProps> = ({
                 )}
             </View>
 
-            <TouchableOpacity
-                style={styles.primaryButton}
-                onPress={onPrimaryPress}
-                accessibilityRole="button"
-                accessibilityLabel={primaryLabel}
-            >
-                <Text style={styles.primaryButtonText}>{primaryLabel}</Text>
-            </TouchableOpacity>
-
-            <View style={styles.row3}>
+            <View style={styles.primaryWrap}>
+                <Animated.View
+                    style={[styles.primaryShadow, { opacity: primaryShadowOpacity }]}
+                    pointerEvents="none"
+                />
                 <TouchableOpacity
-                    style={styles.secondaryButton}
-                    onPress={onPresets}
+                    activeOpacity={1}
+                    onPress={onPrimaryPress}
+                    onPressIn={() => animatePress(1)}
+                    onPressOut={() => animatePress(0)}
                     accessibilityRole="button"
-                    accessibilityLabel="Presets"
+                    accessibilityLabel={primaryLabel}
                 >
-                    <Text style={styles.secondaryButtonText}>presets</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={styles.secondaryButton}
-                    onPress={onNewWorkout}
-                    accessibilityRole="button"
-                    accessibilityLabel="New workout"
-                >
-                    <Text style={styles.secondaryButtonText}>new workout</Text>
+                    <Animated.View
+                        style={[
+                            styles.primaryButton,
+                            { transform: [{ translateY: primaryTranslateY }] },
+                        ]}
+                    >
+                        <Text style={styles.primaryButtonText}>{primaryLabel}</Text>
+                    </Animated.View>
                 </TouchableOpacity>
             </View>
         </View>
@@ -80,10 +81,8 @@ const {
     bottomAreaHeight,
     bottomRow1Height,
     bottomRow2Height,
-    bottomRow3Height,
     padding,
     rowGap,
-    itemGap,
     borderWidth,
     buttonRadius,
 } = PICK_WORKOUT_LAYOUT;
@@ -111,9 +110,22 @@ const styles = StyleSheet.create({
     selectionHint: {
         flex: 1,
         fontFamily: fonts.regular,
-        fontSize: 13,
-        color: WORKOUT_COLORS.placeholder,
+        fontSize: 14,
+        color: WORKOUT_COLORS.muted,
         textTransform: 'lowercase',
+    },
+    primaryWrap: {
+        height: bottomRow2Height,
+        position: 'relative',
+    },
+    primaryShadow: {
+        position: 'absolute',
+        top: 4,
+        left: 0,
+        right: 0,
+        height: bottomRow2Height,
+        borderRadius: buttonRadius,
+        backgroundColor: WORKOUT_COLORS.border,
     },
     primaryButton: {
         height: bottomRow2Height,
@@ -128,27 +140,6 @@ const styles = StyleSheet.create({
         fontFamily: fonts.bold,
         fontSize: 16,
         color: WORKOUT_COLORS.background,
-        textTransform: 'lowercase',
-    },
-    row3: {
-        height: bottomRow3Height,
-        flexDirection: 'row',
-        gap: itemGap,
-    },
-    secondaryButton: {
-        flex: 1,
-        height: bottomRow3Height,
-        borderWidth,
-        borderColor: WORKOUT_COLORS.border,
-        borderRadius: buttonRadius,
-        backgroundColor: WORKOUT_COLORS.background,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    secondaryButtonText: {
-        fontFamily: fonts.bold,
-        fontSize: 14,
-        color: WORKOUT_COLORS.text,
         textTransform: 'lowercase',
     },
 });

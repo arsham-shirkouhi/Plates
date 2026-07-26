@@ -5,7 +5,8 @@ import {
     StyleSheet,
     Modal,
     ScrollView,
-    TextInput,
+    Alert,
+    Platform,
     Animated,
     Easing,
     Image,
@@ -14,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../../constants/fonts';
 import { WORKOUT_COLORS } from '../../workout/constants';
@@ -73,9 +75,7 @@ export const WorkoutWrapUpOverlay: React.FC<WorkoutWrapUpOverlayProps> = ({
     onDone,
     onSavePreset,
 }) => {
-    const [presetTitle, setPresetTitle] = useState('');
     const [savedPreset, setSavedPreset] = useState(false);
-    const [showPresetSection, setShowPresetSection] = useState(false);
     const [confettiParticles, setConfettiParticles] = useState<ConfettiParticle[]>([]);
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -92,9 +92,7 @@ export const WorkoutWrapUpOverlay: React.FC<WorkoutWrapUpOverlayProps> = ({
     useEffect(() => {
         if (!visible || !summary) return;
 
-        setPresetTitle('');
         setSavedPreset(false);
-        setShowPresetSection(false);
 
         fadeAnim.setValue(0);
         slideAnim.setValue(40);
@@ -186,10 +184,34 @@ export const WorkoutWrapUpOverlay: React.FC<WorkoutWrapUpOverlayProps> = ({
         outputRange: ['0deg', '-360deg'],
     });
 
-    const handleSavePreset = () => {
-        onSavePreset(presetTitle.trim() || summary.workout.title);
-        setSavedPreset(true);
+    const handleSavePresetPress = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        const defaultTitle = summary.workout.title || 'my workout';
+
+        // iOS has a native single-field prompt; core RN has no equivalent on
+        // Android, so there we save with the session title.
+        if (Platform.OS === 'ios' && typeof Alert.prompt === 'function') {
+            Alert.prompt(
+                'save as preset',
+                'name this preset for next time',
+                [
+                    { text: 'cancel', style: 'cancel' },
+                    {
+                        text: 'save',
+                        onPress: (text?: string) => {
+                            onSavePreset((text ?? '').trim() || defaultTitle);
+                            setSavedPreset(true);
+                        },
+                    },
+                ],
+                'plain-text',
+                defaultTitle
+            );
+            return;
+        }
+
+        onSavePreset(defaultTitle);
+        setSavedPreset(true);
     };
 
     return (
@@ -211,19 +233,19 @@ export const WorkoutWrapUpOverlay: React.FC<WorkoutWrapUpOverlayProps> = ({
                 </View>
 
                 <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-                    <ScrollView
-                        style={styles.scroll}
-                        contentContainerStyle={styles.scrollContent}
-                        showsVerticalScrollIndicator={false}
+                    <Animated.View
+                        style={[
+                            styles.content,
+                            {
+                                opacity: fadeAnim,
+                                transform: [{ translateY: slideAnim }],
+                            },
+                        ]}
                     >
-                        <Animated.View
-                            style={[
-                                styles.content,
-                                {
-                                    opacity: fadeAnim,
-                                    transform: [{ translateY: slideAnim }],
-                                },
-                            ]}
+                        <ScrollView
+                            style={styles.topScroll}
+                            contentContainerStyle={styles.topScrollContent}
+                            showsVerticalScrollIndicator={false}
                         >
                             <View style={styles.heroBadge}>
                                 <Ionicons name="trophy" size={18} color={WORKOUT_COLORS.accent} />
@@ -274,66 +296,75 @@ export const WorkoutWrapUpOverlay: React.FC<WorkoutWrapUpOverlayProps> = ({
                                     />
                                 </View>
                             </View>
+                        </ScrollView>
 
-                            <View style={styles.exerciseSection}>
-                                <Text style={styles.sectionTitle}>highlights</Text>
-                                {summary.workout.exercises.map((exercise, index) => {
-                                    const completedSets = exercise.sets.filter((set) => set.completed);
-                                    const topSet = completedSets[completedSets.length - 1];
-                                    return (
-                                        <View key={exercise.id} style={styles.exerciseCard}>
-                                            <View style={styles.exerciseCardHeader}>
-                                                <View style={styles.exerciseIndex}>
-                                                    <Text style={styles.exerciseIndexText}>{index + 1}</Text>
-                                                </View>
-                                                <View style={styles.exerciseCopy}>
-                                                    <Text style={styles.exerciseName}>{exercise.name}</Text>
-                                                    <Text style={styles.exerciseMeta}>
-                                                        {completedSets.length}/{exercise.sets.length} sets completed
-                                                    </Text>
-                                                </View>
-                                                <Ionicons
-                                                    name="checkmark-circle"
-                                                    size={22}
-                                                    color={completedSets.length > 0 ? '#34A853' : WORKOUT_COLORS.placeholder}
-                                                />
+                        <Text style={styles.sectionTitle}>highlights</Text>
+
+                        <View style={styles.exercisesWrap}>
+                        <ScrollView
+                            style={styles.exercisesScroll}
+                            contentContainerStyle={styles.exercisesContent}
+                            showsVerticalScrollIndicator={false}
+                            nestedScrollEnabled
+                        >
+                            {summary.workout.exercises.map((exercise, index) => {
+                                const completedSets = exercise.sets.filter((set) => set.completed);
+                                const topSet = completedSets[completedSets.length - 1];
+                                return (
+                                    <View key={exercise.id} style={styles.exerciseCard}>
+                                        <View style={styles.exerciseCardHeader}>
+                                            <View style={styles.exerciseIndex}>
+                                                <Text style={styles.exerciseIndexText}>{index + 1}</Text>
                                             </View>
-                                            {topSet ? (
-                                                <Text style={styles.exerciseDetail}>
-                                                    top set · {topSet.weight || '0'} kg × {topSet.reps || '0'} reps
+                                            <View style={styles.exerciseCopy}>
+                                                <Text style={styles.exerciseName}>{exercise.name}</Text>
+                                                <Text style={styles.exerciseMeta}>
+                                                    {completedSets.length}/{exercise.sets.length} sets completed
                                                 </Text>
-                                            ) : null}
+                                            </View>
+                                            <Ionicons
+                                                name="checkmark-circle"
+                                                size={22}
+                                                color={completedSets.length > 0 ? '#34A853' : WORKOUT_COLORS.placeholder}
+                                            />
                                         </View>
-                                    );
-                                })}
-                            </View>
+                                        {topSet ? (
+                                            <Text style={styles.exerciseDetail}>
+                                                top set · {topSet.weight || '0'} kg × {topSet.reps || '0'} reps
+                                            </Text>
+                                        ) : null}
+                                    </View>
+                                );
+                            })}
+                        </ScrollView>
+                            <LinearGradient
+                                colors={['#ffffff', 'rgba(255,255,255,0)']}
+                                style={styles.exercisesFadeTop}
+                                pointerEvents="none"
+                            />
+                            <LinearGradient
+                                colors={['rgba(255,255,255,0)', '#ffffff']}
+                                style={styles.exercisesFadeBottom}
+                                pointerEvents="none"
+                            />
+                        </View>
 
-                            {!showPresetSection ? (
+                        <View style={styles.footer}>
+                            {!savedPreset ? (
                                 <TouchableOpacity
                                     style={styles.presetLink}
-                                    onPress={() => setShowPresetSection(true)}
+                                    onPress={handleSavePresetPress}
                                     activeOpacity={0.7}
                                 >
                                     <Ionicons name="bookmark-outline" size={18} color={WORKOUT_COLORS.muted} />
                                     <Text style={styles.presetLinkText}>save as preset for next time</Text>
                                 </TouchableOpacity>
                             ) : (
-                                <View style={styles.presetCard}>
-                                    <Text style={styles.presetTitle}>save as preset</Text>
-                                    <TextInput
-                                        value={presetTitle}
-                                        onChangeText={setPresetTitle}
-                                        placeholder={summary.workout.title || 'my workout preset'}
-                                        placeholderTextColor={WORKOUT_COLORS.placeholder}
-                                        style={styles.presetInput}
-                                    />
-                                    <Button
-                                        variant="secondary"
-                                        title={savedPreset ? 'preset saved' : 'save preset'}
-                                        onPress={handleSavePreset}
-                                        disabled={savedPreset}
-                                        containerStyle={styles.presetButton}
-                                    />
+                                <View style={styles.presetLink}>
+                                    <Ionicons name="bookmark" size={18} color={WORKOUT_COLORS.accent} />
+                                    <Text style={[styles.presetLinkText, styles.presetLinkTextSaved]}>
+                                        saved as preset
+                                    </Text>
                                 </View>
                             )}
 
@@ -343,8 +374,8 @@ export const WorkoutWrapUpOverlay: React.FC<WorkoutWrapUpOverlayProps> = ({
                                 onPress={onDone}
                                 containerStyle={styles.doneButton}
                             />
-                        </Animated.View>
-                    </ScrollView>
+                        </View>
+                    </Animated.View>
                 </SafeAreaView>
             </View>
         </Modal>
@@ -381,20 +412,55 @@ const styles = StyleSheet.create({
         flex: 1,
         zIndex: 1,
     },
-    scroll: {
-        flex: 1,
-    },
-    scrollContent: {
-        flexGrow: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 24,
-    },
     content: {
+        flex: 1,
         width: '100%',
         maxWidth: CONTENT_WIDTH,
+        alignSelf: 'center',
+        paddingHorizontal: 16,
+        paddingTop: 16,
+        paddingBottom: 8,
+    },
+    topScroll: {
+        flexGrow: 0,
+        flexShrink: 1,
+        width: '100%',
+    },
+    topScrollContent: {
         alignItems: 'center',
+        paddingBottom: 20,
+    },
+    exercisesWrap: {
+        flexGrow: 1,
+        flexShrink: 1,
+        width: '100%',
+        position: 'relative',
+    },
+    exercisesScroll: {
+        flex: 1,
+        width: '100%',
+    },
+    exercisesContent: {
+        paddingTop: 6,
+        paddingBottom: 48,
+    },
+    exercisesFadeTop: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: 0,
+        height: 16,
+    },
+    exercisesFadeBottom: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        height: 56,
+    },
+    footer: {
+        width: '100%',
+        paddingTop: 16,
     },
     heroBadge: {
         alignSelf: 'center',
@@ -472,7 +538,7 @@ const styles = StyleSheet.create({
         width: '100%',
         flexDirection: 'row',
         gap: 10,
-        marginBottom: 20,
+        marginBottom: 0,
     },
     statTile: {
         flex: 1,
@@ -496,15 +562,12 @@ const styles = StyleSheet.create({
         fontSize: 24,
         color: WORKOUT_COLORS.text,
     },
-    exerciseSection: {
-        width: '100%',
-        marginBottom: 16,
-    },
     sectionTitle: {
+        width: '100%',
         fontFamily: fonts.bold,
         fontSize: 16,
         color: WORKOUT_COLORS.text,
-        marginBottom: 10,
+        marginBottom: 12,
         textTransform: 'lowercase',
     },
     exerciseCard: {
@@ -571,36 +634,8 @@ const styles = StyleSheet.create({
         color: WORKOUT_COLORS.muted,
         textTransform: 'lowercase',
     },
-    presetCard: {
-        width: '100%',
-        borderWidth: 2.5,
-        borderColor: WORKOUT_COLORS.border,
-        borderRadius: 12,
-        padding: 14,
-        backgroundColor: '#FAFAFF',
-        marginBottom: 8,
-    },
-    presetTitle: {
-        fontFamily: fonts.bold,
-        fontSize: 14,
-        color: WORKOUT_COLORS.muted,
-        marginBottom: 10,
-        textTransform: 'lowercase',
-    },
-    presetInput: {
-        borderWidth: 2,
-        borderColor: WORKOUT_COLORS.border,
-        borderRadius: 10,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        fontFamily: fonts.regular,
-        fontSize: 15,
-        color: WORKOUT_COLORS.text,
-        marginBottom: 12,
-        backgroundColor: '#fff',
-    },
-    presetButton: {
-        width: '100%',
+    presetLinkTextSaved: {
+        color: WORKOUT_COLORS.accent,
     },
     doneButton: {
         marginTop: 8,

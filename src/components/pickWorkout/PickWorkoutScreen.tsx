@@ -54,7 +54,6 @@ interface PickWorkoutScreenProps {
 export const PickWorkoutScreen: React.FC<PickWorkoutScreenProps> = ({
     onReviewWorkout,
     onStartRoutine,
-    onStartEmpty,
 }) => {
     const { user } = useAuth();
     const { close: closeWorkoutOverlay } = useWorkoutOverlay();
@@ -75,6 +74,8 @@ export const PickWorkoutScreen: React.FC<PickWorkoutScreenProps> = ({
     const layoutAnim = useRef(new Animated.Value(0)).current;
     const bodyFadeAnim = useRef(new Animated.Value(1)).current;
     const bodySlideAnim = useRef(new Animated.Value(0)).current;
+    const introAnim = useRef(new Animated.Value(0)).current;
+    const introStartedRef = useRef(false);
     const flipDirection = useRef(1);
     const flipAnimating = useRef(false);
 
@@ -165,6 +166,19 @@ export const PickWorkoutScreen: React.FC<PickWorkoutScreenProps> = ({
     }, [layoutAnim, svgWidthFull, svgHeightFull, syncBodyLayout]);
 
     useEffect(() => {
+        if (introStartedRef.current) return;
+        if (bodyLayout.width <= 0 || bodyLayout.height <= 0) return;
+
+        introStartedRef.current = true;
+        Animated.timing(introAnim, {
+            toValue: 1,
+            duration: 340,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+        }).start();
+    }, [bodyLayout.width, bodyLayout.height, introAnim]);
+
+    useEffect(() => {
         getWorkoutPresets(user?.id).then((presets) => {
             setUserRoutines(
                 presets.map((preset) =>
@@ -210,10 +224,10 @@ export const PickWorkoutScreen: React.FC<PickWorkoutScreenProps> = ({
             setSelectionPanelVisible(true);
         }
 
-        Animated.spring(layoutAnim, {
+        Animated.timing(layoutAnim, {
             toValue: hasSelection ? 1 : 0,
-            friction: 20,
-            tension: 42,
+            duration: 240,
+            easing: Easing.out(Easing.cubic),
             useNativeDriver: false,
         }).start(({ finished }) => {
             if (finished && !hasSelection) {
@@ -233,8 +247,11 @@ export const PickWorkoutScreen: React.FC<PickWorkoutScreenProps> = ({
     });
 
     const toggleMuscle = useCallback((muscle: MuscleGroup) => {
+        Haptics.selectionAsync();
         setSelectedMuscles((current) =>
-            current.includes(muscle) ? current.filter((item) => item !== muscle) : [...current, muscle]
+            current.includes(muscle)
+                ? current.filter((item) => item !== muscle)
+                : [...current, muscle]
         );
     }, []);
 
@@ -337,6 +354,7 @@ export const PickWorkoutScreen: React.FC<PickWorkoutScreenProps> = ({
                     side={side}
                     onSideChange={handleSideChange}
                     onClose={closeWorkoutOverlay}
+                    onPresets={openPresets}
                 />
 
                 <View style={styles.figureArea} onLayout={handleFigureLayout}>
@@ -370,8 +388,16 @@ export const PickWorkoutScreen: React.FC<PickWorkoutScreenProps> = ({
                                     top: bodyLayout.top,
                                     width: bodyLayout.width,
                                     height: bodyLayout.height,
-                                    opacity: bodyFadeAnim,
-                                    transform: [{ translateX: bodySlideAnim }],
+                                    opacity: Animated.multiply(bodyFadeAnim, introAnim),
+                                    transform: [
+                                        { translateX: bodySlideAnim },
+                                        {
+                                            translateY: introAnim.interpolate({
+                                                inputRange: [0, 1],
+                                                outputRange: [14, 0],
+                                            }),
+                                        },
+                                    ],
                                 },
                             ]}
                         >
@@ -404,14 +430,7 @@ export const PickWorkoutScreen: React.FC<PickWorkoutScreenProps> = ({
 
                 <PickWorkoutBottomBar
                     selectedMuscles={selectedMuscles}
-                    hasUserRoutines={hasUserRoutines}
-                    suggestedRoutine={suggestion?.routine ?? null}
                     onPrimaryPress={handlePrimaryPress}
-                    onPresets={openPresets}
-                    onNewWorkout={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        onStartEmpty();
-                    }}
                 />
             </View>
 

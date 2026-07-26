@@ -39,7 +39,7 @@ export const WORKOUT_COLORS = {
 /** Fixed layout for Pick Workout — figure shrinks, these never do */
 export const PICK_WORKOUT_LAYOUT = {
     topBarHeight: 72,
-    bottomAreaHeight: 172,
+    bottomAreaHeight: 118,
     bottomRow1Height: 32,
     bottomRow2Height: 44,
     bottomRow3Height: 44,
