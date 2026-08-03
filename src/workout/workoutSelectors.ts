@@ -144,7 +144,12 @@ export function createWorkoutExercise(input: {
     exerciseId: string;
     name: string;
     thumbnailUrl?: string;
+    previousSets?: Array<{ weight: number; reps: number }>;
 }): WorkoutExercise {
+    const DEFAULT_SET_COUNT = 3;
+    const history = input.previousSets ?? [];
+    const fallback = history[history.length - 1];
+
     return {
         id: createUniqueId('wx-'),
         exerciseId: input.exerciseId,
@@ -152,10 +157,13 @@ export function createWorkoutExercise(input: {
         thumbnailUrl: input.thumbnailUrl,
         note: '',
         restSeconds: 120,
-        sets: [{
-            ...createDefaultSet(),
-            previous: { weight: 60, reps: 10 },
-        }],
+        sets: Array.from({ length: DEFAULT_SET_COUNT }, (_, index) => {
+            const previous = history[index] ?? fallback;
+            return {
+                ...createDefaultSet(),
+                previous: previous ?? undefined,
+            };
+        }),
     };
 }
 

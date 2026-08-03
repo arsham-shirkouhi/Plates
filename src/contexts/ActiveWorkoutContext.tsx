@@ -24,6 +24,8 @@ import {
     loadPersistedWorkoutState,
     persistWorkoutState,
 } from '../workout/workoutPersistence';
+import { getLastExercisePreviousSets } from '../services/workoutHistoryService';
+import { useAuth } from '../context/AuthContext';
 
 interface ActiveWorkoutContextValue {
     state: ActiveWorkoutStoreState;
@@ -34,7 +36,7 @@ interface ActiveWorkoutContextValue {
     expand: () => void;
     dismiss: () => void;
     updateTitle: (title: string) => void;
-    addExercises: (items: CatalogExercise[]) => void;
+    addExercises: (items: CatalogExercise[]) => Promise<void>;
     removeExercise: (exerciseId: string) => void;
     updateExerciseNote: (exerciseId: string, note: string) => void;
     updateRestSeconds: (exerciseId: string, restSeconds: number) => void;
@@ -62,6 +64,7 @@ interface ActiveWorkoutContextValue {
 const ActiveWorkoutContext = createContext<ActiveWorkoutContextValue | null>(null);
 
 export const ActiveWorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const { user } = useAuth();
     const [state, dispatch] = useReducer(activeWorkoutReducer, undefined, getInitialStoreState);
     const [wrapUpSummary, setWrapUpSummary] = useState<WorkoutWrapUpSummary | null>(null);
     const hydratedRef = useRef(false);
@@ -131,9 +134,20 @@ export const ActiveWorkoutProvider: React.FC<{ children: React.ReactNode }> = ({
         dispatch({ type: 'UPDATE_TITLE', payload: title });
     }, []);
 
-    const addExercises = useCallback((items: CatalogExercise[]) => {
-        dispatch({ type: 'ADD_EXERCISES', payload: items });
-    }, []);
+    const addExercises = useCallback(
+        async (items: CatalogExercise[]) => {
+            const enriched = await Promise.all(
+                items.map(async (item) => ({
+                    ...item,
+                    previousSets:
+                        item.previousSets ??
+                        (await getLastExercisePreviousSets(item.exerciseId, item.name, user?.id)),
+                }))
+            );
+            dispatch({ type: 'ADD_EXERCISES', payload: enriched });
+        },
+        [user?.id]
+    );
 
     const removeExercise = useCallback((exerciseId: string) => {
         dispatch({ type: 'REMOVE_EXERCISE', payload: { exerciseId } });

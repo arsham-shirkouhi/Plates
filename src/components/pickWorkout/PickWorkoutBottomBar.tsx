@@ -5,7 +5,7 @@ import { PICK_WORKOUT_LAYOUT, WORKOUT_COLORS } from '../../workout/constants';
 import { MuscleGroup } from '../../workout/muscleGroups';
 
 const HINT_LINE =
-    'Tap muscles to build a workout, or pick up where you left off.';
+    'Tap muscles to pick exercises, or start an empty workout.';
 
 interface PickWorkoutBottomBarProps {
     selectedMuscles: MuscleGroup[];
@@ -36,7 +36,7 @@ export const PickWorkoutBottomBar: React.FC<PickWorkoutBottomBarProps> = ({
         outputRange: [1, 0],
     });
 
-    const primaryLabel = hasSelection ? 'start workout' : 'start routine';
+    const primaryLabel = hasSelection ? 'pick exercises' : 'start empty workout';
 
     return (
         <View style={styles.bar}>

@@ -67,7 +67,7 @@ export type ActiveWorkoutAction =
     | { type: 'SET_PRESENTATION'; payload: OverlayPresentation }
     | { type: 'UPDATE_TITLE'; payload: string }
     | { type: 'UPDATE_WORKOUT_NOTES'; payload: string }
-    | { type: 'ADD_EXERCISES'; payload: Array<{ exerciseId: string; name: string; thumbnailUrl?: string }> }
+    | { type: 'ADD_EXERCISES'; payload: CatalogExercise[] }
     | { type: 'REMOVE_EXERCISE'; payload: { exerciseId: string } }
     | { type: 'UPDATE_EXERCISE_NOTE'; payload: { exerciseId: string; note: string } }
     | { type: 'UPDATE_REST_SECONDS'; payload: { exerciseId: string; restSeconds: number } }
@@ -91,4 +91,5 @@ export interface CatalogExercise {
     exerciseId: string;
     name: string;
     thumbnailUrl?: string;
+    previousSets?: PreviousSetSnapshot[];
 }

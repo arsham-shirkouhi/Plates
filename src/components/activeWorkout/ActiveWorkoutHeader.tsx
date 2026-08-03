@@ -1,25 +1,27 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import {
+    View,
+    StyleSheet,
+    TouchableOpacity,
+    type GestureResponderHandlers,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { fonts } from '../../constants/fonts';
 import { Button } from '../Button';
 import { WORKOUT_COLORS } from '../../workout/constants';
 
 interface ActiveWorkoutHeaderProps {
-    title: string;
-    onTitleChange: (title: string) => void;
     onCollapse: () => void;
     onFinish: () => void;
+    collapsePanHandlers?: GestureResponderHandlers;
 }
 
 export const ActiveWorkoutHeader: React.FC<ActiveWorkoutHeaderProps> = ({
-    title,
-    onTitleChange,
     onCollapse,
     onFinish,
+    collapsePanHandlers,
 }) => {
     return (
-        <View style={styles.container}>
+        <View style={styles.container} {...collapsePanHandlers}>
             <View style={styles.topRow}>
                 <TouchableOpacity
                     onPress={onCollapse}
@@ -28,14 +30,7 @@ export const ActiveWorkoutHeader: React.FC<ActiveWorkoutHeaderProps> = ({
                 >
                     <Ionicons name="chevron-down" size={24} color={WORKOUT_COLORS.text} />
                 </TouchableOpacity>
-                <TextInput
-                    value={title}
-                    onChangeText={onTitleChange}
-                    style={styles.titleInput}
-                    placeholder="workout title"
-                    placeholderTextColor={WORKOUT_COLORS.placeholder}
-                    numberOfLines={1}
-                />
+                <View style={styles.spacer} />
                 <Button
                     title="finish"
                     onPress={onFinish}
@@ -68,12 +63,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    titleInput: {
+    spacer: {
         flex: 1,
-        fontFamily: fonts.bold,
-        fontSize: 18,
-        color: WORKOUT_COLORS.text,
-        paddingVertical: 6,
     },
     finishButtonWrap: {
         width: 88,

@@ -119,6 +119,35 @@ export async function getCompletedWorkouts(userId?: string | null): Promise<Stor
     return loadCompleted(userId);
 }
 
+/** Most recent completed sets for an exercise, used as the "previous" column. */
+export async function getLastExercisePreviousSets(
+    exerciseId: string,
+    name: string,
+    userId?: string | null
+): Promise<Array<{ weight: number; reps: number }>> {
+    const completed = await loadCompleted(userId);
+    const sorted = [...completed].sort(
+        (a, b) => Date.parse(b.completedAt) - Date.parse(a.completedAt)
+    );
+    const normalizedName = name.trim().toLowerCase();
+
+    for (const workout of sorted) {
+        const match = workout.exercises.find(
+            (exercise) =>
+                (exerciseId && exercise.exerciseId === exerciseId) ||
+                exercise.name.trim().toLowerCase() === normalizedName
+        );
+        if (!match?.sets?.length) continue;
+
+        return match.sets.map((set) => ({
+            weight: set.previous?.weight ?? 0,
+            reps: set.previous?.reps ?? 0,
+        }));
+    }
+
+    return [];
+}
+
 export async function deleteWorkoutPreset(presetId: string, userId?: string | null): Promise<void> {
     try {
         const existing = await loadPresets(userId);

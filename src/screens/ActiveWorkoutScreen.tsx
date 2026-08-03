@@ -24,7 +24,6 @@ import { PickWorkoutScreen, PendingReviewWorkout } from '../components/pickWorko
 import { ReviewWorkoutScreen } from '../components/pickWorkout/ReviewWorkoutScreen';
 import { routineToPendingStart } from '../components/startWorkout/StartWorkoutIdleView';
 import { StartWorkoutRoutine } from '../workout/startWorkoutTypes';
-import { rootNavigationRef } from '../navigation/rootNavigationRef';
 import { WorkoutExercise } from '../workout/types';
 
 type PendingStart = {
@@ -164,12 +163,6 @@ export const ActiveWorkoutScreen: React.FC = () => {
         addExercises([{ exerciseId: exercise.id, name: exercise.name }]);
     };
 
-    const handleOpenExercise = (exerciseId: string) => {
-        if (rootNavigationRef.isReady()) {
-            rootNavigationRef.navigate('ExerciseInfo', { exerciseId });
-        }
-    };
-
     const handleStartFromRoutine = useCallback(
         (routine: StartWorkoutRoutine) => {
             startWorkoutDirect(routineToPendingStart(routine));
@@ -214,7 +207,6 @@ export const ActiveWorkoutScreen: React.FC = () => {
                 <>
                     <ActiveWorkoutOverlay
                         onAddExercises={() => setShowAddExerciseOverlay(true)}
-                        onOpenExercise={handleOpenExercise}
                         onRequestWrapUp={requestWrapUp}
                     />
                     <AddExerciseOverlay

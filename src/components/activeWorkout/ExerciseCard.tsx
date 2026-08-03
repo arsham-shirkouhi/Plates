@@ -26,7 +26,6 @@ interface ExerciseCardProps {
     exercise: WorkoutExercise;
     supersetColorIndex?: number;
     showRpe?: boolean;
-    onOpenExercise: () => void;
     onUpdateNote: (note: string) => void;
     onUpdateRestSeconds: (restSeconds: number) => void;
     onAddSet: () => void;
@@ -47,7 +46,6 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
     exercise,
     supersetColorIndex = 0,
     showRpe = false,
-    onOpenExercise,
     onUpdateNote,
     onUpdateRestSeconds,
     onAddSet,
@@ -98,12 +96,12 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
     return (
         <View style={[styles.card, railColor ? { borderLeftColor: railColor, borderLeftWidth: 4 } : null]}>
             <View style={styles.headerRow}>
-                <TouchableOpacity style={styles.titleWrap} onPress={onOpenExercise}>
+                <View style={styles.titleWrap}>
                     <View style={styles.thumbnail}>
                         <Ionicons name="barbell-outline" size={18} color={WORKOUT_COLORS.accent} />
                     </View>
                     <Text style={styles.title}>{exercise.name.toLowerCase()}</Text>
-                </TouchableOpacity>
+                </View>
                 <TouchableOpacity onPress={openMenu} style={styles.menuButton}>
                     <Ionicons name="ellipsis-horizontal" size={20} color={WORKOUT_COLORS.text} />
                 </TouchableOpacity>

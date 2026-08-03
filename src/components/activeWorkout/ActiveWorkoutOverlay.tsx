@@ -39,13 +39,11 @@ const MINI_CORNER_RADIUS = 36;
 
 interface ActiveWorkoutOverlayProps {
     onAddExercises: () => void;
-    onOpenExercise: (exerciseId: string) => void;
     onRequestWrapUp: () => void;
 }
 
 export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
     onAddExercises,
-    onOpenExercise,
     onRequestWrapUp,
 }) => {
     const insets = useSafeAreaInsets();
@@ -54,7 +52,6 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
         state,
         minimize,
         expand,
-        updateTitle,
         finishWorkout,
         addSet,
         updateSet,
@@ -124,10 +121,11 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
         PanResponder.create({
             onMoveShouldSetPanResponder: (_, gesture) =>
                 isFullscreenRef.current &&
-                gesture.dy > 8 &&
-                Math.abs(gesture.dy) > Math.abs(gesture.dx),
+                gesture.dy > 24 &&
+                Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.5,
             onPanResponderRelease: (_, gesture) => {
-                if (gesture.dy > 80 || gesture.vy > 0.8) {
+                // Require a deliberate pull — avoid accidental minimize from light drags.
+                if (gesture.dy > 160 || gesture.vy > 1.6) {
                     minimize();
                 }
             },
@@ -224,13 +222,11 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
                 <Animated.View
                     pointerEvents={isFullscreen ? 'auto' : 'none'}
                     style={[styles.expandedLayer, { opacity: expandedOpacity }]}
-                    {...collapsePanResponder.panHandlers}
                 >
                     <ActiveWorkoutHeader
-                        title={workout.title}
-                        onTitleChange={updateTitle}
                         onCollapse={minimize}
                         onFinish={handleFinish}
+                        collapsePanHandlers={collapsePanResponder.panHandlers}
                     />
                     <ActiveWorkoutStatsStrip elapsedSeconds={elapsedSeconds} volume={volume} sets={sets} />
                     <ScrollView
@@ -255,7 +251,6 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
                                             : undefined
                                     }
                                     showRpe={state.settings.showRpeColumn}
-                                    onOpenExercise={() => onOpenExercise(exercise.exerciseId)}
                                     onUpdateNote={(note) => updateExerciseNote(exercise.id, note)}
                                     onUpdateRestSeconds={(restSeconds) =>
                                         updateRestSeconds(exercise.id, restSeconds)

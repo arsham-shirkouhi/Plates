@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     View,
     StyleSheet,
@@ -11,20 +11,10 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../context/AuthContext';
 import { useWorkoutOverlay } from '../../contexts/WorkoutOverlayContext';
 import { useMuscleRecency } from '../../hooks/useMuscleRecency';
-import {
-    assembleWorkoutFromMuscleGroups,
-    countExercisesForMuscleGroups,
-} from '../../services/workoutAssemblyService';
-import { getWorkoutPresets } from '../../services/workoutHistoryService';
+import { assembleWorkoutFromMuscleGroups } from '../../services/workoutAssemblyService';
 import { PICK_WORKOUT_LAYOUT, WORKOUT_COLORS } from '../../workout/constants';
 import { MuscleGroup } from '../../workout/muscleGroups';
-import { MOCK_WORKOUT_TEMPLATES } from '../../workout/mockWorkoutData';
-import { estimateDurationLabel, pickSuggestedWorkout } from '../../workout/startWorkoutSelectors';
-import {
-    routineFromMockTemplate,
-    routineFromUserPreset,
-    StartWorkoutRoutine,
-} from '../../workout/startWorkoutTypes';
+import { StartWorkoutRoutine } from '../../workout/startWorkoutTypes';
 import { WorkoutExercise } from '../../workout/types';
 import { rootNavigationRef } from '../../navigation/rootNavigationRef';
 import { BODY_MAP_VIEWBOX } from '../startWorkout/bodyMapPaths';
@@ -37,7 +27,9 @@ import { PickWorkoutSelectedList } from './PickWorkoutSelectedList';
 
 type BodySide = 'front' | 'back';
 
-const SELECTION_PANEL_WIDTH = 136;
+const SELECTION_PANEL_WIDTH = 104;
+/** Extra px the figure slides past the right edge when muscles are selected. */
+const BODY_RIGHT_OFFSET = 32;
 
 export interface PendingReviewWorkout {
     selectedMuscles: MuscleGroup[];
@@ -53,21 +45,18 @@ interface PickWorkoutScreenProps {
 
 export const PickWorkoutScreen: React.FC<PickWorkoutScreenProps> = ({
     onReviewWorkout,
-    onStartRoutine,
+    onStartEmpty,
 }) => {
     const { user } = useAuth();
     const { close: closeWorkoutOverlay } = useWorkoutOverlay();
     const insets = useSafeAreaInsets();
-    const { recency, hasHistory } = useMuscleRecency(user?.id);
+    const { recency } = useMuscleRecency(user?.id);
 
     const [side, setSide] = useState<BodySide>('front');
     const [renderSide, setRenderSide] = useState<BodySide>('front');
     const [selectedMuscles, setSelectedMuscles] = useState<MuscleGroup[]>([]);
     const [figureLayout, setFigureLayout] = useState({ width: 0, height: 0 });
-    const [bodyLayout, setBodyLayout] = useState({ left: 0, top: 0, width: 0, height: 0 });
-    const [exerciseCount, setExerciseCount] = useState(0);
     const [pickerVisible, setPickerVisible] = useState(false);
-    const [userRoutines, setUserRoutines] = useState<StartWorkoutRoutine[]>([]);
     const [isReviewLoading, setIsReviewLoading] = useState(false);
     const [selectionPanelVisible, setSelectionPanelVisible] = useState(false);
 
@@ -86,11 +75,6 @@ export const PickWorkoutScreen: React.FC<PickWorkoutScreenProps> = ({
         figureLayout.width - PICK_WORKOUT_LAYOUT.padding * 2
     );
 
-    const splitMapSlotWidth = Math.max(
-        0,
-        innerFigureWidth - SELECTION_PANEL_WIDTH - PICK_WORKOUT_LAYOUT.itemGap
-    );
-
     const fullScale =
         innerFigureWidth > 0 && figureLayout.height > 0
             ? Math.min(
@@ -99,75 +83,36 @@ export const PickWorkoutScreen: React.FC<PickWorkoutScreenProps> = ({
               )
             : 0;
 
-    const splitScale =
-        splitMapSlotWidth > 0 && figureLayout.height > 0
-            ? Math.min(
-                  splitMapSlotWidth / BODY_MAP_VIEWBOX.width,
-                  figureLayout.height / BODY_MAP_VIEWBOX.height
-              )
-            : 0;
-
     const svgWidthFull = Math.max(0, BODY_MAP_VIEWBOX.width * fullScale);
     const svgHeightFull = Math.max(0, BODY_MAP_VIEWBOX.height * fullScale);
-    const svgWidthSplit = Math.max(0, BODY_MAP_VIEWBOX.width * splitScale);
-    const svgHeightSplit = Math.max(0, BODY_MAP_VIEWBOX.height * splitScale);
+    // Body keeps its full size when selected — it only slides right, no shrink.
 
     const bodyStartLeft =
         innerFigureWidth > 0 && svgWidthFull > 0 ? (innerFigureWidth - svgWidthFull) / 2 : 0;
     const bodyEndLeft =
-        innerFigureWidth > 0 && svgWidthSplit > 0 ? innerFigureWidth - svgWidthSplit : bodyStartLeft;
+        innerFigureWidth > 0 && svgWidthFull > 0 ? innerFigureWidth - svgWidthFull : bodyStartLeft;
 
-    const bodyStartTop =
+    const bodyTopOffset =
         figureLayout.height > 0 && svgHeightFull > 0
             ? Math.max(0, (figureLayout.height - svgHeightFull) / 2)
             : 0;
-    const bodyEndTop =
-        figureLayout.height > 0 && svgHeightSplit > 0
-            ? Math.max(0, (figureLayout.height - svgHeightSplit) / 2)
-            : bodyStartTop;
 
-    const syncBodyLayout = useCallback(
-        (progress: number) => {
-            if (svgWidthFull <= 0 || svgHeightFull <= 0) return;
+    const bodyReady = svgWidthFull > 0 && svgHeightFull > 0;
 
-            setBodyLayout({
-                left: PICK_WORKOUT_LAYOUT.padding + bodyStartLeft + (bodyEndLeft - bodyStartLeft) * progress,
-                top: bodyStartTop + (bodyEndTop - bodyStartTop) * progress,
-                width: svgWidthFull + (svgWidthSplit - svgWidthFull) * progress,
-                height: svgHeightFull + (svgHeightSplit - svgHeightFull) * progress,
-            });
-        },
-        [
-            bodyEndLeft,
-            bodyEndTop,
-            bodyStartLeft,
-            bodyStartTop,
-            svgHeightFull,
-            svgHeightSplit,
-            svgWidthFull,
-            svgWidthSplit,
-        ]
-    );
-
-    useEffect(() => {
-        if (svgWidthFull <= 0 || svgHeightFull <= 0) return;
-
-        const listenerId = layoutAnim.addListener(({ value }) => {
-            syncBodyLayout(value);
-        });
-
-        layoutAnim.stopAnimation((value) => {
-            syncBodyLayout(value);
-        });
-
-        return () => {
-            layoutAnim.removeListener(listenerId);
-        };
-    }, [layoutAnim, svgWidthFull, svgHeightFull, syncBodyLayout]);
+    // Drive left straight off the animated value so every selection toggle
+    // re-runs the slide reliably (no listener → setState round-trip that could
+    // go stale after a select/deselect cycle).
+    const bodyLeft = layoutAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [
+            PICK_WORKOUT_LAYOUT.padding + bodyStartLeft,
+            PICK_WORKOUT_LAYOUT.padding + bodyEndLeft + BODY_RIGHT_OFFSET,
+        ],
+    });
 
     useEffect(() => {
         if (introStartedRef.current) return;
-        if (bodyLayout.width <= 0 || bodyLayout.height <= 0) return;
+        if (!bodyReady) return;
 
         introStartedRef.current = true;
         Animated.timing(introAnim, {
@@ -176,48 +121,7 @@ export const PickWorkoutScreen: React.FC<PickWorkoutScreenProps> = ({
             easing: Easing.out(Easing.cubic),
             useNativeDriver: true,
         }).start();
-    }, [bodyLayout.width, bodyLayout.height, introAnim]);
-
-    useEffect(() => {
-        getWorkoutPresets(user?.id).then((presets) => {
-            setUserRoutines(
-                presets.map((preset) =>
-                    routineFromUserPreset(preset, estimateDurationLabel(preset.exercises.length))
-                )
-            );
-        });
-    }, [user?.id]);
-
-    const allRoutines = useMemo(
-        () => [
-            ...userRoutines,
-            ...MOCK_WORKOUT_TEMPLATES.map((template) => routineFromMockTemplate(template)),
-        ],
-        [userRoutines]
-    );
-
-    const hasUserRoutines = userRoutines.length > 0;
-
-    const suggestion = useMemo(
-        () => pickSuggestedWorkout(allRoutines, recency, hasHistory),
-        [allRoutines, recency, hasHistory]
-    );
-
-    useEffect(() => {
-        if (selectedMuscles.length === 0) {
-            setExerciseCount(0);
-            return;
-        }
-
-        let cancelled = false;
-        countExercisesForMuscleGroups(selectedMuscles, user?.id).then((count) => {
-            if (!cancelled) setExerciseCount(count);
-        });
-
-        return () => {
-            cancelled = true;
-        };
-    }, [selectedMuscles, user?.id]);
+    }, [bodyReady, introAnim]);
 
     useEffect(() => {
         if (hasSelection) {
@@ -323,6 +227,8 @@ export const PickWorkoutScreen: React.FC<PickWorkoutScreenProps> = ({
     const handlePrimaryPress = async () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
+        // Body parts selected → go to the exercise-selection page for those
+        // muscle groups (pulls saved/known exercises for each body part).
         if (selectedMuscles.length > 0) {
             if (isReviewLoading) return;
             setIsReviewLoading(true);
@@ -339,12 +245,8 @@ export const PickWorkoutScreen: React.FC<PickWorkoutScreenProps> = ({
             return;
         }
 
-        if (hasUserRoutines && suggestion) {
-            onStartRoutine(suggestion.routine);
-            return;
-        }
-
-        openPresets();
+        // Nothing selected → jump straight into a blank workout.
+        onStartEmpty();
     };
 
     return (
@@ -371,23 +273,28 @@ export const PickWorkoutScreen: React.FC<PickWorkoutScreenProps> = ({
                             {selectedMuscles.length > 0 ? (
                                 <PickWorkoutSelectedList
                                     selectedMuscles={selectedMuscles}
-                                    exerciseCount={exerciseCount}
                                     onRemoveMuscle={toggleMuscle}
                                 />
                             ) : null}
                         </Animated.View>
                     ) : null}
 
-                    {bodyLayout.width > 0 && bodyLayout.height > 0 ? (
+                    {bodyReady ? (
                         <Animated.View
                             collapsable={false}
                             style={[
                                 styles.mapFrame,
                                 {
-                                    left: bodyLayout.left,
-                                    top: bodyLayout.top,
-                                    width: bodyLayout.width,
-                                    height: bodyLayout.height,
+                                    left: bodyLeft,
+                                    top: bodyTopOffset,
+                                    width: svgWidthFull,
+                                    height: svgHeightFull,
+                                },
+                            ]}
+                        >
+                            <Animated.View
+                                style={{
+                                    flex: 1,
                                     opacity: Animated.multiply(bodyFadeAnim, introAnim),
                                     transform: [
                                         { translateX: bodySlideAnim },
@@ -398,26 +305,26 @@ export const PickWorkoutScreen: React.FC<PickWorkoutScreenProps> = ({
                                             }),
                                         },
                                     ],
-                                },
-                            ]}
-                        >
-                            {renderSide === 'front' ? (
-                                <SelectableBodyMapFront
-                                    recency={recency}
-                                    selectedMuscles={selectedMuscles}
-                                    onToggleMuscle={toggleMuscle}
-                                    width={bodyLayout.width}
-                                    height={bodyLayout.height}
-                                />
-                            ) : (
-                                <SelectableBodyMapBack
-                                    recency={recency}
-                                    selectedMuscles={selectedMuscles}
-                                    onToggleMuscle={toggleMuscle}
-                                    width={bodyLayout.width}
-                                    height={bodyLayout.height}
-                                />
-                            )}
+                                }}
+                            >
+                                {renderSide === 'front' ? (
+                                    <SelectableBodyMapFront
+                                        recency={recency}
+                                        selectedMuscles={selectedMuscles}
+                                        onToggleMuscle={toggleMuscle}
+                                        width={svgWidthFull}
+                                        height={svgHeightFull}
+                                    />
+                                ) : (
+                                    <SelectableBodyMapBack
+                                        recency={recency}
+                                        selectedMuscles={selectedMuscles}
+                                        onToggleMuscle={toggleMuscle}
+                                        width={svgWidthFull}
+                                        height={svgHeightFull}
+                                    />
+                                )}
+                            </Animated.View>
                         </Animated.View>
                     ) : null}
                 </View>
