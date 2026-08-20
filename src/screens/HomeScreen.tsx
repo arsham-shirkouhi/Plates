@@ -32,6 +32,7 @@ import {
 import { getQuickAddItems, FoodItem } from '../services/foodService';
 import { useAddFood } from '../context/AddFoodContext';
 import { useWorkoutOverlay } from '../contexts/WorkoutOverlayContext';
+import { useActiveWorkout } from '../contexts/ActiveWorkoutContext';
 import {
   getDailyTasks,
   createDailyTask,
@@ -69,6 +70,7 @@ export const HomeScreen: React.FC = () => {
     showAddFoodSheet: openAddFoodSheet,
   } = useAddFood();
   const { open: openWorkoutOverlay } = useWorkoutOverlay();
+  const { state: activeWorkoutState, endActiveWorkout, expand: expandWorkout } = useActiveWorkout();
   const [loggingOut, setLoggingOut] = useState(false);
   const [resettingOnboarding, setResettingOnboarding] = useState(false);
 
@@ -103,9 +105,13 @@ export const HomeScreen: React.FC = () => {
     fats: 0,
   });
 
-  const handleLogout = async () => {
+  const performLogout = async () => {
     setLoggingOut(true);
     try {
+      // Ending the workout first ensures a non-empty session is saved to history
+      // and an empty one is discarded, before the session is torn down.
+      await endActiveWorkout();
+
       // Clear cache on logout
       dataCache.profile = null;
       dataCache.dailyLog = null;
@@ -121,6 +127,30 @@ export const HomeScreen: React.FC = () => {
     } finally {
       setLoggingOut(false);
     }
+  };
+
+  const handleLogout = () => {
+    // If a workout is in progress, let the user keep it going or end it on logout.
+    if (activeWorkoutState.workout) {
+      Alert.alert(
+        'Workout in progress',
+        'Logging out will end your current workout. What would you like to do?',
+        [
+          { text: 'Continue workout', style: 'cancel' },
+          {
+            text: 'End & log out',
+            style: 'destructive',
+            onPress: () => {
+              void performLogout();
+            },
+          },
+        ],
+        { cancelable: true }
+      );
+      return;
+    }
+
+    void performLogout();
   };
 
   const loadUserProfile = useCallback(async () => {
@@ -605,8 +635,15 @@ export const HomeScreen: React.FC = () => {
             />
 
             <QuickActionsWidget
+              workoutInProgress={!!activeWorkoutState.workout}
               onLogFoodPress={() => openAddFoodSheet()}
               onLogExercisePress={() => {
+                // Resume the active workout if one is already going.
+                if (activeWorkoutState.workout) {
+                  openWorkoutOverlay();
+                  expandWorkout();
+                  return;
+                }
                 Alert.alert(
                   'Start a workout?',
                   'Ready to log your exercises and track your session?',

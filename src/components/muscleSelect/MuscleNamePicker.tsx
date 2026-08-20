@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { fonts } from '../../constants/fonts';
 import { WORKOUT_COLORS } from '../../workout/constants';
+import { useRegisterOverlay } from '../../contexts/OverlayContext';
 import {
     MUSCLE_GROUP_LABELS,
     MUSCLE_GROUPS,
@@ -33,6 +34,7 @@ export const MuscleNamePicker: React.FC<MuscleNamePickerProps> = ({
     recency,
     onToggleMuscle,
 }) => {
+    useRegisterOverlay('MuscleNamePicker', visible);
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
             <View style={styles.root}>

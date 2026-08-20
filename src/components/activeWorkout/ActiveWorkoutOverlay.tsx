@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     View,
     StyleSheet,
@@ -84,6 +84,7 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
     const widgetBottomInset = insets.bottom + WIDGET_FLOAT_BOTTOM;
     const minimizedShellTop = screenHeight - MINI_BAR_HEIGHT - widgetBottomInset;
 
+    const [bottomActionsHeight, setBottomActionsHeight] = useState(0);
     const expandProgress = useRef(new Animated.Value(isFullscreen ? 1 : 0)).current;
     const scrollRef = useRef<ScrollView>(null);
     const exerciseOffsetsRef = useRef<Record<string, number>>({});
@@ -91,7 +92,9 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
     isFullscreenRef.current = isFullscreen;
 
     const elapsedSeconds = useWorkoutTimer(workout?.startedAt);
+    const [restCelebrateAt, setRestCelebrateAt] = useState(0);
     const handleRestComplete = useCallback(() => {
+        setRestCelebrateAt(Date.now());
         dispatch({ type: 'CLEAR_REST_TIMER' });
     }, [dispatch]);
     const { remainingSeconds, progress, isRunning } = useRestTimer({
@@ -275,16 +278,26 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
                         ))}
                     </ScrollView>
 
-                    {isRunning ? (
+                    <View
+                        pointerEvents="box-none"
+                        style={[styles.restTimerFloat, { bottom: bottomActionsHeight }]}
+                    >
                         <RestTimerBar
+                            visible={isRunning}
                             remainingSeconds={remainingSeconds}
                             progress={progress}
+                            celebrateAt={restCelebrateAt}
                             onAdjust={adjustRestTimer}
                             onSkip={skipRestTimer}
                         />
-                    ) : null}
+                    </View>
 
-                    <ActiveWorkoutBottomActions onAddExercises={onAddExercises} />
+                    <View
+                        style={styles.bottomActionsLayer}
+                        onLayout={(event) => setBottomActionsHeight(event.nativeEvent.layout.height)}
+                    >
+                        <ActiveWorkoutBottomActions onAddExercises={onAddExercises} />
+                    </View>
                 </Animated.View>
 
                 <Animated.View
@@ -336,6 +349,16 @@ const styles = StyleSheet.create({
     },
     expandedLayer: {
         flex: 1,
+    },
+    restTimerFloat: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        zIndex: 1,
+    },
+    bottomActionsLayer: {
+        zIndex: 2,
+        backgroundColor: WORKOUT_COLORS.background,
     },
     scroll: {
         flex: 1,

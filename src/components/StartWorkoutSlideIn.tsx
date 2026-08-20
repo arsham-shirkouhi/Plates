@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { fonts } from '../constants/fonts';
 import * as Haptics from 'expo-haptics';
+import { useRegisterOverlay } from '../contexts/OverlayContext';
 
 interface StartWorkoutSlideInProps {
     visible: boolean;
@@ -26,6 +27,7 @@ export const StartWorkoutSlideIn: React.FC<StartWorkoutSlideInProps> = ({
     onClose,
     onStartWorkout,
 }) => {
+    useRegisterOverlay('StartWorkoutSlideIn', visible);
     const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
     const backdropOpacity = useRef(new Animated.Value(0)).current;
 

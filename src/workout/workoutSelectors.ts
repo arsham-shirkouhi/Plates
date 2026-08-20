@@ -129,11 +129,15 @@ export function getNextSupersetExercise(workout: Workout, exerciseId: string): W
 }
 
 export function createDefaultSet(previousSet?: WorkoutSet): WorkoutSet {
+    // Prefill from the prior set's typed values, falling back to its historical
+    // "previous" values so a freshly added set is ready to go.
+    const fallbackWeight = previousSet?.previous ? String(previousSet.previous.weight) : '';
+    const fallbackReps = previousSet?.previous ? String(previousSet.previous.reps) : '';
     return {
         id: createUniqueId('set-'),
         type: 'normal',
-        weight: previousSet?.weight ?? '',
-        reps: previousSet?.reps ?? '',
+        weight: previousSet?.weight || fallbackWeight,
+        reps: previousSet?.reps || fallbackReps,
         rpe: previousSet?.rpe,
         completed: false,
         previous: previousSet?.previous,
@@ -196,6 +200,7 @@ export function getInitialStoreState(): ActiveWorkoutStoreState {
             excludeWarmupFromSetCount: true,
             showRpeColumn: false,
             restTimerSoundEnabled: false,
+            restTimerEnabled: true,
         },
         scrollTargetExerciseId: null,
         isHydrated: false,

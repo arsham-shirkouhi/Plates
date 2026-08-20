@@ -9,6 +9,7 @@ export const DEFAULT_WORKOUT_SETTINGS: WorkoutSettings = {
     excludeWarmupFromSetCount: true,
     showRpeColumn: false,
     restTimerSoundEnabled: false,
+    restTimerEnabled: true,
 };
 
 export const SUPERSET_COLORS = ['#526EFF', '#E53935', '#7B1FA2', '#00897B', '#F57C00', '#455A64'];
@@ -27,8 +28,8 @@ export const WORKOUT_COLORS = {
     placeholder: '#9E9E9E',
     border: '#252525',
     destructive: '#E53935',
-    completedRow: '#E8F5E9',
-    completedBorder: '#A5D6A7',
+    completedRow: '#EAEEFF',
+    completedBorder: '#B8C4FF',
     background: '#FFFFFF',
     /** Secondary panels — matches #F5F5F5 used in FoodLog / TextInput surfaces */
     surfaceSecondary: '#F5F5F5',

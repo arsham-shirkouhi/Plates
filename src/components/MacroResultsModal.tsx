@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Modal, Animated, Easing, StyleSheet } from 'react-native';
 import { Button } from './Button';
 import { fonts } from '../constants/fonts';
+import { useRegisterOverlay } from '../contexts/OverlayContext';
 
 // Helper component to display animated numbers
 const AnimatedNumber: React.FC<{
@@ -53,6 +54,7 @@ export const MacroResultsModal: React.FC<MacroResultsModalProps> = ({
     goal,
     goalIntensity,
 }) => {
+    useRegisterOverlay('MacroResultsModal', visible);
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(0.8)).current;
     const slideAnim = useRef(new Animated.Value(50)).current;

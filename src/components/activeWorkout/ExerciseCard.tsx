@@ -10,7 +10,7 @@ import {
     Platform,
     UIManager,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { fonts } from '../../constants/fonts';
 import { SUPERSET_COLORS, WORKOUT_COLORS } from '../../workout/constants';
 import { WorkoutExercise } from '../../workout/types';
@@ -88,10 +88,36 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
         ]);
     };
 
+    const animateSetChange = () => {
+        LayoutAnimation.configureNext({
+            duration: 260,
+            create: {
+                type: LayoutAnimation.Types.easeInEaseOut,
+                property: LayoutAnimation.Properties.opacity,
+            },
+            update: {
+                type: LayoutAnimation.Types.easeInEaseOut,
+            },
+            delete: {
+                type: LayoutAnimation.Types.easeInEaseOut,
+                property: LayoutAnimation.Properties.opacity,
+            },
+        });
+    };
+
     const handleAddSet = () => {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        animateSetChange();
         onAddSet();
     };
+
+    const handleRemoveLastSet = () => {
+        const lastSet = exercise.sets[exercise.sets.length - 1];
+        if (!lastSet) return;
+        animateSetChange();
+        onRemoveSet(lastSet.id);
+    };
+
+    const canRemoveSet = exercise.sets.length > 0;
 
     return (
         <View style={[styles.card, railColor ? { borderLeftColor: railColor, borderLeftWidth: 4 } : null]}>
@@ -137,9 +163,29 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                 />
             ))}
 
-            <TouchableOpacity style={styles.addSetButton} onPress={handleAddSet}>
-                <Text style={styles.addSetText}>+ add set</Text>
-            </TouchableOpacity>
+            <View style={styles.setActionsRow}>
+                <TouchableOpacity
+                    style={styles.setActionButton}
+                    onPress={handleRemoveLastSet}
+                    disabled={!canRemoveSet}
+                >
+                    <MaterialCommunityIcons
+                        name="minus-thick"
+                        size={16}
+                        color={canRemoveSet ? WORKOUT_COLORS.muted : WORKOUT_COLORS.placeholder}
+                    />
+                    <Text style={[styles.setActionText, !canRemoveSet && styles.setActionTextDisabled]}>
+                        remove
+                    </Text>
+                </TouchableOpacity>
+
+                <View style={styles.setActionDivider} />
+
+                <TouchableOpacity style={styles.setActionButton} onPress={handleAddSet}>
+                    <MaterialCommunityIcons name="plus-thick" size={16} color={WORKOUT_COLORS.accent} />
+                    <Text style={[styles.setActionText, styles.addSetText]}>add</Text>
+                </TouchableOpacity>
+            </View>
         </View>
     );
 };
@@ -148,8 +194,8 @@ const styles = StyleSheet.create({
     card: {
         backgroundColor: '#fff',
         borderRadius: 16,
-        borderWidth: 1.5,
-        borderColor: '#ECECEC',
+        borderWidth: 2,
+        borderColor: WORKOUT_COLORS.border,
         marginHorizontal: 16,
         marginBottom: 14,
         overflow: 'hidden',
@@ -212,16 +258,33 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: WORKOUT_COLORS.text,
     },
-    addSetButton: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 14,
+    setActionsRow: {
+        flexDirection: 'row',
+        alignItems: 'stretch',
         borderTopWidth: 1,
         borderTopColor: '#F0F0F0',
     },
-    addSetText: {
+    setActionButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 4,
+        paddingVertical: 14,
+    },
+    setActionDivider: {
+        width: 1,
+        backgroundColor: '#F0F0F0',
+    },
+    setActionText: {
         fontFamily: fonts.bold,
         fontSize: 14,
         color: WORKOUT_COLORS.muted,
+    },
+    setActionTextDisabled: {
+        color: WORKOUT_COLORS.placeholder,
+    },
+    addSetText: {
+        color: WORKOUT_COLORS.accent,
     },
 });

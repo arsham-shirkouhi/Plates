@@ -18,7 +18,7 @@ import * as Haptics from 'expo-haptics';
 import { fonts } from '../constants/fonts';
 import { Button } from './Button';
 import { getExercisesList, searchExercises, Exercise, getExerciseDetails, ExerciseDetails } from '../services/exerciseService';
-import { useOverlay } from '../contexts/OverlayContext';
+import { useRegisterOverlay } from '../contexts/OverlayContext';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -29,6 +29,39 @@ const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 function createUniqueId(): string {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
+
+interface BodyPartVisual {
+    icon: IoniconName;
+    tint: string;
+    bg: string;
+}
+
+const BODY_PART_VISUALS: { keys: string[]; visual: BodyPartVisual }[] = [
+    { keys: ['chest', 'pec'], visual: { icon: 'body-outline', tint: '#526EFF', bg: '#EAEEFF' } },
+    { keys: ['back', 'lat', 'trap'], visual: { icon: 'body-outline', tint: '#00897B', bg: '#E0F2F1' } },
+    { keys: ['shoulder', 'delt'], visual: { icon: 'barbell-outline', tint: '#F4511E', bg: '#FBE9E7' } },
+    { keys: ['bicep', 'tricep', 'arm', 'forearm'], visual: { icon: 'barbell-outline', tint: '#8E24AA', bg: '#F3E5F5' } },
+    { keys: ['leg', 'quad', 'hamstring', 'glute', 'calf', 'thigh'], visual: { icon: 'walk-outline', tint: '#3949AB', bg: '#E8EAF6' } },
+    { keys: ['core', 'ab', 'waist', 'oblique'], visual: { icon: 'flame-outline', tint: '#FB8C00', bg: '#FFF3E0' } },
+    { keys: ['cardio', 'heart'], visual: { icon: 'heart-outline', tint: '#E53935', bg: '#FFEBEE' } },
+];
+
+const DEFAULT_BODY_PART_VISUAL: BodyPartVisual = {
+    icon: 'barbell-outline',
+    tint: '#526EFF',
+    bg: '#EAEEFF',
+};
+
+function getBodyPartVisual(bodyPart?: string): BodyPartVisual {
+    if (!bodyPart) return DEFAULT_BODY_PART_VISUAL;
+    const normalized = bodyPart.trim().toLowerCase();
+    const match = BODY_PART_VISUALS.find((entry) =>
+        entry.keys.some((key) => normalized.includes(key))
+    );
+    return match?.visual ?? DEFAULT_BODY_PART_VISUAL;
 }
 
 interface AddExerciseOverlayProps {
@@ -54,8 +87,7 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
 }) => {
     const navigation = useNavigation<NavigationProp>();
     const insets = useSafeAreaInsets();
-    const { registerOverlay } = useOverlay();
-    const OVERLAY_ID = 'AddExerciseOverlay';
+    useRegisterOverlay('AddExerciseOverlay', visible);
     const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
     const backdropOpacity = useRef(new Animated.Value(0)).current;
     const [searchQuery, setSearchQuery] = useState('');
@@ -71,6 +103,7 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
     const [exerciseDetails, setExerciseDetails] = useState<ExerciseDetails | null>(null);
     const [loadingDetails, setLoadingDetails] = useState(false);
     const [selectedExerciseNames, setSelectedExerciseNames] = useState<Set<string>>(new Set());
+    const [bodyPartFilter, setBodyPartFilter] = useState<string | null>(null);
     const loadedForOpenRef = useRef(false);
     const wasVisibleRef = useRef(false);
 
@@ -98,6 +131,7 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
             setSelectedExercise(null);
             setExerciseDetails(null);
             setSelectedExerciseNames(new Set());
+            setBodyPartFilter(null);
         }
 
         loadedForOpenRef.current = false;
@@ -378,6 +412,25 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
     const selectedCount = selectedExerciseNames.size;
     const floatingButtonBottom = Math.max(insets.bottom - 15, 4);
 
+    // Body-part filter chips derived from whatever is currently loaded.
+    const availableBodyParts = Array.from(
+        new Set(
+            displayedExercises
+                .map((exercise) => exercise.bodyPart?.trim().toLowerCase())
+                .filter((value): value is string => !!value)
+        )
+    ).sort();
+    const filteredExercises = bodyPartFilter
+        ? displayedExercises.filter(
+              (exercise) => exercise.bodyPart?.trim().toLowerCase() === bodyPartFilter
+          )
+        : displayedExercises;
+
+    const handleSelectBodyPartFilter = (value: string | null) => {
+        Haptics.selectionAsync();
+        setBodyPartFilter((current) => (current === value ? null : value));
+    };
+
     return (
         <>
             <Modal
@@ -536,6 +589,65 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
                                             </TouchableOpacity>
                                         )}
                                     </View>
+
+                                    {!loading && availableBodyParts.length > 0 && (
+                                        <View style={styles.filterRow}>
+                                            <ScrollView
+                                                horizontal
+                                                showsHorizontalScrollIndicator={false}
+                                                contentContainerStyle={styles.filterContent}
+                                                keyboardShouldPersistTaps="handled"
+                                            >
+                                                <TouchableOpacity
+                                                    style={[
+                                                        styles.filterChip,
+                                                        bodyPartFilter === null && styles.filterChipActive,
+                                                    ]}
+                                                    onPress={() => handleSelectBodyPartFilter(null)}
+                                                    activeOpacity={0.8}
+                                                >
+                                                    <Text
+                                                        style={[
+                                                            styles.filterChipText,
+                                                            bodyPartFilter === null && styles.filterChipTextActive,
+                                                        ]}
+                                                    >
+                                                        all
+                                                    </Text>
+                                                </TouchableOpacity>
+                                                {availableBodyParts.map((part) => {
+                                                    const isActive = bodyPartFilter === part;
+                                                    const visual = getBodyPartVisual(part);
+                                                    return (
+                                                        <TouchableOpacity
+                                                            key={part}
+                                                            style={[
+                                                                styles.filterChip,
+                                                                isActive && styles.filterChipActive,
+                                                            ]}
+                                                            onPress={() => handleSelectBodyPartFilter(part)}
+                                                            activeOpacity={0.8}
+                                                        >
+                                                            <Ionicons
+                                                                name={visual.icon}
+                                                                size={14}
+                                                                color={isActive ? '#FFFFFF' : visual.tint}
+                                                                style={styles.filterChipIcon}
+                                                            />
+                                                            <Text
+                                                                style={[
+                                                                    styles.filterChipText,
+                                                                    isActive && styles.filterChipTextActive,
+                                                                ]}
+                                                            >
+                                                                {part}
+                                                            </Text>
+                                                        </TouchableOpacity>
+                                                    );
+                                                })}
+                                            </ScrollView>
+                                        </View>
+                                    )}
                                 </>
                             )}
 
@@ -559,59 +671,97 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
                                             onScroll={handleScroll}
                                             scrollEventThrottle={400}
                                         >
-                                            {displayedExercises.length === 0 ? (
+                                            {filteredExercises.length === 0 ? (
                                                 <View style={styles.emptyContainer}>
-                                                    <Text style={styles.emptyText}>no exercises found</Text>
+                                                    <View style={styles.emptyIconCircle}>
+                                                        <Ionicons name="barbell-outline" size={30} color="#B0B6C9" />
+                                                    </View>
+                                                    <Text style={styles.emptyText}>
+                                                        {searchQuery.trim().length > 0
+                                                            ? 'no exercises match your search'
+                                                            : bodyPartFilter
+                                                                ? 'no exercises for this filter'
+                                                                : 'no exercises found'}
+                                                    </Text>
+                                                    {(searchQuery.trim().length > 0 || bodyPartFilter) && (
+                                                        <Text style={styles.emptyHint}>try a different keyword or filter</Text>
+                                                    )}
                                                 </View>
                                             ) : (
                                                 <>
-                                                    {displayedExercises.map((exercise, index) => {
+                                                    <Text style={styles.resultsCount}>
+                                                        {filteredExercises.length}
+                                                        {hasMore && !bodyPartFilter ? '+' : ''}{' '}
+                                                        {filteredExercises.length === 1 ? 'exercise' : 'exercises'}
+                                                    </Text>
+                                                    {filteredExercises.map((exercise, index) => {
                                                         const exerciseNameKey = exercise.name?.trim().toLowerCase();
                                                         const isAlreadyAdded = (!!exercise.id && currentExerciseIdSet.has(exercise.id))
                                                             || (!!exerciseNameKey && currentExerciseNameSet.has(exerciseNameKey));
                                                         const isSelected =
                                                             !!exerciseNameKey && selectedExerciseNames.has(exerciseNameKey);
+                                                        const visual = getBodyPartVisual(exercise.bodyPart);
                                                         return (
-                                                            <View
+                                                            <TouchableOpacity
                                                                 key={`exercise-${index}-${exercise.id || exercise.name || 'item'}`}
-                                                                style={styles.exerciseItem}
+                                                                style={[
+                                                                    styles.exerciseItem,
+                                                                    isSelected && styles.exerciseItemSelected,
+                                                                    isAlreadyAdded && styles.exerciseItemAdded,
+                                                                ]}
+                                                                onPress={() => handleExerciseTitlePress(exercise)}
+                                                                activeOpacity={0.85}
                                                             >
-                                                                <TouchableOpacity
-                                                                    style={styles.exerciseTitleContainer}
-                                                                    onPress={() => handleExerciseTitlePress(exercise)}
-                                                                    activeOpacity={0.7}
-                                                                >
-                                                                    <Text style={styles.exerciseName}>{exercise.name}</Text>
+                                                                <View style={[styles.exerciseAvatar, { backgroundColor: visual.bg }]}>
+                                                                    <Ionicons name={visual.icon} size={22} color={visual.tint} />
+                                                                </View>
+                                                                <View style={styles.exerciseTitleContainer}>
+                                                                    <Text style={styles.exerciseName} numberOfLines={2}>
+                                                                        {exercise.name}
+                                                                    </Text>
                                                                     {!!exercise.bodyPart && (
-                                                                        <Text style={styles.exerciseBodyPart}>
-                                                                            {exercise.bodyPart.toLowerCase()}
-                                                                        </Text>
+                                                                        <View style={styles.bodyPartChip}>
+                                                                            <View
+                                                                                style={[
+                                                                                    styles.bodyPartDot,
+                                                                                    { backgroundColor: visual.tint },
+                                                                                ]}
+                                                                            />
+                                                                            <Text style={styles.exerciseBodyPart}>
+                                                                                {exercise.bodyPart.toLowerCase()}
+                                                                            </Text>
+                                                                        </View>
                                                                     )}
-                                                                </TouchableOpacity>
+                                                                </View>
                                                                 {isAlreadyAdded ? (
-                                                                    <View style={styles.recentlyAddedContainer}>
-                                                                        <TouchableOpacity
-                                                                            style={styles.removeButton}
-                                                                            onPress={() => onRemoveExercise?.(exercise)}
-                                                                            activeOpacity={0.7}
-                                                                        >
-                                                                            <Ionicons name="trash-outline" size={24} color="#FF5252" />
-                                                                        </TouchableOpacity>
-                                                                    </View>
+                                                                    <TouchableOpacity
+                                                                        style={[styles.toggleButton, styles.toggleButtonRemove]}
+                                                                        onPress={() => onRemoveExercise?.(exercise)}
+                                                                        activeOpacity={0.7}
+                                                                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                                                    >
+                                                                        <Ionicons name="trash-outline" size={20} color="#FF5252" />
+                                                                    </TouchableOpacity>
                                                                 ) : (
                                                                     <TouchableOpacity
-                                                                        style={styles.addButton}
+                                                                        style={[
+                                                                            styles.toggleButton,
+                                                                            isSelected
+                                                                                ? styles.toggleButtonSelected
+                                                                                : styles.toggleButtonDefault,
+                                                                        ]}
                                                                         onPress={() => handleAddExercise(exercise)}
                                                                         activeOpacity={0.7}
+                                                                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                                                                     >
                                                                         <Ionicons
-                                                                            name={isSelected ? 'checkmark-circle' : 'add'}
-                                                                            size={24}
-                                                                            color={isSelected ? '#34A853' : '#526EFF'}
+                                                                            name={isSelected ? 'checkmark' : 'add'}
+                                                                            size={22}
+                                                                            color={isSelected ? '#FFFFFF' : '#526EFF'}
                                                                         />
                                                                     </TouchableOpacity>
                                                                 )}
-                                                            </View>
+                                                            </TouchableOpacity>
                                                         );
                                                     })}
                                                     {loadingMore && (
@@ -757,55 +907,129 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         paddingHorizontal: 20,
-        paddingTop: 0,
+        paddingTop: 8,
         paddingBottom: 8,
     },
     detailScrollContent: {
         paddingHorizontal: 20,
         paddingVertical: 20,
     },
+    resultsCount: {
+        fontSize: 13,
+        fontFamily: fonts.bold,
+        color: '#9E9E9E',
+        textTransform: 'lowercase',
+        marginTop: 4,
+        marginBottom: 12,
+    },
     exerciseItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingVertical: 14,
-        borderBottomWidth: 2,
-        borderBottomColor: '#F0F0F0',
+        paddingVertical: 12,
+        paddingHorizontal: 12,
+        marginBottom: 10,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        borderWidth: 2,
+        borderColor: '#EDEDED',
+    },
+    exerciseItemSelected: {
+        borderColor: '#526EFF',
+        backgroundColor: '#F5F7FF',
+    },
+    exerciseItemAdded: {
+        borderColor: '#A5D6A7',
+        backgroundColor: '#F3FBF4',
+    },
+    exerciseAvatar: {
+        width: 46,
+        height: 46,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 14,
     },
     exerciseTitleContainer: {
         flex: 1,
         paddingRight: 12,
     },
     exerciseName: {
-        fontSize: 18,
-        fontFamily: fonts.regular,
+        fontSize: 17,
+        fontFamily: fonts.bold,
         color: '#252525',
         textTransform: 'lowercase',
+    },
+    bodyPartChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 5,
+    },
+    bodyPartDot: {
+        width: 7,
+        height: 7,
+        borderRadius: 4,
+        marginRight: 6,
     },
     exerciseBodyPart: {
         fontSize: 12,
         fontFamily: fonts.regular,
-        color: '#9E9E9E',
+        color: '#757575',
         textTransform: 'lowercase',
-        marginTop: 2,
     },
-    addButton: {
+    toggleButton: {
         width: 40,
         height: 40,
+        borderRadius: 20,
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: 2,
     },
-    recentlyAddedContainer: {
-        width: 40,
-        height: 40,
-        alignItems: 'center',
-        justifyContent: 'center',
+    toggleButtonDefault: {
+        backgroundColor: '#EAEEFF',
+        borderColor: '#EAEEFF',
     },
-    removeButton: {
-        width: 40,
-        height: 40,
+    toggleButtonSelected: {
+        backgroundColor: '#526EFF',
+        borderColor: '#526EFF',
+    },
+    toggleButtonRemove: {
+        backgroundColor: '#FFEBEE',
+        borderColor: '#FFEBEE',
+    },
+    filterRow: {
+        marginTop: 4,
+        marginBottom: 4,
+    },
+    filterContent: {
+        paddingHorizontal: 20,
+        paddingVertical: 8,
+        gap: 8,
+    },
+    filterChip: {
+        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 999,
+        backgroundColor: '#F2F2F2',
+        borderWidth: 2,
+        borderColor: '#F2F2F2',
+    },
+    filterChipActive: {
+        backgroundColor: '#252525',
+        borderColor: '#252525',
+    },
+    filterChipIcon: {
+        marginRight: 5,
+    },
+    filterChipText: {
+        fontSize: 13,
+        fontFamily: fonts.bold,
+        color: '#616161',
+        textTransform: 'lowercase',
+    },
+    filterChipTextActive: {
+        color: '#FFFFFF',
     },
     emptyContainer: {
         flex: 1,
@@ -813,11 +1037,27 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: 60,
     },
+    emptyIconCircle: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        backgroundColor: '#F2F3F7',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+    },
     emptyText: {
         fontSize: 16,
+        fontFamily: fonts.bold,
+        color: '#616161',
+        textTransform: 'lowercase',
+    },
+    emptyHint: {
+        fontSize: 13,
         fontFamily: fonts.regular,
         color: '#9E9E9E',
         textTransform: 'lowercase',
+        marginTop: 6,
     },
     loadingContainer: {
         flex: 1,

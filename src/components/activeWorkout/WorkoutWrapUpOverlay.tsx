@@ -26,6 +26,7 @@ import {
 } from '../../workout/workoutSelectors';
 import { Button } from '../Button';
 import { Confetti, ConfettiParticle } from '../Confetti';
+import { useRegisterOverlay } from '../../contexts/OverlayContext';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CONTENT_WIDTH = 360;
@@ -75,6 +76,7 @@ export const WorkoutWrapUpOverlay: React.FC<WorkoutWrapUpOverlayProps> = ({
     onDone,
     onSavePreset,
 }) => {
+    useRegisterOverlay('WorkoutWrapUpOverlay', visible);
     const [savedPreset, setSavedPreset] = useState(false);
     const [confettiParticles, setConfettiParticles] = useState<ConfettiParticle[]>([]);
 

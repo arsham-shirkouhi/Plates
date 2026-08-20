@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../constants/fonts';
 import { FoodItem } from '../services/foodService';
+import { useRegisterOverlay } from '../contexts/OverlayContext';
 
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 
@@ -47,6 +48,7 @@ export const DailyMacrosOverlay: React.FC<DailyMacrosOverlayProps> = ({
     foods,
     totals,
 }) => {
+    useRegisterOverlay('DailyMacrosOverlay', visible);
     const insets = useSafeAreaInsets();
 
     // Animation refs - slide up from bottom

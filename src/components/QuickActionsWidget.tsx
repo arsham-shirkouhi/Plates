@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { fonts } from '../constants/fonts';
@@ -8,6 +8,7 @@ interface QuickActionsWidgetProps {
   exerciseCount?: number;
   onLogFoodPress?: () => void;
   onLogExercisePress?: () => void;
+  workoutInProgress?: boolean;
 }
 
 const screenWidth = Dimensions.get('window').width;
@@ -30,6 +31,7 @@ export const QuickActionsWidget: React.FC<QuickActionsWidgetProps> = ({
   exerciseCount = 0,
   onLogFoodPress,
   onLogExercisePress,
+  workoutInProgress = false,
 }) => {
   return (
     <View style={[styles.container, { width: widgetSize, height: widgetSize }]}>
@@ -46,12 +48,21 @@ export const QuickActionsWidget: React.FC<QuickActionsWidgetProps> = ({
 
       <QuickActionButton
         height={actionHeight}
-        backgroundColor="#F9C117"
-        title="log exercise!"
-        subtitle={formatCount(exerciseCount)}
-        titleColor="#252525"
-        subtitleColor="#252525"
-        icon={<Ionicons name="add" size={24} color="#252525" style={styles.icon} />}
+        backgroundColor={workoutInProgress ? '#526EFF' : '#F9C117'}
+        title={workoutInProgress ? 'in progress' : 'log exercise!'}
+        subtitle={workoutInProgress ? 'tap to resume' : formatCount(exerciseCount)}
+        titleColor={workoutInProgress ? '#FFFFFF' : '#252525'}
+        subtitleColor={workoutInProgress ? '#FFFFFF' : '#252525'}
+        pressedLook={workoutInProgress}
+        topRight={workoutInProgress ? <LiveIndicator /> : null}
+        icon={
+          <Ionicons
+            name={workoutInProgress ? 'barbell' : 'add'}
+            size={workoutInProgress ? 20 : 24}
+            color={workoutInProgress ? '#FFFFFF' : '#252525'}
+            style={styles.icon}
+          />
+        }
         onPress={onLogExercisePress}
       />
     </View>
@@ -67,6 +78,8 @@ interface QuickActionButtonProps {
   subtitleColor: string;
   icon: React.ReactNode;
   onPress?: () => void;
+  pressedLook?: boolean;
+  topRight?: React.ReactNode;
 }
 
 const QuickActionButton: React.FC<QuickActionButtonProps> = ({
@@ -78,9 +91,33 @@ const QuickActionButton: React.FC<QuickActionButtonProps> = ({
   subtitleColor,
   icon,
   onPress,
+  pressedLook = false,
+  topRight = null,
 }) => {
-  const translateY = useRef(new Animated.Value(0)).current;
-  const shadowOpacity = useRef(new Animated.Value(1)).current;
+  // When pressedLook is on, the button rests in its "pushed down" position
+  // so it reads as actively engaged while still animating on touch.
+  const restY = pressedLook ? SHADOW_OFFSET : 0;
+  const restShadow = pressedLook ? 0 : 1;
+
+  const translateY = useRef(new Animated.Value(restY)).current;
+  const shadowOpacity = useRef(new Animated.Value(restShadow)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(translateY, {
+        toValue: restY,
+        duration: PRESS_ANIM_MS,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.timing(shadowOpacity, {
+        toValue: restShadow,
+        duration: PRESS_ANIM_MS,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [restY, restShadow, translateY, shadowOpacity]);
 
   const handlePressIn = () => {
     Animated.parallel([
@@ -102,13 +139,13 @@ const QuickActionButton: React.FC<QuickActionButtonProps> = ({
   const handlePressOut = () => {
     Animated.parallel([
       Animated.timing(translateY, {
-        toValue: 0,
+        toValue: restY,
         duration: PRESS_ANIM_MS,
         easing: Easing.out(Easing.ease),
         useNativeDriver: true,
       }),
       Animated.timing(shadowOpacity, {
-        toValue: 1,
+        toValue: restShadow,
         duration: PRESS_ANIM_MS,
         easing: Easing.out(Easing.ease),
         useNativeDriver: true,
@@ -132,6 +169,7 @@ const QuickActionButton: React.FC<QuickActionButtonProps> = ({
             { backgroundColor, transform: [{ translateY }] },
           ]}
         >
+          {topRight ? <View style={styles.topRight}>{topRight}</View> : null}
           <View style={styles.textBlock}>
             <Text style={[styles.titleText, { color: titleColor }]}>{title}</Text>
             <Text style={[styles.subtitleText, { color: subtitleColor }]}>{subtitle}</Text>
@@ -139,6 +177,43 @@ const QuickActionButton: React.FC<QuickActionButtonProps> = ({
           {icon}
         </Animated.View>
       </TouchableOpacity>
+    </View>
+  );
+};
+
+const LiveIndicator: React.FC = () => {
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 900,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+
+  const ringScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.6, 2.6] });
+  const ringOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0] });
+
+  return (
+    <View style={styles.liveWrap}>
+      <Animated.View
+        style={[styles.liveRing, { opacity: ringOpacity, transform: [{ scale: ringScale }] }]}
+        pointerEvents="none"
+      />
+      <View style={styles.liveDot} />
     </View>
   );
 };
@@ -196,5 +271,30 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 10,
     bottom: 8,
+  },
+  topRight: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 2,
+  },
+  liveWrap: {
+    width: 12,
+    height: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  liveRing: {
+    position: 'absolute',
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#FFFFFF',
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FFFFFF',
   },
 });

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Modal, Animated, Easing } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../../constants/fonts';
+import { useRegisterOverlay } from '../../contexts/OverlayContext';
 
 interface WorkoutCountdownOverlayProps {
     visible: boolean;
@@ -14,6 +15,7 @@ export const WorkoutCountdownOverlay: React.FC<WorkoutCountdownOverlayProps> = (
     visible,
     onComplete,
 }) => {
+    useRegisterOverlay('WorkoutCountdownOverlay', visible);
     const [count, setCount] = useState(COUNTDOWN_SECONDS);
     const scaleAnim = useRef(new Animated.Value(0.6)).current;
     const opacityAnim = useRef(new Animated.Value(0)).current;

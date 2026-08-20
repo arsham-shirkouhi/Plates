@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 
 interface OverlayContextType {
     isAnyOverlayOpen: boolean;
@@ -52,4 +52,20 @@ export const useOverlay = () => {
         };
     }
     return context;
+};
+
+/**
+ * Registers an overlay as open while `isOpen` is true, so that shared UI
+ * (e.g. SwipeableScreen) knows to block interaction with the content behind it.
+ * Automatically unregisters on unmount or when `isOpen` becomes false.
+ */
+export const useRegisterOverlay = (id: string, isOpen: boolean) => {
+    const { registerOverlay, unregisterOverlay } = useOverlay();
+
+    useEffect(() => {
+        registerOverlay(id, isOpen);
+        return () => {
+            unregisterOverlay(id);
+        };
+    }, [id, isOpen, registerOverlay, unregisterOverlay]);
 };

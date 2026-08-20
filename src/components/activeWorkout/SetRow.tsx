@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     View,
     Text,
@@ -6,6 +6,7 @@ import {
     TouchableOpacity,
     TextInput,
     Alert,
+    LayoutChangeEvent,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -13,6 +14,9 @@ import { fonts } from '../../constants/fonts';
 import { SET_TYPE_META, WORKOUT_COLORS } from '../../workout/constants';
 import { WorkoutSet, WorkoutSetType } from '../../workout/types';
 import { formatPreviousSet } from '../../workout/workoutSelectors';
+import { Confetti, ConfettiParticle } from '../Confetti';
+
+const CONFETTI_COLORS = ['#526EFF', '#F9C117', '#FF5151', '#2ED573', '#B06BFF', '#FF8A3D'];
 
 interface SetRowProps {
     set: WorkoutSet;
@@ -37,12 +41,47 @@ export const SetRow: React.FC<SetRowProps> = ({
 }) => {
     const [weightDraft, setWeightDraft] = useState(set.weight);
     const [repsDraft, setRepsDraft] = useState(set.reps);
+    const [confetti, setConfetti] = useState<ConfettiParticle[]>([]);
     const badge = SET_TYPE_META[set.type].badge;
+
+    const checkLayoutRef = useRef({ x: 0, y: 0, width: 28, height: 28 });
+    const confettiIdRef = useRef(0);
+    const confettiTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         setWeightDraft(set.weight);
         setRepsDraft(set.reps);
     }, [set.weight, set.reps, set.id]);
+
+    useEffect(() => {
+        return () => {
+            if (confettiTimerRef.current) clearTimeout(confettiTimerRef.current);
+        };
+    }, []);
+
+    const handleCheckLayout = (event: LayoutChangeEvent) => {
+        const { x, y, width, height } = event.nativeEvent.layout;
+        checkLayoutRef.current = { x, y, width, height };
+    };
+
+    const burstConfetti = () => {
+        const { x, y, width, height } = checkLayoutRef.current;
+        const originX = x + width / 2;
+        const originY = y + height / 2;
+        const particles: ConfettiParticle[] = Array.from({ length: 12 }, () => {
+            confettiIdRef.current += 1;
+            return {
+                id: confettiIdRef.current,
+                originX,
+                originY,
+                angle: Math.random() * 360,
+                color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+            };
+        });
+        setConfetti(particles);
+        if (confettiTimerRef.current) clearTimeout(confettiTimerRef.current);
+        confettiTimerRef.current = setTimeout(() => setConfetti([]), 600);
+    };
 
     const openSetTypeMenu = () => {
         Alert.alert('Set type', undefined, [
@@ -58,6 +97,7 @@ export const SetRow: React.FC<SetRowProps> = ({
     const handleToggleComplete = () => {
         if (!set.completed) {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            burstConfetti();
         }
         onToggleComplete();
     };
@@ -129,13 +169,19 @@ export const SetRow: React.FC<SetRowProps> = ({
                 />
             ) : null}
 
-            <TouchableOpacity style={styles.checkCell} onPress={handleToggleComplete}>
+            <TouchableOpacity
+                style={styles.checkCell}
+                onPress={handleToggleComplete}
+                onLayout={handleCheckLayout}
+            >
                 <Ionicons
                     name={set.completed ? 'checkmark-circle' : 'ellipse-outline'}
                     size={22}
                     color={set.completed ? WORKOUT_COLORS.accent : WORKOUT_COLORS.placeholder}
                 />
             </TouchableOpacity>
+
+            <Confetti particles={confetti} />
         </View>
     );
 };

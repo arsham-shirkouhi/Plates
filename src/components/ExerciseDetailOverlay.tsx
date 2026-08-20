@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../constants/fonts';
 import { getExerciseDetails, ExerciseDetails } from '../services/exerciseService';
+import { useRegisterOverlay } from '../contexts/OverlayContext';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -30,6 +31,7 @@ export const ExerciseDetailOverlay: React.FC<ExerciseDetailOverlayProps> = ({
     onClose,
     exerciseId,
 }) => {
+    useRegisterOverlay('ExerciseDetailOverlay', visible);
     const insets = useSafeAreaInsets();
     const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
     const backdropOpacity = useRef(new Animated.Value(0)).current;

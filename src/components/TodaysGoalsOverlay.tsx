@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../constants/fonts';
+import { useRegisterOverlay } from '../contexts/OverlayContext';
 
 interface Goal {
     text: string;
@@ -42,6 +43,7 @@ export const TodaysGoalsOverlay: React.FC<TodaysGoalsOverlayProps> = ({
     goals,
     onGoalsChange,
 }) => {
+    useRegisterOverlay('TodaysGoalsOverlay', visible);
     const insets = useSafeAreaInsets();
     const [confettiParticles, setConfettiParticles] = useState<Array<{ id: number; originX: number; originY: number; angle: number }>>([]);
     const [removingIndex, setRemovingIndex] = useState<number | null>(null);

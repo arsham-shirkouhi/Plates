@@ -22,6 +22,7 @@ import * as Haptics from 'expo-haptics';
 import { FoodItem } from '../services/foodService';
 import { FoodDetailView } from './FoodDetailView';
 import { Button } from './Button';
+import { useRegisterOverlay } from '../contexts/OverlayContext';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -51,6 +52,7 @@ export const EditFoodBottomSheet: React.FC<EditFoodBottomSheetProps> = ({
     onUpdateFood,
     onDelete,
 }) => {
+    useRegisterOverlay('EditFoodBottomSheet', visible);
     const [detailServingSize, setDetailServingSize] = useState('');
     const [detailNumberOfServings, setDetailNumberOfServings] = useState('');
     const [detailMeal, setDetailMeal] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack' | null>(null);

@@ -24,7 +24,7 @@ import {
     loadPersistedWorkoutState,
     persistWorkoutState,
 } from '../workout/workoutPersistence';
-import { getLastExercisePreviousSets } from '../services/workoutHistoryService';
+import { getLastExercisePreviousSets, saveCompletedWorkout } from '../services/workoutHistoryService';
 import { useAuth } from '../context/AuthContext';
 
 interface ActiveWorkoutContextValue {
@@ -55,6 +55,7 @@ interface ActiveWorkoutContextValue {
     skipRestTimer: () => void;
     clearScrollTarget: () => void;
     finishWorkout: () => Promise<void>;
+    endActiveWorkout: () => Promise<void>;
     wrapUpSummary: WorkoutWrapUpSummary | null;
     requestWrapUp: () => WorkoutWrapUpSummary | null;
     commitFinishWorkout: () => Promise<void>;
@@ -69,6 +70,7 @@ export const ActiveWorkoutProvider: React.FC<{ children: React.ReactNode }> = ({
     const [wrapUpSummary, setWrapUpSummary] = useState<WorkoutWrapUpSummary | null>(null);
     const hydratedRef = useRef(false);
     const lastPersistedRef = useRef<string>('');
+    const prevUserIdRef = useRef<string | null>(user?.id ?? null);
 
     useEffect(() => {
         let cancelled = false;
@@ -114,6 +116,23 @@ export const ActiveWorkoutProvider: React.FC<{ children: React.ReactNode }> = ({
         state.restTimer,
         state.settings,
     ]);
+
+    // The active workout belongs to the logged-in session only. Keep it running for
+    // the whole session, but once the user logs out clear it (and its persisted copy)
+    // so the minimized widget doesn't linger over the login screen or into another account.
+    useEffect(() => {
+        const currentUserId = user?.id ?? null;
+        const previousUserId = prevUserIdRef.current;
+        prevUserIdRef.current = currentUserId;
+
+        const loggedOut = !!previousUserId && !currentUserId;
+        if (!loggedOut) return;
+
+        dispatch({ type: 'DISCARD_WORKOUT' });
+        setWrapUpSummary(null);
+        lastPersistedRef.current = '';
+        void clearPersistedWorkoutState();
+    }, [user?.id]);
 
     const startWorkout = useCallback(
         (options?: { title?: string; exercises?: WorkoutExercise[] }) => {
@@ -226,6 +245,28 @@ export const ActiveWorkoutProvider: React.FC<{ children: React.ReactNode }> = ({
         await clearPersistedWorkoutState();
     }, [state.workout]);
 
+    // Ends the current workout immediately (e.g. on logout). A workout that has
+    // exercises is saved to history; an empty workout is discarded so it never
+    // shows up in the completed-workouts list.
+    const endActiveWorkout = useCallback(async () => {
+        const workout = state.workout;
+        const hasExercises = (workout?.exercises.length ?? 0) > 0;
+
+        if (workout && hasExercises) {
+            try {
+                const summary = buildWrapUpSummary(workout, state.settings);
+                await saveCompletedWorkout(summary, user?.id);
+            } catch (error) {
+                console.warn('[ActiveWorkout] Failed to save workout while ending', error);
+            }
+        }
+
+        dispatch({ type: hasExercises ? 'FINISH_WORKOUT' : 'DISCARD_WORKOUT' });
+        setWrapUpSummary(null);
+        lastPersistedRef.current = '';
+        await clearPersistedWorkoutState();
+    }, [state.workout, state.settings, user?.id]);
+
     const requestWrapUp = useCallback(() => {
         const workout = state.workout;
         if (!workout || workout.exercises.length === 0) return null;
@@ -272,6 +313,7 @@ export const ActiveWorkoutProvider: React.FC<{ children: React.ReactNode }> = ({
             skipRestTimer,
             clearScrollTarget,
             finishWorkout,
+            endActiveWorkout,
             wrapUpSummary,
             requestWrapUp,
             commitFinishWorkout,
@@ -300,6 +342,7 @@ export const ActiveWorkoutProvider: React.FC<{ children: React.ReactNode }> = ({
             skipRestTimer,
             clearScrollTarget,
             finishWorkout,
+            endActiveWorkout,
             wrapUpSummary,
             requestWrapUp,
             commitFinishWorkout,

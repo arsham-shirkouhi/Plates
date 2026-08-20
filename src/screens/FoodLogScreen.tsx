@@ -31,6 +31,7 @@ import { getDailyMacroLog, addToDailyMacroLog, subtractFromDailyMacroLog, getTod
 import { useAddFood } from '../context/AddFoodContext';
 import { useAuth } from '../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRegisterOverlay } from '../contexts/OverlayContext';
 
 type FoodLogScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'FoodLog'>;
 
@@ -230,6 +231,7 @@ export const FoodLogScreen: React.FC = () => {
 
     const [selectedMeal, setSelectedMeal] = useState<MealType | null>(null);
     const [showMealSelector, setShowMealSelector] = useState(false);
+    useRegisterOverlay('FoodLogMealSelector', showMealSelector);
 
     // Animation refs for meal selector
     const mealSelectorSlideAnim = useRef(new Animated.Value(Dimensions.get('window').height)).current;

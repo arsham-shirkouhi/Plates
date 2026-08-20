@@ -19,6 +19,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { fonts } from '../constants/fonts';
 import * as Haptics from 'expo-haptics';
+import { useRegisterOverlay } from '../contexts/OverlayContext';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -51,6 +52,7 @@ export const ExerciseDetailBottomSheet: React.FC<ExerciseDetailBottomSheetProps>
     exercise,
     onUpdateExercise,
 }) => {
+    useRegisterOverlay('ExerciseDetailBottomSheet', visible);
     const [sets, setSets] = useState<Set[]>([]);
     const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT + TOASTER_OFFSET)).current;
     const backdropOpacity = useRef(new Animated.Value(0)).current;

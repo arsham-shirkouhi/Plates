@@ -54,6 +54,9 @@ export function activeWorkoutReducer(
             return {
                 ...state,
                 ...action.payload,
+                // Merge persisted settings over defaults so newly added settings
+                // (e.g. restTimerEnabled) keep their default when missing from storage.
+                settings: { ...state.settings, ...(action.payload.settings ?? {}) },
                 isHydrated: true,
             };
 
@@ -277,15 +280,15 @@ export function activeWorkoutReducer(
             if (remaining === 0) {
                 return { ...state, restTimer: null };
             }
+            const endsAt = action.payload.now + remaining * 1000;
             return {
                 ...state,
                 restTimer: {
                     ...state.restTimer,
-                    endsAt: action.payload.now + remaining * 1000,
-                    durationSeconds: Math.max(
-                        state.restTimer.durationSeconds,
-                        Math.ceil((action.payload.now + remaining * 1000 - state.restTimer.startedAt) / 1000)
-                    ),
+                    endsAt,
+                    // Duration spans from the original start to the new end, so the
+                    // progress bar reflects the adjustment instead of resetting.
+                    durationSeconds: Math.max(1, Math.ceil((endsAt - state.restTimer.startedAt) / 1000)),
                 },
             };
         }
@@ -296,6 +299,13 @@ export function activeWorkoutReducer(
 
         case 'CLEAR_SCROLL_TARGET':
             return { ...state, scrollTargetExerciseId: null };
+
+        case 'UPDATE_SETTINGS': {
+            const nextSettings = { ...state.settings, ...action.payload };
+            // Turning the rest timer off should also dismiss any running timer.
+            const nextRestTimer = nextSettings.restTimerEnabled ? state.restTimer : null;
+            return { ...state, settings: nextSettings, restTimer: nextRestTimer };
+        }
 
         case 'FINISH_WORKOUT':
         case 'DISCARD_WORKOUT':

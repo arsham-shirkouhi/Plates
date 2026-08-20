@@ -49,6 +49,7 @@ export interface WorkoutSettings {
     excludeWarmupFromSetCount: boolean;
     showRpeColumn: boolean;
     restTimerSoundEnabled: boolean;
+    restTimerEnabled: boolean;
 }
 
 export interface ActiveWorkoutStoreState {

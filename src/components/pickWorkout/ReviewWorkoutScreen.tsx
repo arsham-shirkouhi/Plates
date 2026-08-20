@@ -5,10 +5,7 @@ import {
     StyleSheet,
     TouchableOpacity,
     ScrollView,
-    Alert,
     TextInput,
-    Modal,
-    Pressable,
     Animated as RNAnimated,
     Easing as RNEasing,
 } from 'react-native';
@@ -25,11 +22,22 @@ import { fonts } from '../../constants/fonts';
 import { PICK_WORKOUT_LAYOUT, WORKOUT_COLORS } from '../../workout/constants';
 import { MUSCLE_GROUP_LABELS, MuscleGroup, mapBodyPartToMuscleGroup } from '../../workout/muscleGroups';
 import { WorkoutExercise, WorkoutSet } from '../../workout/types';
-import { saveWorkoutPresetFromExercises, getLastExercisePreviousSets } from '../../services/workoutHistoryService';
+import { getLastExercisePreviousSets } from '../../services/workoutHistoryService';
 import { searchExercises, Exercise } from '../../services/exerciseService';
 import { createUniqueId } from '../../workout/workoutSelectors';
 import { useAuth } from '../../context/AuthContext';
 import { PendingReviewWorkout } from './PickWorkoutScreen';
+
+type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
+
+const MUSCLE_VISUALS: Record<MuscleGroup, { icon: IoniconName; tint: string; bg: string }> = {
+    chest: { icon: 'body-outline', tint: '#526EFF', bg: '#EAEEFF' },
+    shoulders: { icon: 'barbell-outline', tint: '#F4511E', bg: '#FBE9E7' },
+    arms: { icon: 'barbell-outline', tint: '#8E24AA', bg: '#F3E5F5' },
+    back: { icon: 'body-outline', tint: '#00897B', bg: '#E0F2F1' },
+    core: { icon: 'flame-outline', tint: '#FB8C00', bg: '#FFF3E0' },
+    legs: { icon: 'walk-outline', tint: '#3949AB', bg: '#E8EAF6' },
+};
 
 const SWAP_DURATION = 250;
 
@@ -135,8 +143,6 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
     const [recommended, setRecommended] = useState<WorkoutExercise[]>(() =>
         pending.exercises.map((exercise) => withDefaults(exercise))
     );
-    const [saveVisible, setSaveVisible] = useState(false);
-    const [routineName, setRoutineName] = useState(pending.title);
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<Exercise[]>([]);
     const [searching, setSearching] = useState(false);
@@ -301,38 +307,32 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
         onStartWorkout({ title: pending.title, exercises: added });
     };
 
-    const handleSaveRoutine = async () => {
-        const name = routineName.trim();
-        if (!name) return;
-        await saveWorkoutPresetFromExercises(
-            name,
-            added.map((exercise) => ({
-                exerciseId: exercise.exerciseId,
-                name: exercise.name,
-                restSeconds: exercise.restSeconds ?? 120,
-                sets: exercise.sets.map((set) => ({
-                    type: set.type,
-                    previous: set.previous,
-                })),
-            })),
-            user?.id
-        );
-        setSaveVisible(false);
-        Alert.alert('Saved', `${name} saved as a routine.`);
-    };
-
     const startLabel = added.length > 0 ? 'start workout' : 'start empty workout';
 
     return (
         <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
-            <ReviewHeader onBack={onBack} onSave={() => setSaveVisible(true)} canSave={added.length > 0} />
+            <ReviewHeader onBack={onBack} />
 
             <View style={styles.chipRow}>
-                {pending.selectedMuscles.map((muscle) => (
-                    <View key={muscle} style={styles.chip}>
-                        <Text style={styles.chipText}>{MUSCLE_GROUP_LABELS[muscle]}</Text>
-                    </View>
-                ))}
+                {pending.selectedMuscles.map((muscle) => {
+                    const visual = MUSCLE_VISUALS[muscle];
+                    return (
+                        <View
+                            key={muscle}
+                            style={[styles.chip, { backgroundColor: visual.bg, borderColor: visual.tint }]}
+                        >
+                            <Ionicons
+                                name={visual.icon}
+                                size={15}
+                                color={visual.tint}
+                                style={styles.chipIcon}
+                            />
+                            <Text style={[styles.chipText, { color: visual.tint }]}>
+                                {MUSCLE_GROUP_LABELS[muscle]}
+                            </Text>
+                        </View>
+                    );
+                })}
             </View>
 
             <View style={styles.searchArea}>
@@ -412,7 +412,7 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
                                         <Text style={styles.rowMeta}>{formatExerciseMeta(item)}</Text>
                                     </View>
                                     <View style={styles.addButton}>
-                                        <Ionicons name="add" size={22} color={WORKOUT_COLORS.background} />
+                                        <Ionicons name="add" size={28} color={WORKOUT_COLORS.accent} />
                                     </View>
                                 </TouchableOpacity>
                             ))}
@@ -451,8 +451,8 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
                                             <View style={styles.addButton}>
                                                 <Ionicons
                                                     name="add"
-                                                    size={22}
-                                                    color={WORKOUT_COLORS.background}
+                                                    size={28}
+                                                    color={WORKOUT_COLORS.accent}
                                                 />
                                             </View>
                                         </TouchableOpacity>
@@ -471,24 +471,6 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
             <View style={styles.footer}>
                 <ShadowButton label={startLabel} onPress={handleStart} />
             </View>
-
-            <Modal visible={saveVisible} transparent animationType="fade" onRequestClose={() => setSaveVisible(false)}>
-                <Pressable style={styles.modalBackdrop} onPress={() => setSaveVisible(false)} />
-                <View style={styles.modalSheet}>
-                    <Text style={styles.modalTitle}>save as routine</Text>
-                    <TextInput
-                        style={styles.modalInput}
-                        value={routineName}
-                        onChangeText={setRoutineName}
-                        placeholder="routine name"
-                        placeholderTextColor={WORKOUT_COLORS.placeholder}
-                        autoCapitalize="none"
-                    />
-                    <TouchableOpacity style={styles.primaryButton} onPress={handleSaveRoutine}>
-                        <Text style={styles.primaryButtonText}>save</Text>
-                    </TouchableOpacity>
-                </View>
-            </Modal>
         </SafeAreaView>
     );
 };
@@ -684,15 +666,7 @@ function Stepper({
     );
 }
 
-function ReviewHeader({
-    onBack,
-    onSave,
-    canSave,
-}: {
-    onBack: () => void;
-    onSave: () => void;
-    canSave: boolean;
-}) {
+function ReviewHeader({ onBack }: { onBack: () => void }) {
     return (
         <View style={styles.header}>
             <TouchableOpacity
@@ -704,17 +678,7 @@ function ReviewHeader({
                 <Ionicons name="arrow-back" size={22} color={WORKOUT_COLORS.text} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>pick exercises</Text>
-            <TouchableOpacity
-                style={styles.headerSide}
-                onPress={onSave}
-                disabled={!canSave}
-                accessibilityRole="button"
-                accessibilityLabel="Save as routine"
-            >
-                <Text style={[styles.headerAction, !canSave && styles.headerActionDisabled]}>
-                    save as routine
-                </Text>
-            </TouchableOpacity>
+            <View style={styles.headerSide} />
         </View>
     );
 }
@@ -745,15 +709,6 @@ const styles = StyleSheet.create({
         color: WORKOUT_COLORS.text,
         textTransform: 'lowercase',
     },
-    headerAction: {
-        fontFamily: fonts.regular,
-        fontSize: 14,
-        color: WORKOUT_COLORS.placeholder,
-        textTransform: 'lowercase',
-    },
-    headerActionDisabled: {
-        opacity: 0.35,
-    },
     chipRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
@@ -762,17 +717,19 @@ const styles = StyleSheet.create({
         paddingBottom: padding,
     },
     chip: {
-        borderWidth,
-        borderColor: WORKOUT_COLORS.border,
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1.5,
         borderRadius: 999,
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        backgroundColor: WORKOUT_COLORS.background,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+    },
+    chipIcon: {
+        marginRight: 6,
     },
     chipText: {
-        fontFamily: fonts.regular,
+        fontFamily: fonts.bold,
         fontSize: 14,
-        color: WORKOUT_COLORS.text,
         textTransform: 'lowercase',
     },
     searchArea: {
@@ -856,8 +813,6 @@ const styles = StyleSheet.create({
     addButton: {
         width: 32,
         height: 32,
-        borderRadius: 16,
-        backgroundColor: WORKOUT_COLORS.accent,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -1003,34 +958,5 @@ const styles = StyleSheet.create({
         textTransform: 'lowercase',
         paddingVertical: 12,
         paddingHorizontal: 12,
-    },
-    modalBackdrop: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: WORKOUT_COLORS.backdrop,
-    },
-    modalSheet: {
-        marginTop: 'auto',
-        backgroundColor: WORKOUT_COLORS.background,
-        padding: padding,
-        borderTopWidth: borderWidth,
-        borderColor: WORKOUT_COLORS.border,
-        gap: 16,
-    },
-    modalTitle: {
-        fontFamily: fonts.bold,
-        fontSize: 16,
-        color: WORKOUT_COLORS.text,
-        textTransform: 'lowercase',
-    },
-    modalInput: {
-        borderWidth,
-        borderColor: WORKOUT_COLORS.border,
-        borderRadius: buttonRadius,
-        paddingHorizontal: padding,
-        paddingVertical: 10,
-        fontFamily: fonts.regular,
-        fontSize: 16,
-        color: WORKOUT_COLORS.text,
-        backgroundColor: WORKOUT_COLORS.surfaceSecondary,
     },
 });
