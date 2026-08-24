@@ -9,6 +9,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { Button } from '../components/Button';
 import { HeaderSection } from '../components/HeaderSection';
+import { ProfileOverlay, ProfileIconOrigin } from '../components/ProfileOverlay';
 import { MacrosCard } from '../components/MacrosCard';
 import { FoodLog } from '../components/FoodLog';
 import { AIWidget } from '../components/AIWidget';
@@ -26,11 +27,9 @@ import {
   getDailyMacroLog,
   getTodayDateString,
   DailyMacroLog,
-  addToDailyMacroLog,
-  subtractFromDailyMacroLog,
 } from '../services/userService';
-import { getQuickAddItems, FoodItem } from '../services/foodService';
 import { useAddFood } from '../context/AddFoodContext';
+import { useFoodLog } from '../context/FoodLogContext';
 import { useWorkoutOverlay } from '../contexts/WorkoutOverlayContext';
 import { useActiveWorkout } from '../contexts/ActiveWorkoutContext';
 import {
@@ -63,12 +62,11 @@ export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const insets = useSafeAreaInsets();
   const {
-    registerHandler,
-    unregisterHandler,
     registerSheetState,
     unregisterSheetState,
     showAddFoodSheet: openAddFoodSheet,
   } = useAddFood();
+  const { consumed: loggedConsumed, dashboardItems } = useFoodLog();
   const { open: openWorkoutOverlay } = useWorkoutOverlay();
   const { state: activeWorkoutState, endActiveWorkout, expand: expandWorkout } = useActiveWorkout();
   const [loggingOut, setLoggingOut] = useState(false);
@@ -85,6 +83,9 @@ export const HomeScreen: React.FC = () => {
   const [loadingLog, setLoadingLog] = useState(!dataCache.dailyLog);
   const [showAddFoodSheet, setShowAddFoodSheet] = useState(false);
   const [showGoalsOverlay, setShowGoalsOverlay] = useState(false);
+  const [showProfileOverlay, setShowProfileOverlay] = useState(false);
+  const [hideProfileIcon, setHideProfileIcon] = useState(false);
+  const [profileOrigin, setProfileOrigin] = useState<ProfileIconOrigin | null>(null);
 
   // Tasks state (loaded from database)
   const [tasks, setTasks] = useState<DailyTask[]>(dataCache.tasks);
@@ -152,6 +153,21 @@ export const HomeScreen: React.FC = () => {
 
     void performLogout();
   };
+
+  const handleProfilePress = (origin: ProfileIconOrigin) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setProfileOrigin(origin);
+    setShowProfileOverlay(true);
+  };
+
+  useEffect(() => {
+    if (!showProfileOverlay) {
+      setHideProfileIcon(false);
+      return;
+    }
+    const frame = requestAnimationFrame(() => setHideProfileIcon(true));
+    return () => cancelAnimationFrame(frame);
+  }, [showProfileOverlay]);
 
   const loadUserProfile = useCallback(async () => {
     if (!user) {
@@ -282,88 +298,12 @@ export const HomeScreen: React.FC = () => {
     }
   }, [user]);
 
-  const handleAddFood = useCallback(
-    async (food: FoodItem) => {
-      if (!user) return;
-
-      try {
-        const currentLog = dailyLog || { calories: 0, protein: 0, carbs: 0, fats: 0 };
-        const optimisticLog = {
-          ...currentLog,
-          calories: (currentLog.calories || 0) + food.calories,
-          protein: (currentLog.protein || 0) + food.protein,
-          carbs: (currentLog.carbs || 0) + food.carbs,
-          fats: (currentLog.fats || 0) + food.fats,
-        };
-        setDailyLog(optimisticLog as DailyMacroLog);
-        dataCache.dailyLog = optimisticLog as DailyMacroLog;
-
-        await addToDailyMacroLog(user, {
-          calories: food.calories,
-          protein: food.protein,
-          carbs: food.carbs,
-          fats: food.fats,
-        });
-
-        const today = getTodayDateString();
-        const log = await getDailyMacroLog(user, today);
-        dataCache.dailyLog = log;
-        dataCache.lastUpdate.dailyLog = Date.now();
-        setDailyLog(log);
-      } catch (error) {
-        console.error('Error adding food:', error);
-        Alert.alert('Error', 'Failed to add food. Please try again.');
-        await loadDailyLog();
-      }
-    },
-    [user, dailyLog, loadDailyLog]
-  );
-
-  const handleRemoveFood = useCallback(
-    async (food: FoodItem) => {
-      if (!user) return;
-
-      try {
-        const currentLog = dailyLog || { calories: 0, protein: 0, carbs: 0, fats: 0 };
-        const optimisticLog = {
-          ...currentLog,
-          calories: Math.max(0, (currentLog.calories || 0) - food.calories),
-          protein: Math.max(0, (currentLog.protein || 0) - food.protein),
-          carbs: Math.max(0, (currentLog.carbs || 0) - food.carbs),
-          fats: Math.max(0, (currentLog.fats || 0) - food.fats),
-        };
-        setDailyLog(optimisticLog as DailyMacroLog);
-        dataCache.dailyLog = optimisticLog as DailyMacroLog;
-
-        await subtractFromDailyMacroLog(user, {
-          calories: food.calories,
-          protein: food.protein,
-          carbs: food.carbs,
-          fats: food.fats,
-        });
-
-        const today = getTodayDateString();
-        const log = await getDailyMacroLog(user, today);
-        dataCache.dailyLog = log;
-        dataCache.lastUpdate.dailyLog = Date.now();
-        setDailyLog(log);
-      } catch (error) {
-        console.error('Error removing food:', error);
-        Alert.alert('Error', 'Failed to remove food. Please try again.');
-        await loadDailyLog();
-      }
-    },
-    [user, dailyLog, loadDailyLog]
-  );
-
   useEffect(() => {
-    registerHandler(handleAddFood);
     registerSheetState(setShowAddFoodSheet);
     return () => {
-      unregisterHandler();
       unregisterSheetState();
     };
-  }, [handleAddFood, registerHandler, unregisterHandler, registerSheetState, unregisterSheetState]);
+  }, [registerSheetState, unregisterSheetState]);
 
   const goals = (tasks || []).map((task, index) => ({
     text: task.title,
@@ -465,12 +405,11 @@ export const HomeScreen: React.FC = () => {
 
   const macros = userProfile?.target_macros || undefined;
   const streak = userProfile?.streak || 0;
-  const baseConsumed = dailyLog || { calories: 0, protein: 0, carbs: 0, fats: 0 };
   const consumed = {
-    calories: baseConsumed.calories + testValues.calories,
-    protein: baseConsumed.protein + testValues.protein,
-    carbs: baseConsumed.carbs + testValues.carbs,
-    fats: baseConsumed.fats + testValues.fats,
+    calories: loggedConsumed.calories + testValues.calories,
+    protein: loggedConsumed.protein + testValues.protein,
+    carbs: loggedConsumed.carbs + testValues.carbs,
+    fats: loggedConsumed.fats + testValues.fats,
   };
 
   const handleTestUpdate = (type: 'calories' | 'protein' | 'carbs' | 'fats', amount: number) => {
@@ -591,12 +530,12 @@ export const HomeScreen: React.FC = () => {
       }}
     >
       <View
-        onTouchStart={showAddFoodSheet || showGoalsOverlay ? undefined : handleTouchStart}
-        onTouchMove={showAddFoodSheet || showGoalsOverlay ? undefined : handleTouchMove}
+        onTouchStart={showAddFoodSheet || showGoalsOverlay || showProfileOverlay ? undefined : handleTouchStart}
+        onTouchMove={showAddFoodSheet || showGoalsOverlay || showProfileOverlay ? undefined : handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
         style={{ flex: 1 }}
-        pointerEvents={showAddFoodSheet || showGoalsOverlay ? 'none' : 'auto'}
+        pointerEvents={showAddFoodSheet || showGoalsOverlay || showProfileOverlay ? 'none' : 'auto'}
       >
         <ScrollingGridBackground />
         <ScrollView
@@ -618,12 +557,13 @@ export const HomeScreen: React.FC = () => {
           <HeaderSection
             streak={streak}
             topInset={insets.top}
-            onProfilePress={() => Alert.alert('Profile', 'Profile screen coming soon')}
+            onProfilePress={handleProfilePress}
+            hideProfile={hideProfileIcon}
           />
 
           <MacrosCard macros={macros} consumed={consumed} loading={loadingProfile} />
 
-          <FoodLog onPress={() => navigation.navigate('FoodLog')} />
+          <FoodLog items={dashboardItems} onPress={() => navigation.navigate('FoodLog')} />
 
           <AIWidget />
 
@@ -694,6 +634,17 @@ export const HomeScreen: React.FC = () => {
       </View>
 
       {showBorderRing && <AuraOverlay isActive={showBorderRing} />}
+
+      <ProfileOverlay
+        visible={showProfileOverlay}
+        origin={profileOrigin}
+        username={userProfile?.onboarding_data?.name}
+        email={user?.email ?? undefined}
+        streak={streak}
+        onClose={() => setShowProfileOverlay(false)}
+        onLogout={handleLogout}
+        loggingOut={loggingOut}
+      />
 
     </View>
   );

@@ -99,6 +99,7 @@ const styles = StyleSheet.create({
         height: bottomRow1Height,
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
     },
     hintText: {
         flex: 1,
@@ -106,6 +107,7 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: WORKOUT_COLORS.muted,
         textTransform: 'lowercase',
+        textAlign: 'center',
     },
     selectionHint: {
         flex: 1,
@@ -113,6 +115,7 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: WORKOUT_COLORS.muted,
         textTransform: 'lowercase',
+        textAlign: 'center',
     },
     primaryWrap: {
         height: bottomRow2Height,

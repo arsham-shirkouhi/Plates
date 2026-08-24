@@ -16,7 +16,6 @@ import { PICK_WORKOUT_LAYOUT, WORKOUT_COLORS } from '../../workout/constants';
 import { MuscleGroup } from '../../workout/muscleGroups';
 import { StartWorkoutRoutine } from '../../workout/startWorkoutTypes';
 import { WorkoutExercise } from '../../workout/types';
-import { rootNavigationRef } from '../../navigation/rootNavigationRef';
 import { BODY_MAP_VIEWBOX } from '../startWorkout/bodyMapPaths';
 import { SelectableBodyMapFront } from '../muscleSelect/SelectableBodyMapFront';
 import { SelectableBodyMapBack } from '../muscleSelect/SelectableBodyMapBack';
@@ -217,13 +216,6 @@ export const PickWorkoutScreen: React.FC<PickWorkoutScreenProps> = ({
         setFigureLayout({ width, height });
     };
 
-    const openPresets = () => {
-        closeWorkoutOverlay();
-        if (rootNavigationRef.isReady()) {
-            rootNavigationRef.navigate('BrowseWorkouts');
-        }
-    };
-
     const handlePrimaryPress = async () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -256,7 +248,6 @@ export const PickWorkoutScreen: React.FC<PickWorkoutScreenProps> = ({
                     side={side}
                     onSideChange={handleSideChange}
                     onClose={closeWorkoutOverlay}
-                    onPresets={openPresets}
                 />
 
                 <View style={styles.figureArea} onLayout={handleFigureLayout}>

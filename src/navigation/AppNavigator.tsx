@@ -89,8 +89,8 @@ const NavigatorWithNavBar: React.FC = () => {
                     component={PreloadedFoodLogScreen}
                     options={{
                         gestureEnabled: true,
-                        animation: 'slide_from_right',
-                        animationDuration: 200,
+                        animation: 'slide_from_bottom',
+                        animationDuration: 280,
                         freezeOnBlur: false,
                     }}
                 />

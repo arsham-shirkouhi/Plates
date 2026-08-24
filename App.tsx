@@ -3,6 +3,7 @@ import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
 import { useFonts } from 'expo-font';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { FoodLogProvider } from './src/context/FoodLogContext';
 import { AddFoodProvider } from './src/context/AddFoodContext';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { OverlayProvider } from './src/contexts/OverlayContext';
@@ -82,11 +83,13 @@ export default function App() {
         <ErrorBoundary>
             <SafeAreaProvider>
                 <AuthProvider>
-                    <AddFoodProvider>
-                        <OverlayProvider>
-                            <AppContent />
-                        </OverlayProvider>
-                    </AddFoodProvider>
+                    <FoodLogProvider>
+                        <AddFoodProvider>
+                            <OverlayProvider>
+                                <AppContent />
+                            </OverlayProvider>
+                        </AddFoodProvider>
+                    </FoodLogProvider>
                 </AuthProvider>
             </SafeAreaProvider>
         </ErrorBoundary>

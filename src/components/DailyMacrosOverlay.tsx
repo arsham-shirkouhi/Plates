@@ -15,18 +15,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../constants/fonts';
-import { FoodItem } from '../services/foodService';
 import { useRegisterOverlay } from '../contexts/OverlayContext';
-
-type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
-
-interface LoggedFoodEntry {
-    id: string;
-    food: FoodItem;
-    loggedAt: Date;
-    meal: MealType;
-    portion?: string;
-}
+import { LoggedFoodEntry, MealType } from '../food/types';
 
 interface DailyMacrosOverlayProps {
     visible: boolean;

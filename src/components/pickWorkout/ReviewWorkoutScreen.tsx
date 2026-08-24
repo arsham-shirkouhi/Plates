@@ -742,7 +742,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 12,
         borderWidth: 2,
-        borderColor: WORKOUT_COLORS.border,
+        borderColor: '#CCCCCC',
         borderRadius: 12,
         backgroundColor: WORKOUT_COLORS.background,
     },

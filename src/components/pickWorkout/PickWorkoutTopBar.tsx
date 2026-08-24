@@ -11,7 +11,6 @@ interface PickWorkoutTopBarProps {
     side: BodySide;
     onSideChange: (side: BodySide) => void;
     onClose: () => void;
-    onPresets: () => void;
 }
 
 const TOGGLE_PADDING = 3;
@@ -20,13 +19,13 @@ export const PickWorkoutTopBar: React.FC<PickWorkoutTopBarProps> = ({
     side,
     onSideChange,
     onClose,
-    onPresets,
 }) => {
     const [toggleWidth, setToggleWidth] = useState(0);
     const slideAnim = useRef(new Animated.Value(side === 'front' ? 0 : 1)).current;
     const scaleAnim = useRef(new Animated.Value(1)).current;
 
-    const segmentWidth = toggleWidth > 0 ? (toggleWidth - TOGGLE_PADDING * 2) / 2 : 0;
+    const segmentWidth =
+        toggleWidth > 0 ? (toggleWidth - TOGGLE_PADDING * 2 - borderWidth * 2) / 2 : 0;
 
     useEffect(() => {
         Animated.spring(slideAnim, {
@@ -121,16 +120,7 @@ export const PickWorkoutTopBar: React.FC<PickWorkoutTopBarProps> = ({
                 </TouchableOpacity>
             </Animated.View>
 
-            <View style={styles.sideRight}>
-                <TouchableOpacity
-                    style={styles.presetsButton}
-                    onPress={onPresets}
-                    accessibilityRole="button"
-                    accessibilityLabel="Browse presets"
-                >
-                    <Text style={styles.presetsText}>presets</Text>
-                </TouchableOpacity>
-            </View>
+            <View style={styles.sideRight} />
         </View>
     );
 };
@@ -164,18 +154,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    presetsButton: {
-        height: SIDE_SLOT,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 4,
-    },
-    presetsText: {
-        fontFamily: fonts.bold,
-        fontSize: 14,
-        color: WORKOUT_COLORS.muted,
-        textTransform: 'lowercase',
-    },
     toggleRow: {
         flexDirection: 'row',
         minWidth: 152,
@@ -192,7 +170,7 @@ const styles = StyleSheet.create({
         left: TOGGLE_PADDING,
         height: 28,
         borderRadius: 999,
-        backgroundColor: WORKOUT_COLORS.text,
+        backgroundColor: WORKOUT_COLORS.accent,
     },
     toggleSegment: {
         flex: 1,

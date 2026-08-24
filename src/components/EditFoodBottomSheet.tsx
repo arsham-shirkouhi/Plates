@@ -23,25 +23,18 @@ import { FoodItem } from '../services/foodService';
 import { FoodDetailView } from './FoodDetailView';
 import { Button } from './Button';
 import { useRegisterOverlay } from '../contexts/OverlayContext';
+import { LoggedFoodEntry, MealType } from '../food/types';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const SHEET_HEIGHT = SCREEN_HEIGHT * 0.75;
 const TOASTER_OFFSET = 50;
 
-interface LoggedFoodEntry {
-    id: string;
-    food: FoodItem;
-    loggedAt: Date;
-    meal: 'breakfast' | 'lunch' | 'dinner' | 'snack';
-    portion?: string;
-}
-
 interface EditFoodBottomSheetProps {
     visible: boolean;
     onClose: () => void;
     entry: LoggedFoodEntry | null;
-    onUpdateFood: (entryId: string, updatedFood: FoodItem, servingSize: string, numberOfServings: string, meal: 'breakfast' | 'lunch' | 'dinner' | 'snack') => void;
+    onUpdateFood: (entryId: string, updatedFood: FoodItem, servingSize: string, numberOfServings: string, meal: MealType) => void;
     onDelete?: () => void;
 }
 

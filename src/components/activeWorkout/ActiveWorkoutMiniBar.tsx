@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { fonts } from '../../constants/fonts';
 import { WORKOUT_COLORS } from '../../workout/constants';
@@ -11,10 +11,10 @@ interface ActiveWorkoutMiniBarProps {
     completedSets: number;
     totalSets: number;
     restRemainingSeconds: number;
-    restProgress: number;
     restActive: boolean;
     onExpand: () => void;
     onSkipRest: () => void;
+    onCelebrate?: (origin: { x: number; y: number }) => void;
 }
 
 export const ActiveWorkoutMiniBar: React.FC<ActiveWorkoutMiniBarProps> = ({
@@ -23,29 +23,76 @@ export const ActiveWorkoutMiniBar: React.FC<ActiveWorkoutMiniBarProps> = ({
     completedSets,
     totalSets,
     restRemainingSeconds,
-    restProgress,
     restActive,
     onExpand,
     onSkipRest,
+    onCelebrate,
 }) => {
+    const pulse = useRef(new Animated.Value(0)).current;
+    const doneRef = useRef<View>(null);
+
+    useEffect(() => {
+        const loop = Animated.loop(
+            Animated.timing(pulse, {
+                toValue: 1,
+                duration: 1800,
+                easing: Easing.out(Easing.ease),
+                useNativeDriver: true,
+            })
+        );
+        loop.start();
+        return () => loop.stop();
+    }, [pulse]);
+
+    const pulseScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 2.8] });
+    const pulseOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0] });
+    const iconPulseScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.55] });
+    const iconPulseOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.4, 0] });
+
+    const handleDone = () => {
+        const node = doneRef.current;
+        if (node && onCelebrate) {
+            node.measureInWindow((x, y, width, height) => {
+                onCelebrate({ x: x + width / 2, y: y + height / 2 });
+            });
+        }
+        onSkipRest();
+    };
+
     if (restActive) {
         return (
             <TouchableOpacity style={styles.container} activeOpacity={0.92} onPress={onExpand}>
-                <View style={styles.restTrack}>
-                    <View style={[styles.restFill, { width: `${Math.round(restProgress * 100)}%` }]} />
-                </View>
-                <View style={styles.restRow}>
-                    <Text style={styles.restLabel}>rest</Text>
-                    <Text style={styles.restCountdown}>{formatRestDuration(restRemainingSeconds)}</Text>
-                    <TouchableOpacity
-                        style={styles.skipButton}
-                        onPress={(event) => {
-                            event.stopPropagation?.();
-                            onSkipRest();
-                        }}
-                    >
-                        <Text style={styles.skipText}>skip</Text>
-                    </TouchableOpacity>
+                <View style={styles.row}>
+                    <Ionicons name="expand-outline" size={20} color={WORKOUT_COLORS.text} />
+                    <View style={styles.center}>
+                        <Text style={styles.duration}>
+                            {formatRestDuration(restRemainingSeconds)}
+                        </Text>
+                        <Text style={styles.meta} numberOfLines={1}>
+                            resting
+                        </Text>
+                    </View>
+                    <View style={styles.iconButtonWrap}>
+                        <Animated.View
+                            pointerEvents="none"
+                            style={[
+                                styles.iconPulse,
+                                { transform: [{ scale: iconPulseScale }], opacity: iconPulseOpacity },
+                            ]}
+                        />
+                        <TouchableOpacity
+                            ref={doneRef}
+                            style={styles.iconButton}
+                            onPress={(event) => {
+                                event.stopPropagation?.();
+                                handleDone();
+                            }}
+                            accessibilityRole="button"
+                            accessibilityLabel="Finish rest"
+                        >
+                            <Ionicons name="checkmark" size={20} color="#fff" />
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </TouchableOpacity>
         );
@@ -61,7 +108,16 @@ export const ActiveWorkoutMiniBar: React.FC<ActiveWorkoutMiniBarProps> = ({
                         {exerciseName.toLowerCase()} · {completedSets}/{totalSets} sets
                     </Text>
                 </View>
-                <View style={styles.dot} />
+                <View style={styles.dotWrap}>
+                    <Animated.View
+                        pointerEvents="none"
+                        style={[
+                            styles.dotPulse,
+                            { transform: [{ scale: pulseScale }], opacity: pulseOpacity },
+                        ]}
+                    />
+                    <View style={styles.dot} />
+                </View>
             </View>
         </TouchableOpacity>
     );
@@ -92,48 +148,45 @@ const styles = StyleSheet.create({
         color: WORKOUT_COLORS.muted,
         marginTop: 2,
     },
+    dotWrap: {
+        width: 8,
+        height: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 8,
+    },
     dot: {
         width: 8,
         height: 8,
         borderRadius: 4,
         backgroundColor: WORKOUT_COLORS.accent,
     },
-    restTrack: {
-        height: 4,
-        borderRadius: 999,
-        backgroundColor: '#DDE2FF',
-        overflow: 'hidden',
-        marginBottom: 8,
-    },
-    restFill: {
-        height: '100%',
+    dotPulse: {
+        position: 'absolute',
+        width: 8,
+        height: 8,
+        borderRadius: 4,
         backgroundColor: WORKOUT_COLORS.accent,
     },
-    restRow: {
-        flexDirection: 'row',
+    iconButtonWrap: {
+        width: 44,
+        height: 44,
         alignItems: 'center',
+        justifyContent: 'center',
     },
-    restLabel: {
-        fontFamily: fonts.regular,
-        fontSize: 12,
-        color: WORKOUT_COLORS.muted,
-        width: 34,
+    iconPulse: {
+        position: 'absolute',
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: WORKOUT_COLORS.accent,
     },
-    restCountdown: {
-        flex: 1,
-        fontFamily: fonts.bold,
-        fontSize: 18,
-        color: WORKOUT_COLORS.accent,
-    },
-    skipButton: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 999,
-        backgroundColor: WORKOUT_COLORS.text,
-    },
-    skipText: {
-        fontFamily: fonts.bold,
-        fontSize: 12,
-        color: '#fff',
+    iconButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: WORKOUT_COLORS.accent,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
 });

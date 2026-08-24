@@ -2,17 +2,25 @@ import React, { useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { fonts } from '../constants/fonts';
+import type { ProfileIconOrigin } from './ProfileOverlay';
 
 interface HeaderSectionProps {
     streak: number;
     topInset?: number;
-    onProfilePress?: () => void;
+    onProfilePress?: (origin: ProfileIconOrigin) => void;
+    hideProfile?: boolean;
 }
 
-export const HeaderSection: React.FC<HeaderSectionProps> = ({ streak, topInset = 0, onProfilePress }) => {
+export const HeaderSection: React.FC<HeaderSectionProps> = ({
+    streak,
+    topInset = 0,
+    onProfilePress,
+    hideProfile = false,
+}) => {
     // Animation values for circle positions
     const profileCircleLeft = useRef(new Animated.Value(0)).current;
     const greenCircleLeft = useRef(new Animated.Value(10)).current;
+    const profileCircleRef = useRef<View>(null);
 
     const handlePressIn = () => {
         // Animate circles to stack on blue circle (at left: 20)
@@ -46,6 +54,18 @@ export const HeaderSection: React.FC<HeaderSectionProps> = ({ streak, topInset =
         ]).start();
     };
 
+    const handlePress = () => {
+        const emitOrigin = (origin: ProfileIconOrigin) => {
+            onProfilePress?.(origin);
+        };
+
+        profileCircleRef.current?.measureInWindow((x, y, width, height) => {
+            if (width > 0 && height > 0) {
+                emitOrigin({ x, y, width, height });
+            }
+        });
+    };
+
     return (
         <View style={[styles.container, { paddingTop: (10) }]}>
             {/* Streak and date row */}
@@ -62,13 +82,22 @@ export const HeaderSection: React.FC<HeaderSectionProps> = ({ streak, topInset =
 
                 {/* User icon */}
                 <TouchableOpacity
-                    onPress={onProfilePress}
+                    onPress={handlePress}
                     onPressIn={handlePressIn}
                     onPressOut={handlePressOut}
                     style={styles.profileButton}
+                    activeOpacity={1}
                 >
-                    <View style={styles.profileContainer}>
-                        <Animated.View style={[styles.profileCircle, { left: profileCircleLeft }]}>
+                    <View style={[styles.profileContainer, hideProfile && styles.profileHidden]}>
+                        <View
+                            ref={profileCircleRef}
+                            collapsable={false}
+                            pointerEvents="none"
+                            style={styles.profileMeasureAnchor}
+                        />
+                        <Animated.View
+                            style={[styles.profileCircle, { left: profileCircleLeft }]}
+                        >
                             <Image
                                 source={require('../../assets/images/temp_pfp.png')}
                                 style={styles.profileImage}
@@ -128,11 +157,21 @@ const styles = StyleSheet.create({
     profileButton: {
         marginLeft: 16,
     },
+    profileHidden: {
+        opacity: 0,
+    },
     profileContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         position: 'relative',
         width: 80, // Main circle (60px) + blue circle extends to 80px
+    },
+    profileMeasureAnchor: {
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        width: 60,
+        height: 60,
     },
     profileCircle: {
         width: 60,

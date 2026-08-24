@@ -2,15 +2,21 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     View,
     StyleSheet,
-    Animated,
     Dimensions,
-    Easing,
     ScrollView,
     PanResponder,
     Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import Reanimated, {
+    Easing,
+    Extrapolation,
+    interpolate,
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming,
+} from 'react-native-reanimated';
 import { useActiveWorkout } from '../../contexts/ActiveWorkoutContext';
 import { useWorkoutOverlay } from '../../contexts/WorkoutOverlayContext';
 import { useWorkoutTimer } from '../../hooks/useWorkoutTimer';
@@ -28,8 +34,12 @@ import { ActiveWorkoutBottomActions } from './ActiveWorkoutBottomActions';
 import { ActiveWorkoutMiniBar } from './ActiveWorkoutMiniBar';
 import { RestTimerBar } from './RestTimerBar';
 import { ExerciseCard } from './ExerciseCard';
+import { Confetti, ConfettiParticle } from '../Confetti';
+
+const CONFETTI_COLORS = ['#526EFF', '#F9C117', '#FF5151', '#2ED573', '#B06BFF', '#FF8A3D'];
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 const SHEET_MARGIN_H = 20;
 const SHEET_MARGIN_V = 4;
 const SHEET_MAX_WIDTH = 540;
@@ -72,7 +82,7 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
     const workout = state.workout;
     const presentation = state.presentation;
     const isFullscreen = presentation === 'fullscreen';
-    const screenHeight = Dimensions.get('window').height;
+    const screenHeight = SCREEN_HEIGHT;
     const sheetPaddingTop = insets.top + SHEET_MARGIN_V;
     const sheetPaddingBottom = insets.bottom + SHEET_MARGIN_V;
     const expandedSheetHeight = screenHeight - sheetPaddingTop - sheetPaddingBottom;
@@ -85,7 +95,20 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
     const minimizedShellTop = screenHeight - MINI_BAR_HEIGHT - widgetBottomInset;
 
     const [bottomActionsHeight, setBottomActionsHeight] = useState(0);
-    const expandProgress = useRef(new Animated.Value(isFullscreen ? 1 : 0)).current;
+    const [celebration, setCelebration] = useState<ConfettiParticle[]>([]);
+    const expandProgress = useSharedValue(isFullscreen ? 1 : 0);
+
+    const celebrateAtPoint = useCallback((origin: { x: number; y: number }) => {
+        const burst: ConfettiParticle[] = Array.from({ length: 18 }, (_, i) => ({
+            id: Date.now() + i,
+            originX: origin.x + (Math.random() - 0.5) * 34,
+            originY: origin.y,
+            angle: -30 - Math.random() * 120,
+            color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+        }));
+        setCelebration(burst);
+        setTimeout(() => setCelebration([]), 900);
+    }, []);
     const scrollRef = useRef<ScrollView>(null);
     const exerciseOffsetsRef = useRef<Record<string, number>>({});
     const isFullscreenRef = useRef(isFullscreen);
@@ -103,12 +126,10 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
     });
 
     useEffect(() => {
-        Animated.timing(expandProgress, {
-            toValue: isFullscreen ? 1 : 0,
-            duration: 220,
+        expandProgress.value = withTiming(isFullscreen ? 1 : 0, {
+            duration: 180,
             easing: Easing.out(Easing.cubic),
-            useNativeDriver: false,
-        }).start();
+        });
     }, [isFullscreen, expandProgress]);
 
     useEffect(() => {
@@ -135,6 +156,23 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
         })
     ).current;
 
+    const backdropStyle = useAnimatedStyle(() => ({
+        opacity: interpolate(expandProgress.value, [0, 0.15, 1], [0, 1, 1], Extrapolation.CLAMP),
+    }));
+    const shellStyle = useAnimatedStyle(() => ({
+        top: interpolate(expandProgress.value, [0, 1], [minimizedShellTop, sheetPaddingTop]),
+        left: interpolate(expandProgress.value, [0, 1], [widgetBarLeft, expandedCardLeft]),
+        width: interpolate(expandProgress.value, [0, 1], [widgetBarWidth, expandedCardWidth]),
+        height: interpolate(expandProgress.value, [0, 1], [MINI_BAR_HEIGHT, expandedSheetHeight]),
+        borderRadius: interpolate(expandProgress.value, [0, 1], [MINI_CORNER_RADIUS, SHELL_CORNER_RADIUS]),
+    }));
+    const expandedStyle = useAnimatedStyle(() => ({
+        opacity: interpolate(expandProgress.value, [0, 0.22, 1], [0, 1, 1], Extrapolation.CLAMP),
+    }));
+    const miniStyle = useAnimatedStyle(() => ({
+        opacity: interpolate(expandProgress.value, [0, 0.3, 1], [1, 0, 0], Extrapolation.CLAMP),
+    }));
+
     if (!workout) return null;
 
     const volume = getCompletedVolume(workout, state.settings);
@@ -143,39 +181,6 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
     const currentProgress = currentExercise
         ? getExerciseSetProgress(currentExercise)
         : { completed: 0, total: 0 };
-
-    const shellTop = expandProgress.interpolate({
-        inputRange: [0, 1],
-        outputRange: [minimizedShellTop, sheetPaddingTop],
-    });
-    const shellLeft = expandProgress.interpolate({
-        inputRange: [0, 1],
-        outputRange: [widgetBarLeft, expandedCardLeft],
-    });
-    const shellWidth = expandProgress.interpolate({
-        inputRange: [0, 1],
-        outputRange: [widgetBarWidth, expandedCardWidth],
-    });
-    const shellHeight = expandProgress.interpolate({
-        inputRange: [0, 1],
-        outputRange: [MINI_BAR_HEIGHT, expandedSheetHeight],
-    });
-    const shellRadius = expandProgress.interpolate({
-        inputRange: [0, 1],
-        outputRange: [MINI_CORNER_RADIUS, SHELL_CORNER_RADIUS],
-    });
-    const backdropOpacity = expandProgress.interpolate({
-        inputRange: [0, 0.15, 1],
-        outputRange: [0, 1, 1],
-    });
-    const expandedOpacity = expandProgress.interpolate({
-        inputRange: [0, 0.22, 1],
-        outputRange: [0, 1, 1],
-    });
-    const miniOpacity = expandProgress.interpolate({
-        inputRange: [0, 0.3, 1],
-        outputRange: [1, 0, 0],
-    });
 
     const supersetColorMap = new Map<string, number>();
     let supersetCounter = 0;
@@ -204,27 +209,18 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
 
     return (
         <>
-            <Animated.View
+            <Reanimated.View
                 pointerEvents={isFullscreen ? 'auto' : 'none'}
-                style={[StyleSheet.absoluteFillObject, styles.backdrop, { opacity: backdropOpacity }]}
+                style={[StyleSheet.absoluteFillObject, styles.backdrop, backdropStyle]}
             />
 
-            <Animated.View
+            <Reanimated.View
                 pointerEvents="box-none"
-                style={[
-                    styles.shell,
-                    {
-                        top: shellTop,
-                        left: shellLeft,
-                        width: shellWidth,
-                        height: shellHeight,
-                        borderRadius: shellRadius,
-                    },
-                ]}
+                style={[styles.shell, shellStyle]}
             >
-                <Animated.View
+                <Reanimated.View
                     pointerEvents={isFullscreen ? 'auto' : 'none'}
-                    style={[styles.expandedLayer, { opacity: expandedOpacity }]}
+                    style={[styles.expandedLayer, expandedStyle]}
                 >
                     <ActiveWorkoutHeader
                         onCollapse={minimize}
@@ -279,30 +275,16 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
                     </ScrollView>
 
                     <View
-                        pointerEvents="box-none"
-                        style={[styles.restTimerFloat, { bottom: bottomActionsHeight }]}
-                    >
-                        <RestTimerBar
-                            visible={isRunning}
-                            remainingSeconds={remainingSeconds}
-                            progress={progress}
-                            celebrateAt={restCelebrateAt}
-                            onAdjust={adjustRestTimer}
-                            onSkip={skipRestTimer}
-                        />
-                    </View>
-
-                    <View
                         style={styles.bottomActionsLayer}
                         onLayout={(event) => setBottomActionsHeight(event.nativeEvent.layout.height)}
                     >
                         <ActiveWorkoutBottomActions onAddExercises={onAddExercises} />
                     </View>
-                </Animated.View>
+                </Reanimated.View>
 
-                <Animated.View
+                <Reanimated.View
                     pointerEvents={isFullscreen ? 'none' : 'auto'}
-                    style={[styles.miniLayer, { opacity: miniOpacity }]}
+                    style={[styles.miniLayer, miniStyle]}
                 >
                     <ActiveWorkoutMiniBar
                         elapsedSeconds={elapsedSeconds}
@@ -310,13 +292,40 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
                         completedSets={currentProgress.completed}
                         totalSets={currentProgress.total}
                         restRemainingSeconds={remainingSeconds}
-                        restProgress={progress}
                         restActive={isRunning}
                         onExpand={expand}
                         onSkipRest={skipRestTimer}
+                        onCelebrate={celebrateAtPoint}
                     />
-                </Animated.View>
-            </Animated.View>
+                </Reanimated.View>
+            </Reanimated.View>
+
+            <View
+                pointerEvents="box-none"
+                style={[
+                    styles.restTimerFloat,
+                    {
+                        left: expandedCardLeft,
+                        width: expandedCardWidth,
+                        bottom: sheetPaddingBottom + bottomActionsHeight,
+                    },
+                ]}
+            >
+                <RestTimerBar
+                    visible={isFullscreen && isRunning}
+                    remainingSeconds={remainingSeconds}
+                    progress={progress}
+                    celebrateAt={restCelebrateAt}
+                    onAdjust={adjustRestTimer}
+                    onSkip={skipRestTimer}
+                />
+            </View>
+
+            {celebration.length > 0 ? (
+                <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+                    <Confetti particles={celebration} />
+                </View>
+            ) : null}
 
             {isFullscreen ? (
                 <LinearGradient
@@ -352,9 +361,8 @@ const styles = StyleSheet.create({
     },
     restTimerFloat: {
         position: 'absolute',
-        left: 0,
-        right: 0,
-        zIndex: 1,
+        zIndex: 12,
+        overflow: 'visible',
     },
     bottomActionsLayer: {
         zIndex: 2,

@@ -871,7 +871,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
         borderRadius: 12,
         borderWidth: 2,
-        borderColor: '#252525',
+        borderColor: '#CCCCCC',
     },
     floatingAddSelectedContainer: {
         position: 'absolute',
@@ -938,8 +938,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#F5F7FF',
     },
     exerciseItemAdded: {
-        borderColor: '#A5D6A7',
-        backgroundColor: '#F3FBF4',
+        borderColor: '#526EFF',
+        backgroundColor: '#F5F7FF',
     },
     exerciseAvatar: {
         width: 46,

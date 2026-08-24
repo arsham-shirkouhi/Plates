@@ -1,5 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing, LayoutChangeEvent } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import Reanimated, {
+    Easing as ReanimatedEasing,
+    interpolate,
+    SharedValue,
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming,
+} from 'react-native-reanimated';
 import { fonts } from '../../constants/fonts';
 import { WORKOUT_COLORS } from '../../workout/constants';
 import { formatRestDuration } from '../../workout/workoutSelectors';
@@ -8,7 +17,7 @@ import { Confetti, ConfettiParticle } from '../Confetti';
 interface RestTimerBarProps {
     visible: boolean;
     remainingSeconds: number;
-    progress: number;
+    progress: SharedValue<number>;
     celebrateAt?: number;
     onAdjust: (deltaSeconds: number) => void;
     onSkip: () => void;
@@ -93,39 +102,56 @@ export const RestTimerBar: React.FC<RestTimerBarProps> = ({
     const [mounted, setMounted] = useState(visible);
     const [celebrating, setCelebrating] = useState(false);
     const [particles, setParticles] = useState<ConfettiParticle[]>([]);
-    const anim = useRef(new Animated.Value(0)).current;
     const cardLayoutRef = useRef({ x: 16, y: 0, width: 0, height: 0 });
+    const frozenRemaining = useRef(remainingSeconds);
+    const mountedRef = useRef(visible);
+    const anim = useSharedValue(visible ? 1 : 0);
+    const frozenProgress = useSharedValue(0);
+    const visibleSV = useSharedValue(visible ? 1 : 0);
+
+    if (visible) {
+        frozenRemaining.current = remainingSeconds;
+    }
+
+    useEffect(() => {
+        visibleSV.value = visible ? 1 : 0;
+        if (!visible) {
+            frozenProgress.value = progress.value;
+        }
+    }, [visible, visibleSV, frozenProgress, progress]);
 
     useEffect(() => {
         if (visible) {
+            mountedRef.current = true;
             setMounted(true);
-            Animated.spring(anim, {
-                toValue: 1,
-                tension: 140,
-                friction: 16,
-                useNativeDriver: true,
-            }).start();
-        } else if (mounted) {
-            Animated.timing(anim, {
-                toValue: 0,
-                duration: 320,
-                easing: Easing.inOut(Easing.cubic),
-                useNativeDriver: true,
-            }).start(({ finished }) => {
-                if (finished) setMounted(false);
+            anim.value = withTiming(1, {
+                duration: 180,
+                easing: ReanimatedEasing.out(ReanimatedEasing.cubic),
             });
+            return;
         }
-    }, [visible, mounted, anim]);
+
+        if (!mountedRef.current) return;
+
+        const hideDuration = 180;
+        anim.value = withTiming(0, {
+            duration: hideDuration,
+            easing: ReanimatedEasing.out(ReanimatedEasing.quad),
+        });
+        const hideTimeout = setTimeout(() => {
+            mountedRef.current = false;
+            setMounted(false);
+        }, hideDuration);
+        return () => clearTimeout(hideTimeout);
+    }, [visible, anim]);
 
     useEffect(() => {
         if (!celebrateAt) return;
         const { x, y, width, height } = cardLayoutRef.current;
         const burst: ConfettiParticle[] = Array.from({ length: 12 }, (_, i) => ({
             id: celebrateAt + i,
-            // Scatter the origins across the width, launching from the bottom edge.
             originX: x + width * (0.1 + Math.random() * 0.8),
             originY: y + height,
-            // Angles fan upward (around -90 in this coordinate space).
             angle: -30 - Math.random() * 120,
             color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
         }));
@@ -143,22 +169,36 @@ export const RestTimerBar: React.FC<RestTimerBarProps> = ({
         cardLayoutRef.current = { x, y, width, height };
     };
 
+    const toasterStyle = useAnimatedStyle(() => ({
+        opacity: anim.value,
+        transform: [{ translateY: interpolate(anim.value, [0, 1], [36, 0]) }],
+    }));
+
+    const fillStyle = useAnimatedStyle(() => {
+        const value = visibleSV.value ? progress.value : frozenProgress.value;
+        return { transform: [{ scaleX: Math.max(0, Math.min(1, value)) }] };
+    });
+
     if (!mounted && !celebrating) return null;
 
-    const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [120, 0] });
+    const shownRemaining = visible ? remainingSeconds : frozenRemaining.current;
 
     return (
-        <View pointerEvents="box-none" style={styles.wrapper}>
+        <View pointerEvents={visible ? 'box-none' : 'none'} style={styles.wrapper} collapsable={false}>
             {celebrating ? <Confetti particles={particles} /> : null}
             {mounted ? (
-                <Animated.View
-                    onLayout={handleCardLayout}
-                    style={[styles.card, { transform: [{ translateY }] }]}
-                >
+                <Reanimated.View collapsable={false} style={[styles.toaster, toasterStyle]}>
+                    <LinearGradient
+                        pointerEvents="none"
+                        colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.92)', '#FFFFFF']}
+                        locations={[0, 0.45, 1]}
+                        style={styles.backdrop}
+                    />
+                    <View onLayout={handleCardLayout} style={styles.card}>
                 <View style={styles.topRow}>
                     <View style={styles.centerTop}>
                         <Text style={styles.label}>rest</Text>
-                        <Text style={styles.countdown}>{formatRestDuration(remainingSeconds)}</Text>
+                        <Text style={styles.countdown}>{formatRestDuration(shownRemaining)}</Text>
                     </View>
 
                     <View style={styles.buttons}>
@@ -187,9 +227,10 @@ export const RestTimerBar: React.FC<RestTimerBarProps> = ({
                 </View>
 
                     <View style={styles.progressTrack}>
-                        <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
+                        <Reanimated.View style={[styles.progressFill, fillStyle]} />
                     </View>
-                </Animated.View>
+                    </View>
+                </Reanimated.View>
             ) : null}
         </View>
     );
@@ -198,7 +239,15 @@ export const RestTimerBar: React.FC<RestTimerBarProps> = ({
 const styles = StyleSheet.create({
     wrapper: {
         paddingHorizontal: 16,
+        paddingTop: 40,
         paddingBottom: 8,
+        overflow: 'visible',
+    },
+    toaster: {
+        overflow: 'visible',
+    },
+    backdrop: {
+        ...StyleSheet.absoluteFillObject,
     },
     card: {
         backgroundColor: '#FFFFFF',
@@ -244,8 +293,10 @@ const styles = StyleSheet.create({
     },
     progressFill: {
         height: '100%',
+        width: '100%',
         borderRadius: 999,
         backgroundColor: WORKOUT_COLORS.accent,
+        transformOrigin: 'left center',
     },
     pressWrap: {
         position: 'relative',

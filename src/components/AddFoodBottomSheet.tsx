@@ -22,6 +22,7 @@ import * as Haptics from 'expo-haptics';
 import { searchFoods } from '../services/foodService';
 import { FoodDetailView } from './FoodDetailView';
 import { useOverlay } from '../contexts/OverlayContext';
+import { MealType } from '../food/types';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -43,11 +44,11 @@ interface FoodItem {
 interface AddFoodBottomSheetProps {
     visible: boolean;
     onClose: () => void;
-    onAddFood: (food: FoodItem) => void;
+    onAddFood: (food: FoodItem, meal?: MealType | null) => void;
     onRemoveFood?: (food: FoodItem) => void;
     quickAddItems?: FoodItem[];
-    onMealChange?: (meal: 'breakfast' | 'lunch' | 'dinner' | 'snack' | null) => void;
-    initialMeal?: 'breakfast' | 'lunch' | 'dinner' | 'snack' | null;
+    onMealChange?: (meal: MealType | null) => void;
+    initialMeal?: MealType | null;
 }
 
 export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
@@ -396,7 +397,7 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
         Keyboard.dismiss();
     };
 
-    const handleAddFood = (food: FoodItem) => {
+    const handleAddFood = (food: FoodItem, mealOverride?: MealType | null) => {
         // Track that this item was added (for visual feedback)
         setAddedItems(new Set([...addedItems, food.id]));
 
@@ -421,8 +422,7 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
             }
         }, 0);
 
-        // Call parent handler
-        onAddFood(food);
+        onAddFood(food, mealOverride ?? selectedMeal);
     };
 
     const handleOpenFoodDetail = (food: FoodItem) => {
@@ -673,7 +673,7 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
                                 onClose={handleCloseFoodDetail}
                                 onAddFood={(food) => {
                                     handleCloseFoodDetail();
-                                    setTimeout(() => handleAddFood(food), 100);
+                                    setTimeout(() => handleAddFood(food, detailMeal), 100);
                                 }}
                                 initialMeal={selectedMeal}
                                 unitOptions={unitOptions}
@@ -1079,7 +1079,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
         borderRadius: 12,
         borderWidth: 2,
-        borderColor: '#252525',
+        borderColor: '#CCCCCC',
         paddingHorizontal: 16,
         paddingVertical: 12,
         marginBottom: 12,

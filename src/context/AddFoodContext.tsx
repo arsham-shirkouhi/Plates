@@ -2,10 +2,12 @@ import React, { createContext, useContext, useState, useCallback, useRef, useMem
 import { FoodItem } from '../services/foodService';
 import { AddFoodBottomSheet } from '../components/AddFoodBottomSheet';
 import { getQuickAddItems } from '../services/foodService';
+import { useFoodLog } from './FoodLogContext';
+import { LoggedFoodEntry, MealType } from '../food/types';
 
 interface AddFoodContextType {
     showAddFoodSheet: () => void;
-    registerHandler: (handler: (food: FoodItem) => void) => void;
+    registerHandler: (handler: (entry: LoggedFoodEntry) => void) => void;
     unregisterHandler: () => void;
     registerSheetState: (setShow: (show: boolean) => void) => void;
     unregisterSheetState: () => void;
@@ -14,8 +16,9 @@ interface AddFoodContextType {
 const AddFoodContext = createContext<AddFoodContextType | undefined>(undefined);
 
 export const AddFoodProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const { addFood } = useFoodLog();
     const [showSheet, setShowSheet] = useState(false);
-    const handlerRef = useRef<((food: FoodItem) => void) | null>(null);
+    const handlerRef = useRef<((entry: LoggedFoodEntry) => void) | null>(null);
     const setSheetStateRef = useRef<((show: boolean) => void) | null>(null);
 
     const showAddFoodSheet = useCallback(() => {
@@ -25,7 +28,7 @@ export const AddFoodProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
     }, []);
 
-    const registerHandler = useCallback((foodHandler: (food: FoodItem) => void) => {
+    const registerHandler = useCallback((foodHandler: (entry: LoggedFoodEntry) => void) => {
         handlerRef.current = foodHandler;
     }, []);
 
@@ -41,15 +44,16 @@ export const AddFoodProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setSheetStateRef.current = null;
     }, []);
 
-    const handleAddFood = useCallback((food: FoodItem) => {
+    const handleAddFood = useCallback((food: FoodItem, meal?: MealType | null) => {
+        const entry = addFood(food, { meal });
         if (handlerRef.current) {
-            handlerRef.current(food);
+            handlerRef.current(entry);
         }
         setShowSheet(false);
         if (setSheetStateRef.current) {
             setSheetStateRef.current(false);
         }
-    }, []);
+    }, [addFood]);
 
     const handleClose = useCallback(() => {
         setShowSheet(false);

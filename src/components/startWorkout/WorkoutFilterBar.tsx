@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
     searchInput: {
         marginTop: 10,
         borderWidth: 2,
-        borderColor: WORKOUT_COLORS.border,
+        borderColor: '#CCCCCC',
         borderRadius: 10,
         paddingHorizontal: 12,
         paddingVertical: 10,

@@ -20,25 +20,6 @@ export type RootStackParamList = {
     ExerciseLog: undefined;
     MealDetail: {
         meal: 'breakfast' | 'lunch' | 'dinner' | 'snack';
-        foods: Array<{
-            id: string;
-            food: {
-                name: string;
-                calories: number;
-                protein: number;
-                carbs: number;
-                fats: number;
-            };
-            loggedAt: string;
-            meal: 'breakfast' | 'lunch' | 'dinner' | 'snack';
-            portion?: string;
-        }>;
-        mealTotal: {
-            calories: number;
-            protein: number;
-            carbs: number;
-            fats: number;
-        };
     };
     Workout: {
         startWorkoutType?: 'pick-as-you-go' | 'previous' | 'new' | 'schedule';

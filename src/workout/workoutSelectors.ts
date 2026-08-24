@@ -160,7 +160,7 @@ export function createWorkoutExercise(input: {
         name: input.name,
         thumbnailUrl: input.thumbnailUrl,
         note: '',
-        restSeconds: 120,
+        restSeconds: 60,
         sets: Array.from({ length: DEFAULT_SET_COUNT }, (_, index) => {
             const previous = history[index] ?? fallback;
             return {

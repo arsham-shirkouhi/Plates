@@ -186,7 +186,7 @@ export const FoodLogHeaderSection: React.FC<FoodLogHeaderSectionProps> = ({
     };
 
     return (
-        <View style={[styles.container, { paddingTop: 12 }]}>
+        <View style={[styles.container, { paddingTop: Math.max(topInset, 12) }]}>
             {/* Macros and calories row */}
             <View style={styles.topRow}>
                 <TouchableOpacity
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
         paddingBottom: 20,
         zIndex: 1,
         elevation: 1, // Android elevation
-        marginTop: 50,
+        marginTop: 8,
     },
     topRow: {
         flexDirection: 'row',
@@ -274,7 +274,7 @@ const styles = StyleSheet.create({
     macroLabel: {
         fontSize: 22,
         fontFamily: fonts.regular,
-        color: '#252525',
+        color: '#fff',
         textTransform: 'lowercase',
         marginBottom: 0,
     },
@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
     separator: {
         fontSize: 16,
         fontFamily: fonts.regular,
-        color: 'rgba(37, 37, 37, 0.5)',
+        color: 'rgba(255, 255, 255, 0.5)',
         marginHorizontal: 12,
     },
     caloriesRow: {
@@ -295,7 +295,7 @@ const styles = StyleSheet.create({
     caloriesText: {
         fontSize: 32,
         fontFamily: fonts.bold,
-        color: '#252525',
+        color: '#fff',
         textTransform: 'lowercase',
     },
     closeInlineButton: {
