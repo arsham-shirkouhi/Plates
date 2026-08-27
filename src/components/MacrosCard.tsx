@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { fonts } from '../constants/fonts';
@@ -97,6 +97,40 @@ const CalorieCircularProgress: React.FC<CalorieCircularProgressProps> = ({
     
     // Track if this is the first render to prevent animation on initial load
     const isFirstRender = useRef(true);
+    const [sparks, setSparks] = useState<BarSpark[]>([]);
+    const sparkIdRef = useRef(0);
+
+    const removeSpark = useCallback((id: number) => {
+        setSparks((current) => current.filter((spark) => spark.id !== id));
+    }, []);
+
+    const emitSparks = (fromPercentage: number) => {
+        const ringCenter = size / 2 + 7.5;
+        const angle = -Math.PI / 2 + (fromPercentage / 100) * 2 * Math.PI;
+        const originX = ringCenter + radius * Math.cos(angle);
+        const originY = ringCenter + radius * Math.sin(angle);
+        const nx = Math.cos(angle);
+        const ny = Math.sin(angle);
+        const tx = -ny;
+        const ty = nx;
+
+        const next: BarSpark[] = Array.from({ length: 4 }, () => {
+            sparkIdRef.current += 1;
+            const outward = 6 + Math.random() * 9;
+            const along = (Math.random() - 0.5) * 8;
+            return {
+                id: sparkIdRef.current,
+                originX: originX + (Math.random() - 0.5) * 4,
+                originY: originY + (Math.random() - 0.5) * 4,
+                dx: nx * outward + tx * along,
+                dy: ny * outward + ty * along,
+                size: 2.5 + Math.random() * 1.5,
+                delay: Math.random() * 90,
+            };
+        });
+        setSparks((current) => [...current, ...next]);
+    };
+
     // Inner and outer border radii
     // Outer border: sits at the outer edge of the progress ring
     const outerBorderRadius = radius + strokeWidth / 2;
@@ -135,7 +169,7 @@ const CalorieCircularProgress: React.FC<CalorieCircularProgressProps> = ({
         }).start();
 
         // Check if percentage is increasing before updating
-        const wasIncreasing = percentage > previousPercentage.current;
+        const wasIncreasing = percentage > previousPercentage.current + 0.4;
         const oldPercentage = previousPercentage.current;
 
         // Update previous values
@@ -145,6 +179,7 @@ const CalorieCircularProgress: React.FC<CalorieCircularProgressProps> = ({
         // Reset haptic tracking to start from old value when increasing
         if (wasIncreasing) {
             lastHapticPercentage.current = oldPercentage;
+            emitSparks(oldPercentage);
         }
 
         // Listen to animated value changes and update dash offset
@@ -249,8 +284,100 @@ const CalorieCircularProgress: React.FC<CalorieCircularProgressProps> = ({
                     />
                     <Text style={calorieStyles.label}>kcal left</Text>
                 </View>
+                {sparks.map((spark) => (
+                    <BarSparkParticle
+                        key={spark.id}
+                        spark={spark}
+                        color="#4463F7"
+                        onDone={removeSpark}
+                    />
+                ))}
             </View>
         </View>
+    );
+};
+
+interface BarSpark {
+    id: number;
+    originX: number;
+    originY: number;
+    dx: number;
+    dy: number;
+    size: number;
+    delay: number;
+}
+
+const BarSparkParticle: React.FC<{ spark: BarSpark; color: string; onDone: (id: number) => void }> = ({
+    spark,
+    color,
+    onDone,
+}) => {
+    const translateX = useRef(new Animated.Value(0)).current;
+    const translateY = useRef(new Animated.Value(0)).current;
+    const opacity = useRef(new Animated.Value(0)).current;
+    const scale = useRef(new Animated.Value(0.4)).current;
+
+    useEffect(() => {
+        const duration = 360 + Math.random() * 80;
+        const animation = Animated.sequence([
+            Animated.delay(spark.delay),
+            Animated.parallel([
+                Animated.timing(translateX, {
+                    toValue: spark.dx,
+                    duration,
+                    easing: Easing.out(Easing.cubic),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(translateY, {
+                    toValue: spark.dy,
+                    duration,
+                    easing: Easing.out(Easing.cubic),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(scale, {
+                    toValue: 1,
+                    duration: duration * 0.35,
+                    easing: Easing.out(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(opacity, {
+                    toValue: 1,
+                    duration: 70,
+                    useNativeDriver: true,
+                }),
+            ]),
+            Animated.timing(opacity, {
+                toValue: 0,
+                duration: 160,
+                easing: Easing.in(Easing.ease),
+                useNativeDriver: true,
+            }),
+        ]);
+
+        animation.start(({ finished }) => {
+            if (finished) onDone(spark.id);
+        });
+
+        return () => animation.stop();
+    }, [onDone, spark, translateX, translateY, opacity, scale]);
+
+    return (
+        <Animated.View
+            pointerEvents="none"
+            style={[
+                macroBarStyles.spark,
+                {
+                    width: spark.size,
+                    height: spark.size,
+                    borderRadius: spark.size / 2,
+                    backgroundColor: color,
+                    left: spark.originX - spark.size / 2,
+                    top: spark.originY - spark.size / 2,
+                    opacity,
+                    transform: [{ translateX }, { translateY }, { scale }],
+                },
+            ]}
+        />
     );
 };
 
@@ -286,6 +413,32 @@ const MacroProgressBar: React.FC<MacroProgressBarProps> = ({
     
     // Track if this is the first render to prevent animation on initial load
     const isFirstRender = useRef(true);
+    const barWidthRef = useRef(0);
+    const [sparks, setSparks] = useState<BarSpark[]>([]);
+    const sparkIdRef = useRef(0);
+
+    const removeSpark = useCallback((id: number) => {
+        setSparks((currentSparks) => currentSparks.filter((spark) => spark.id !== id));
+    }, []);
+
+    const emitSparks = (fromPercentage: number) => {
+        const width = barWidthRef.current;
+        if (width <= 0) return;
+        const originX = Math.max(6, Math.min(width - 6, (fromPercentage / 100) * width));
+        const next: BarSpark[] = Array.from({ length: 4 }, () => {
+            sparkIdRef.current += 1;
+            return {
+                id: sparkIdRef.current,
+                originX: originX + (Math.random() - 0.35) * 8,
+                originY: 7.5,
+                dx: 4 + Math.random() * 10,
+                dy: -(6 + Math.random() * 12),
+                size: 2.5 + Math.random() * 1.5,
+                delay: Math.random() * 90,
+            };
+        });
+        setSparks((currentSparks) => [...currentSparks, ...next]);
+    };
 
     useEffect(() => {
         // On first render, set values immediately without animation
@@ -304,7 +457,7 @@ const MacroProgressBar: React.FC<MacroProgressBarProps> = ({
         numberAnimation.setValue(previousCurrent.current);
 
         // Check if percentage is increasing before updating
-        const wasIncreasing = percentage > previousPercentage.current;
+        const wasIncreasing = percentage > previousPercentage.current + 0.4;
         const oldPercentage = previousPercentage.current;
 
         Animated.timing(animatedWidth, {
@@ -329,6 +482,7 @@ const MacroProgressBar: React.FC<MacroProgressBarProps> = ({
         // Reset haptic tracking to start from old value when increasing
         if (wasIncreasing) {
             lastHapticPercentage.current = oldPercentage;
+            emitSparks(oldPercentage);
         }
         
         // Listen to animated value changes for haptic feedback
@@ -381,16 +535,31 @@ const MacroProgressBar: React.FC<MacroProgressBarProps> = ({
                     <Text style={macroBarStyles.value}>/{displayTarget}g</Text>
                 </View>
             </View>
-            <View style={macroBarStyles.barContainer}>
-                <Animated.View
-                    style={[
-                        macroBarStyles.barFill,
-                        {
-                            width: widthInterpolated,
-                            backgroundColor: color
-                        }
-                    ]}
-                />
+            <View
+                style={macroBarStyles.barWrap}
+                onLayout={(event) => {
+                    barWidthRef.current = event.nativeEvent.layout.width;
+                }}
+            >
+                <View style={macroBarStyles.barContainer}>
+                    <Animated.View
+                        style={[
+                            macroBarStyles.barFill,
+                            {
+                                width: widthInterpolated,
+                                backgroundColor: color
+                            }
+                        ]}
+                    />
+                </View>
+                {sparks.map((spark) => (
+                    <BarSparkParticle
+                        key={spark.id}
+                        spark={spark}
+                        color={color}
+                        onDone={removeSpark}
+                    />
+                ))}
             </View>
         </View>
     );
@@ -457,6 +626,7 @@ const calorieStyles = StyleSheet.create({
         position: 'relative',
         alignItems: 'center',
         justifyContent: 'center',
+        overflow: 'visible',
     },
     textContainer: {
         position: 'absolute',
@@ -508,9 +678,15 @@ const macroBarStyles = StyleSheet.create({
         fontFamily: fonts.regular,
         color: '#252525',
     },
-    barContainer: {
+    barWrap: {
         width: '100%',
         maxWidth: 220,
+        height: 15,
+        position: 'relative',
+        overflow: 'visible',
+    },
+    barContainer: {
+        width: '100%',
         height: 15,
         backgroundColor: '#F5F5F5',
         borderRadius: 16,
@@ -520,5 +696,9 @@ const macroBarStyles = StyleSheet.create({
     },
     barFill: {
         height: '100%',
+    },
+    spark: {
+        position: 'absolute',
+        zIndex: 2,
     },
 });

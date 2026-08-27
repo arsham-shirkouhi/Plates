@@ -264,7 +264,7 @@ export function buildWorkoutExercisesFromExerciseTemplates(
         exerciseId: exerciseTemplate.exerciseId,
         name: exerciseTemplate.name,
         note: '',
-        restSeconds: exerciseTemplate.restSeconds ?? 120,
+        restSeconds: exerciseTemplate.restSeconds ?? 60,
         sets: exerciseTemplate.sets.map((setTemplate): WorkoutSet => ({
             id: createUniqueId('set-'),
             type: setTemplate.type ?? 'normal',

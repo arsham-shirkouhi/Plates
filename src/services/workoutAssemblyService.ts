@@ -27,7 +27,7 @@ function templateFromHistory(
             exerciseId: historyTemplate.exerciseId,
             name: historyTemplate.name,
             bodyPart: historyTemplate.bodyPart,
-            restSeconds: historyTemplate.restSeconds ?? 120,
+            restSeconds: historyTemplate.restSeconds ?? 60,
             sets: historyTemplate.sets.map((set) => ({ ...set })),
         };
     }
@@ -35,7 +35,7 @@ function templateFromHistory(
     return {
         exerciseId,
         name,
-        restSeconds: 120,
+        restSeconds: 60,
         sets: [
             { type: 'normal', previous: { weight: 0, reps: 8 } },
             { type: 'normal', previous: { weight: 0, reps: 8 } },
@@ -126,7 +126,7 @@ export async function assembleExerciseTemplates(
                     exerciseId: fallback.id,
                     name: fallback.name,
                     bodyPart: fallback.bodyPart,
-                    restSeconds: 120,
+                    restSeconds: 60,
                     sets: [
                         { type: 'normal', previous: { weight: 0, reps: 10 } },
                         { type: 'normal', previous: { weight: 0, reps: 10 } },
@@ -148,7 +148,7 @@ export async function assembleExerciseTemplates(
                     exerciseId: next.id,
                     name: next.name,
                     bodyPart: next.bodyPart,
-                    restSeconds: 120,
+                    restSeconds: 60,
                     sets: [{ type: 'normal', previous: { weight: 0, reps: 10 } }],
                 })
             );

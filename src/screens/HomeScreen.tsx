@@ -11,7 +11,7 @@ import { Button } from '../components/Button';
 import { HeaderSection } from '../components/HeaderSection';
 import { ProfileOverlay, ProfileIconOrigin } from '../components/ProfileOverlay';
 import { MacrosCard } from '../components/MacrosCard';
-import { FoodLog } from '../components/FoodLog';
+import { FoodLog, FoodLogHandle } from '../components/FoodLog';
 import { AIWidget } from '../components/AIWidget';
 import { TodaysGoalsWidget } from '../components/TodaysGoalsWidget';
 import { TimerWidget } from '../components/TimerWidget'; // ✅ ADD
@@ -65,8 +65,10 @@ export const HomeScreen: React.FC = () => {
     registerSheetState,
     unregisterSheetState,
     showAddFoodSheet: openAddFoodSheet,
+    registerFoodLogTarget,
   } = useAddFood();
   const { consumed: loggedConsumed, dashboardItems } = useFoodLog();
+  const foodLogRef = useRef<FoodLogHandle>(null);
   const { open: openWorkoutOverlay } = useWorkoutOverlay();
   const { state: activeWorkoutState, endActiveWorkout, expand: expandWorkout } = useActiveWorkout();
   const [loggingOut, setLoggingOut] = useState(false);
@@ -377,6 +379,17 @@ export const HomeScreen: React.FC = () => {
     }, [loadAllData])
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      registerFoodLogTarget({
+        measureTarget: () => foodLogRef.current?.measureTarget() ?? Promise.resolve(null),
+        getTargetRect: () => foodLogRef.current?.getTargetRect() ?? null,
+        pulse: () => foodLogRef.current?.pulse(),
+      });
+      return () => registerFoodLogTarget(null);
+    }, [registerFoodLogTarget])
+  );
+
   const handleResetOnboarding = async () => {
     if (!user) {
       Alert.alert('Error', 'You must be logged in to reset onboarding.');
@@ -563,7 +576,11 @@ export const HomeScreen: React.FC = () => {
 
           <MacrosCard macros={macros} consumed={consumed} loading={loadingProfile} />
 
-          <FoodLog items={dashboardItems} onPress={() => navigation.navigate('FoodLog')} />
+          <FoodLog
+            ref={foodLogRef}
+            items={dashboardItems}
+            onPress={() => navigation.navigate('FoodLog')}
+          />
 
           <AIWidget />
 

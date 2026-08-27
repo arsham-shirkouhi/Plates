@@ -59,6 +59,22 @@ const cardPopIn = new Keyframe({
     },
 }).duration(220);
 
+/** Recommended rows land one at a time after the screen arrives. */
+const recEnter = new Keyframe({
+    0: {
+        opacity: 0,
+        transform: [{ translateY: 18 }, { scale: 0.97 }],
+    },
+    100: {
+        opacity: 1,
+        transform: [{ translateY: 0 }, { scale: 1 }],
+        easing: Easing.out(Easing.cubic),
+    },
+}).duration(320);
+
+const REVEAL_START_MS = 220;
+const REVEAL_STAGGER_MS = 150;
+
 const DEFAULT_SETS = 3;
 const DEFAULT_REPS = 10;
 const DEFAULT_REST = 60;
@@ -69,13 +85,14 @@ const REST_STEP = 15;
 
 function makeSet(
     reps: number,
-    previousWeight = 0
+    previousWeight = 0,
+    filledReps = ''
 ): WorkoutSet {
     return {
         id: createUniqueId('set-'),
         type: 'normal',
         weight: '',
-        reps: '',
+        reps: filledReps,
         completed: false,
         previous: { weight: previousWeight, reps },
     };
@@ -98,7 +115,7 @@ function withDefaults(
         exerciseId: exercise.exerciseId,
         name: exercise.name,
         note: '',
-        restSeconds: exercise.restSeconds ?? DEFAULT_REST,
+        restSeconds: DEFAULT_REST,
         sets: Array.from({ length: DEFAULT_SETS }, (_, index) => {
             const previous = history[index] ?? fallback;
             return {
@@ -114,6 +131,8 @@ function withDefaults(
 }
 
 function repsOf(exercise: WorkoutExercise): number {
+    const filled = Number(exercise.sets[0]?.reps);
+    if (Number.isFinite(filled) && filled > 0) return filled;
     return exercise.sets[0]?.previous?.reps ?? DEFAULT_REPS;
 }
 
@@ -143,6 +162,7 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
     const [recommended, setRecommended] = useState<WorkoutExercise[]>(() =>
         pending.exercises.map((exercise) => withDefaults(exercise))
     );
+    const [revealedIds, setRevealedIds] = useState<Set<string>>(() => new Set());
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<Exercise[]>([]);
     const [searching, setSearching] = useState(false);
@@ -151,9 +171,24 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
     const swapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
+        const ids = recommended.map((item) => item.id);
+        const timers = ids.map((id, index) =>
+            setTimeout(() => {
+                setRevealedIds((current) => {
+                    if (current.has(id)) return current;
+                    const next = new Set(current);
+                    next.add(id);
+                    return next;
+                });
+            }, REVEAL_START_MS + index * REVEAL_STAGGER_MS)
+        );
+
         return () => {
             if (swapTimer.current) clearTimeout(swapTimer.current);
+            timers.forEach(clearTimeout);
         };
+        // Intro cascade only on first mount.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const toggleEditing = useCallback((id: string) => {
@@ -237,8 +272,9 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
                 }
                 const reps = repsOf(exercise);
                 const lastWeight = exercise.sets[exercise.sets.length - 1]?.previous?.weight ?? 0;
+                const filledReps = exercise.sets[0]?.reps ?? '';
                 const extra = Array.from({ length: count - exercise.sets.length }, () =>
-                    makeSet(reps, lastWeight)
+                    makeSet(reps, lastWeight, filledReps)
                 );
                 return { ...exercise, sets: [...exercise.sets, ...extra] };
             });
@@ -255,6 +291,7 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
                     ...exercise,
                     sets: exercise.sets.map((set) => ({
                         ...set,
+                        reps: String(reps),
                         previous: { weight: set.previous?.weight ?? 0, reps },
                     })),
                 };
@@ -308,6 +345,7 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
     };
 
     const startLabel = added.length > 0 ? 'start workout' : 'start empty workout';
+    const visibleRecommended = recommended.filter((item) => revealedIds.has(item.id));
 
     return (
         <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
@@ -398,23 +436,27 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
                     {recommended.length > 0 ? (
                         <View style={styles.section}>
                             <Text style={styles.sectionHeading}>recommended</Text>
-                            {recommended.map((item, index) => (
-                                <TouchableOpacity
-                                    key={`rec-${item.exerciseId}-${index}`}
-                                    style={styles.row}
-                                    onPress={() => addExercise(item)}
-                                    accessibilityRole="button"
-                                    accessibilityLabel={`Add ${item.name}`}
-                                    activeOpacity={0.6}
+                            {visibleRecommended.map((item) => (
+                                <Reanimated.View
+                                    key={item.id}
+                                    entering={recEnter}
                                 >
-                                    <View style={styles.rowCopy}>
-                                        <Text style={styles.rowTitle}>{item.name.toLowerCase()}</Text>
-                                        <Text style={styles.rowMeta}>{formatExerciseMeta(item)}</Text>
-                                    </View>
-                                    <View style={styles.addButton}>
-                                        <Ionicons name="add" size={28} color={WORKOUT_COLORS.accent} />
-                                    </View>
-                                </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={styles.row}
+                                        onPress={() => addExercise(item)}
+                                        accessibilityRole="button"
+                                        accessibilityLabel={`Add ${item.name}`}
+                                        activeOpacity={0.6}
+                                    >
+                                        <View style={styles.rowCopy}>
+                                            <Text style={styles.rowTitle}>{item.name.toLowerCase()}</Text>
+                                            <Text style={styles.rowMeta}>{formatExerciseMeta(item)}</Text>
+                                        </View>
+                                        <View style={styles.addButton}>
+                                            <Ionicons name="add" size={28} color={WORKOUT_COLORS.accent} />
+                                        </View>
+                                    </TouchableOpacity>
+                                </Reanimated.View>
                             ))}
                         </View>
                     ) : null}
@@ -519,75 +561,102 @@ function AddedCard({
                         }s rest`}
                     </Text>
                 </View>
-                <View style={styles.rowActions}>
-                    <TouchableOpacity
-                        onPress={onMoveUp}
-                        disabled={!canMoveUp}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Move ${item.name} up`}
-                        style={styles.iconButton}
-                    >
-                        <Ionicons
-                            name="chevron-up"
-                            size={18}
-                            color={canMoveUp ? WORKOUT_COLORS.text : WORKOUT_COLORS.placeholder}
-                        />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        onPress={onMoveDown}
-                        disabled={!canMoveDown}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Move ${item.name} down`}
-                        style={styles.iconButton}
-                    >
-                        <Ionicons
-                            name="chevron-down"
-                            size={18}
-                            color={canMoveDown ? WORKOUT_COLORS.text : WORKOUT_COLORS.placeholder}
-                        />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        onPress={onToggleEdit}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Edit ${item.name}`}
-                        style={styles.iconButton}
-                    >
-                        <Ionicons
-                            name={isEditing ? 'checkmark' : 'create-outline'}
-                            size={18}
-                            color={isEditing ? WORKOUT_COLORS.accent : WORKOUT_COLORS.text}
-                        />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        onPress={onRemove}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Remove ${item.name}`}
-                        style={styles.iconButton}
-                    >
-                        <Ionicons name="close" size={18} color={WORKOUT_COLORS.text} />
-                    </TouchableOpacity>
-                </View>
+                <TouchableOpacity
+                    onPress={onToggleEdit}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                        isEditing ? `Done editing ${item.name}` : `Edit ${item.name}`
+                    }
+                    style={styles.iconButton}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                    <Ionicons
+                        name={isEditing ? 'checkmark' : 'create-outline'}
+                        size={20}
+                        color={isEditing ? WORKOUT_COLORS.accent : WORKOUT_COLORS.text}
+                    />
+                </TouchableOpacity>
+                <TouchableOpacity
+                    onPress={onRemove}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove ${item.name}`}
+                    style={styles.iconButton}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                    <Ionicons name="close" size={20} color={WORKOUT_COLORS.text} />
+                </TouchableOpacity>
             </View>
             {isEditing ? (
-                <View style={styles.stepperRow}>
-                    <Stepper
-                        label="sets"
-                        value={`${item.sets.length}`}
-                        onDecrement={() => onChangeSets(-1)}
-                        onIncrement={() => onChangeSets(1)}
-                    />
-                    <Stepper
-                        label="reps"
-                        value={`${repsOf(item)}`}
-                        onDecrement={() => onChangeReps(-1)}
-                        onIncrement={() => onChangeReps(1)}
-                    />
-                    <Stepper
-                        label="rest"
-                        value={`${item.restSeconds ?? DEFAULT_REST}s`}
-                        onDecrement={() => onChangeRest(-REST_STEP)}
-                        onIncrement={() => onChangeRest(REST_STEP)}
-                    />
+                <View style={styles.editPanel}>
+                    <View style={styles.stepperRow}>
+                        <Stepper
+                            label="sets"
+                            value={`${item.sets.length}`}
+                            onDecrement={() => onChangeSets(-1)}
+                            onIncrement={() => onChangeSets(1)}
+                        />
+                        <Stepper
+                            label="reps"
+                            value={`${repsOf(item)}`}
+                            onDecrement={() => onChangeReps(-1)}
+                            onIncrement={() => onChangeReps(1)}
+                        />
+                        <Stepper
+                            label="rest"
+                            value={`${item.restSeconds ?? DEFAULT_REST}s`}
+                            onDecrement={() => onChangeRest(-REST_STEP)}
+                            onIncrement={() => onChangeRest(REST_STEP)}
+                        />
+                    </View>
+                    <View style={styles.reorderRow}>
+                        <TouchableOpacity
+                            onPress={onMoveUp}
+                            disabled={!canMoveUp}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Move ${item.name} up`}
+                            style={[styles.reorderButton, !canMoveUp && styles.reorderButtonDisabled]}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons
+                                name="chevron-up"
+                                size={16}
+                                color={canMoveUp ? WORKOUT_COLORS.text : WORKOUT_COLORS.placeholder}
+                            />
+                            <Text
+                                style={[
+                                    styles.reorderLabel,
+                                    !canMoveUp && styles.reorderLabelDisabled,
+                                ]}
+                            >
+                                up
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={onMoveDown}
+                            disabled={!canMoveDown}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Move ${item.name} down`}
+                            style={[
+                                styles.reorderButton,
+                                !canMoveDown && styles.reorderButtonDisabled,
+                            ]}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons
+                                name="chevron-down"
+                                size={16}
+                                color={canMoveDown ? WORKOUT_COLORS.text : WORKOUT_COLORS.placeholder}
+                            />
+                            <Text
+                                style={[
+                                    styles.reorderLabel,
+                                    !canMoveDown && styles.reorderLabelDisabled,
+                                ]}
+                            >
+                                down
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
             ) : null}
         </Reanimated.View>
@@ -846,12 +915,20 @@ const styles = StyleSheet.create({
     addedTop: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
+    },
+    iconButton: {
+        width: 32,
+        height: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    editPanel: {
+        marginTop: 12,
+        gap: 10,
     },
     stepperRow: {
         flexDirection: 'row',
         gap: 8,
-        marginTop: 12,
     },
     stepper: {
         flex: 1,
@@ -892,8 +969,38 @@ const styles = StyleSheet.create({
         color: WORKOUT_COLORS.text,
         textTransform: 'lowercase',
     },
+    reorderRow: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    reorderButton: {
+        flex: 1,
+        height: 36,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 4,
+        borderRadius: buttonRadius,
+        backgroundColor: WORKOUT_COLORS.background,
+        borderWidth,
+        borderColor: WORKOUT_COLORS.border,
+    },
+    reorderButtonDisabled: {
+        opacity: 0.4,
+    },
+    reorderLabel: {
+        fontFamily: fonts.bold,
+        fontSize: 13,
+        color: WORKOUT_COLORS.text,
+        textTransform: 'lowercase',
+    },
+    reorderLabelDisabled: {
+        color: WORKOUT_COLORS.placeholder,
+    },
     rowCopy: {
         flex: 1,
+        minWidth: 0,
+        marginRight: 8,
     },
     rowTitle: {
         fontFamily: fonts.bold,
@@ -907,16 +1014,6 @@ const styles = StyleSheet.create({
         color: WORKOUT_COLORS.placeholder,
         textTransform: 'lowercase',
         marginTop: 2,
-    },
-    rowActions: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    iconButton: {
-        width: 32,
-        height: 32,
-        alignItems: 'center',
-        justifyContent: 'center',
     },
     footer: {
         padding: padding,

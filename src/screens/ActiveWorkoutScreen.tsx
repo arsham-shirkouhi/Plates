@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { useWorkoutOverlay } from '../contexts/WorkoutOverlayContext';
 import { useActiveWorkout } from '../contexts/ActiveWorkoutContext';
 import { useAuth } from '../context/AuthContext';
@@ -20,8 +21,8 @@ import { ActiveWorkoutOverlay } from '../components/activeWorkout/ActiveWorkoutO
 import { AddExerciseOverlay } from '../components/AddExerciseOverlay';
 import { WorkoutCountdownOverlay } from '../components/activeWorkout/WorkoutCountdownOverlay';
 import { WorkoutWrapUpOverlay } from '../components/activeWorkout/WorkoutWrapUpOverlay';
-import { PickWorkoutScreen, PendingReviewWorkout } from '../components/pickWorkout/PickWorkoutScreen';
-import { ReviewWorkoutScreen } from '../components/pickWorkout/ReviewWorkoutScreen';
+import { PendingReviewWorkout } from '../components/pickWorkout/PickWorkoutScreen';
+import { PickReviewFlow } from '../components/pickWorkout/PickReviewFlow';
 import { routineToPendingStart } from '../components/startWorkout/StartWorkoutIdleView';
 import { StartWorkoutRoutine } from '../workout/startWorkoutTypes';
 import { WorkoutExercise } from '../workout/types';
@@ -51,6 +52,7 @@ export const ActiveWorkoutScreen: React.FC = () => {
     const consumedStartKeyRef = useRef<string | null>(null);
     const consumedPromptRef = useRef(false);
     const pendingStartRef = useRef<PendingStart | null>(null);
+    const launchedWorkoutRef = useRef(false);
 
     const [logWorkoutStep, setLogWorkoutStep] = useState<'pick' | 'review'>('pick');
     const [pendingReview, setPendingReview] = useState<PendingReviewWorkout | null>(null);
@@ -61,6 +63,7 @@ export const ActiveWorkoutScreen: React.FC = () => {
         consumedPromptRef.current = false;
         setLogWorkoutStep('pick');
         setPendingReview(null);
+        launchedWorkoutRef.current = false;
     }, [state.workout]);
 
     useEffect(() => {
@@ -87,15 +90,22 @@ export const ActiveWorkoutScreen: React.FC = () => {
 
     const queueWorkoutStart = useCallback((pending: PendingStart) => {
         pendingStartRef.current = pending;
+        launchedWorkoutRef.current = false;
         setShowCountdown(true);
     }, []);
 
-    const beginPendingWorkout = useCallback(() => {
-        const pending = pendingStartRef.current ?? { title: 'workout' };
+    const coverWithWorkout = useCallback(() => {
+        if (launchedWorkoutRef.current) return;
+        const pending = pendingStartRef.current;
+        if (!pending) return;
+        launchedWorkoutRef.current = true;
         startWorkoutDirect(pending);
+    }, [startWorkoutDirect]);
+
+    const finishCountdown = useCallback(() => {
         pendingStartRef.current = null;
         setShowCountdown(false);
-    }, [startWorkoutDirect]);
+    }, []);
 
     const startWorkoutType = params?.startWorkoutType;
     const workoutId = params?.workoutId;
@@ -190,7 +200,7 @@ export const ActiveWorkoutScreen: React.FC = () => {
     }
 
     return (
-        <>
+        <View style={styles.screen} pointerEvents="box-none">
             {wrapUpSummary ? (
                 <WorkoutWrapUpOverlay
                     key={wrapUpSummary.completedAt}
@@ -201,7 +211,26 @@ export const ActiveWorkoutScreen: React.FC = () => {
                 />
             ) : null}
 
-            <WorkoutCountdownOverlay visible={showCountdown} onComplete={beginPendingWorkout} />
+            {!wrapUpSummary && !state.workout ? (
+                <View
+                    style={styles.pickLayer}
+                    pointerEvents={showCountdown ? 'none' : 'auto'}
+                >
+                    <PickReviewFlow
+                        step={logWorkoutStep}
+                        pendingReview={pendingReview}
+                        onReviewWorkout={(pending) => {
+                            setPendingReview(pending);
+                            setLogWorkoutStep('review');
+                        }}
+                        onStartRoutine={handleStartFromRoutine}
+                        onStartEmpty={() => queueWorkoutStart({ title: 'workout' })}
+                        onBack={() => setLogWorkoutStep('pick')}
+                        onReviewExited={() => setPendingReview(null)}
+                        onStartWorkout={queueWorkoutStart}
+                    />
+                </View>
+            ) : null}
 
             {state.workout && isOverlayVisible(state.presentation) ? (
                 <>
@@ -217,24 +246,22 @@ export const ActiveWorkoutScreen: React.FC = () => {
                         currentExerciseNames={state.workout.exercises.map((exercise) => exercise.name)}
                     />
                 </>
-            ) : !wrapUpSummary && !showCountdown ? (
-                logWorkoutStep === 'review' && pendingReview ? (
-                    <ReviewWorkoutScreen
-                        pending={pendingReview}
-                        onBack={() => setLogWorkoutStep('pick')}
-                        onStartWorkout={startWorkoutDirect}
-                    />
-                ) : (
-                    <PickWorkoutScreen
-                        onReviewWorkout={(pending) => {
-                            setPendingReview(pending);
-                            setLogWorkoutStep('review');
-                        }}
-                        onStartRoutine={handleStartFromRoutine}
-                        onStartEmpty={() => startWorkoutDirect({ title: 'workout' })}
-                    />
-                )
             ) : null}
-        </>
+
+            <WorkoutCountdownOverlay
+                visible={showCountdown}
+                onCovered={coverWithWorkout}
+                onComplete={finishCountdown}
+            />
+        </View>
     );
 };
+
+const styles = StyleSheet.create({
+    screen: {
+        flex: 1,
+    },
+    pickLayer: {
+        flex: 1,
+    },
+});

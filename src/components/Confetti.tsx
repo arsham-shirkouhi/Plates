@@ -7,6 +7,8 @@ export interface ConfettiParticle {
     originY: number;
     angle: number;
     color?: string;
+    sizeScale?: number;
+    travel?: number;
 }
 
 interface ConfettiParticleProps {
@@ -14,69 +16,71 @@ interface ConfettiParticleProps {
     originY: number;
     angle: number;
     color?: string;
+    sizeScale?: number;
+    travel?: number;
 }
 
-const ConfettiParticle: React.FC<ConfettiParticleProps> = ({ originX, originY, angle, color = '#526EFF' }) => {
+const ConfettiPiece: React.FC<ConfettiParticleProps> = ({
+    originX,
+    originY,
+    angle,
+    color = '#526EFF',
+    sizeScale = 1,
+    travel,
+}) => {
     const scale = useRef(new Animated.Value(0)).current;
     const translateX = useRef(new Animated.Value(0)).current;
     const translateY = useRef(new Animated.Value(0)).current;
     const opacity = useRef(new Animated.Value(1)).current;
 
     useEffect(() => {
-        // Convert angle to radians
         const angleRad = (angle * Math.PI) / 180;
-
-        // Distance and direction for particle to travel - increased for better visibility
-        const distance = 50 + Math.random() * 30; // 50-80px distance
+        const distance = (travel ?? 50) + Math.random() * 30;
         const deltaX = Math.cos(angleRad) * distance;
         const deltaY = Math.sin(angleRad) * distance;
-
-        // Short, snappy animation
-        const duration = 450; // Shorter duration for quick, satisfying feel
+        const duration = travel && travel > 100 ? 620 : 450;
 
         Animated.parallel([
-            // Quick scale up with bounce
             Animated.spring(scale, {
                 toValue: 1,
                 tension: 120,
                 friction: 8,
                 useNativeDriver: true,
             }),
-            // Shoot out quickly with satisfying easing
-            Animated.parallel([
-                Animated.timing(translateX, {
-                    toValue: deltaX,
-                    duration,
-                    easing: Easing.out(Easing.cubic),
-                    useNativeDriver: true,
-                }),
-                Animated.timing(translateY, {
-                    toValue: deltaY,
-                    duration,
-                    easing: Easing.out(Easing.cubic),
-                    useNativeDriver: true,
-                }),
-                Animated.timing(opacity, {
-                    toValue: 0,
-                    duration,
-                    easing: Easing.out(Easing.ease),
-                    useNativeDriver: true,
-                }),
-            ]),
+            Animated.timing(translateX, {
+                toValue: deltaX,
+                duration,
+                easing: Easing.out(Easing.cubic),
+                useNativeDriver: true,
+            }),
+            Animated.timing(translateY, {
+                toValue: deltaY,
+                duration,
+                easing: Easing.out(Easing.cubic),
+                useNativeDriver: true,
+            }),
+            Animated.timing(opacity, {
+                toValue: 0,
+                duration,
+                easing: Easing.out(Easing.ease),
+                useNativeDriver: true,
+            }),
         ]).start();
     }, []);
 
-    // Static rotation to face the direction of travel (no animation)
-    // Add 90 degrees because the tube starts vertical (pointing up) and we want it to point in the travel direction
     const staticRotation = `${angle + 90}deg`;
+    const width = 3 * sizeScale;
+    const height = 8 * sizeScale;
 
     return (
         <Animated.View
             style={[
                 styles.confettiParticle,
                 {
-                    left: originX - 1.5, // Center the 3px wide particle (3/2 = 1.5)
-                    top: originY - 4, // Center the 8px tall particle (8/2 = 4)
+                    width,
+                    height,
+                    left: originX - width / 2,
+                    top: originY - height / 2,
                     transform: [
                         { scale },
                         { translateX },
@@ -87,7 +91,7 @@ const ConfettiParticle: React.FC<ConfettiParticleProps> = ({ originX, originY, a
                 },
             ]}
         >
-            <View style={[styles.confettiDot, { backgroundColor: color }]} />
+            <View style={[styles.confettiDot, { width, height, borderRadius: width / 2, backgroundColor: color }]} />
         </Animated.View>
     );
 };
@@ -100,12 +104,14 @@ export const Confetti: React.FC<ConfettiProps> = ({ particles }) => {
     return (
         <>
             {particles.map((particle) => (
-                <ConfettiParticle
+                <ConfettiPiece
                     key={particle.id}
                     originX={particle.originX}
                     originY={particle.originY}
                     angle={particle.angle}
                     color={particle.color}
+                    sizeScale={particle.sizeScale}
+                    travel={particle.travel}
                 />
             ))}
         </>

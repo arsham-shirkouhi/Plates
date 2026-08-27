@@ -208,7 +208,7 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
     };
 
     return (
-        <>
+        <View style={styles.host} pointerEvents="box-none" collapsable={false}>
             <Reanimated.View
                 pointerEvents={isFullscreen ? 'auto' : 'none'}
                 style={[StyleSheet.absoluteFillObject, styles.backdrop, backdropStyle]}
@@ -334,11 +334,14 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
                     style={styles.bottomFade}
                 />
             ) : null}
-        </>
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
+    host: {
+        ...StyleSheet.absoluteFillObject,
+    },
     backdrop: {
         backgroundColor: WORKOUT_COLORS.backdrop,
         zIndex: 0,
