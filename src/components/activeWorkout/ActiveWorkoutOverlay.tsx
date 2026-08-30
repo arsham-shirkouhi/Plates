@@ -12,7 +12,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Reanimated, {
     Easing,
     Extrapolation,
+    FadeInDown,
+    FadeOutRight,
     interpolate,
+    LinearTransition,
     useAnimatedStyle,
     useSharedValue,
     withTiming,
@@ -46,6 +49,9 @@ const SHEET_MAX_WIDTH = 540;
 const WIDGET_FLOAT_BOTTOM = 10;
 const SHELL_CORNER_RADIUS = 22;
 const MINI_CORNER_RADIUS = 36;
+const exerciseLayout = LinearTransition.duration(240).easing(Easing.inOut(Easing.cubic));
+const exerciseEnter = FadeInDown.duration(280).easing(Easing.out(Easing.cubic));
+const exerciseExit = FadeOutRight.duration(220).easing(Easing.in(Easing.cubic));
 
 interface ActiveWorkoutOverlayProps {
     onAddExercises: () => void;
@@ -113,6 +119,11 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
     const exerciseOffsetsRef = useRef<Record<string, number>>({});
     const isFullscreenRef = useRef(isFullscreen);
     isFullscreenRef.current = isFullscreen;
+    const skipEnterRef = useRef(true);
+
+    useEffect(() => {
+        skipEnterRef.current = false;
+    }, []);
 
     const elapsedSeconds = useWorkoutTimer(workout?.startedAt);
     const [restCelebrateAt, setRestCelebrateAt] = useState(0);
@@ -171,6 +182,9 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
     }));
     const miniStyle = useAnimatedStyle(() => ({
         opacity: interpolate(expandProgress.value, [0, 0.3, 1], [1, 0, 0], Extrapolation.CLAMP),
+    }));
+    const bottomFadeStyle = useAnimatedStyle(() => ({
+        opacity: interpolate(expandProgress.value, [0, 0.35, 1], [1, 0, 0], Extrapolation.CLAMP),
     }));
 
     if (!workout) return null;
@@ -236,8 +250,11 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
                         showsVerticalScrollIndicator={false}
                     >
                         {workout.exercises.map((exercise) => (
-                            <View
+                            <Reanimated.View
                                 key={exercise.id}
+                                layout={exerciseLayout}
+                                entering={skipEnterRef.current ? undefined : exerciseEnter}
+                                exiting={exerciseExit}
                                 onLayout={(event) => {
                                     exerciseOffsetsRef.current[exercise.id] = event.nativeEvent.layout.y;
                                 }}
@@ -270,7 +287,7 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
                                     }}
                                     onAddToSuperset={() => addToSuperset([exercise.id])}
                                 />
-                            </View>
+                            </Reanimated.View>
                         ))}
                     </ScrollView>
 
@@ -327,13 +344,19 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
                 </View>
             ) : null}
 
-            {isFullscreen ? (
+            <Reanimated.View
+                pointerEvents="none"
+                style={[
+                    styles.bottomFade,
+                    bottomFadeStyle,
+                    { height: MINI_BAR_HEIGHT + widgetBottomInset + 48 },
+                ]}
+            >
                 <LinearGradient
-                    pointerEvents="none"
                     colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.9)']}
-                    style={styles.bottomFade}
+                    style={StyleSheet.absoluteFill}
                 />
-            ) : null}
+            </Reanimated.View>
         </View>
     );
 };
@@ -387,7 +410,6 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         bottom: 0,
-        height: 40,
-        zIndex: 11,
+        zIndex: 1,
     },
 });

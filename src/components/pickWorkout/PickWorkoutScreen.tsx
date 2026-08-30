@@ -16,6 +16,7 @@ import { PICK_WORKOUT_LAYOUT, WORKOUT_COLORS } from '../../workout/constants';
 import { MuscleGroup } from '../../workout/muscleGroups';
 import { StartWorkoutRoutine } from '../../workout/startWorkoutTypes';
 import { WorkoutExercise } from '../../workout/types';
+import { ScrollingGridBackground } from '../ScrollingGridBackground';
 import { BODY_MAP_VIEWBOX } from '../startWorkout/bodyMapPaths';
 import { SelectableBodyMapFront } from '../muscleSelect/SelectableBodyMapFront';
 import { SelectableBodyMapBack } from '../muscleSelect/SelectableBodyMapBack';
@@ -243,6 +244,7 @@ export const PickWorkoutScreen: React.FC<PickWorkoutScreenProps> = ({
 
     return (
         <View style={styles.screen}>
+            <ScrollingGridBackground />
             <SafeAreaView style={styles.upper} edges={['top']}>
                 <PickWorkoutTopBar
                     side={side}
@@ -351,11 +353,11 @@ export function estimatePickWorkoutFigureHeight(screenHeight: number, safeVertic
 const styles = StyleSheet.create({
     screen: {
         flex: 1,
-        backgroundColor: WORKOUT_COLORS.surfaceSecondary,
+        backgroundColor: WORKOUT_COLORS.background,
     },
     upper: {
         flex: 1,
-        backgroundColor: WORKOUT_COLORS.background,
+        backgroundColor: 'transparent',
         minHeight: 0,
     },
     figureArea: {

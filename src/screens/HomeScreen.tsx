@@ -9,6 +9,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { Button } from '../components/Button';
 import { HeaderSection } from '../components/HeaderSection';
+import { CalendarOverlay } from '../components/CalendarOverlay';
 import { ProfileOverlay, ProfileIconOrigin } from '../components/ProfileOverlay';
 import { MacrosCard } from '../components/MacrosCard';
 import { FoodLog, FoodLogHandle } from '../components/FoodLog';
@@ -86,6 +87,7 @@ export const HomeScreen: React.FC = () => {
   const [showAddFoodSheet, setShowAddFoodSheet] = useState(false);
   const [showGoalsOverlay, setShowGoalsOverlay] = useState(false);
   const [showProfileOverlay, setShowProfileOverlay] = useState(false);
+  const [showCalendarOverlay, setShowCalendarOverlay] = useState(false);
   const [hideProfileIcon, setHideProfileIcon] = useState(false);
   const [profileOrigin, setProfileOrigin] = useState<ProfileIconOrigin | null>(null);
 
@@ -160,6 +162,11 @@ export const HomeScreen: React.FC = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setProfileOrigin(origin);
     setShowProfileOverlay(true);
+  };
+
+  const handleDatePress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowCalendarOverlay(true);
   };
 
   useEffect(() => {
@@ -445,7 +452,7 @@ export const HomeScreen: React.FC = () => {
 
   const handleTouchStart = useCallback(
     (evt: any) => {
-      if (showAddFoodSheet || showGoalsOverlay) return;
+      if (showAddFoodSheet || showGoalsOverlay || showCalendarOverlay) return;
 
       // ✅ don't trigger aura if timer is interacting
       if (scrollLockRef.current) return;
@@ -470,7 +477,7 @@ export const HomeScreen: React.FC = () => {
         }
       }, 1000);
     },
-    [showAddFoodSheet, showGoalsOverlay]
+    [showAddFoodSheet, showGoalsOverlay, showCalendarOverlay]
   );
 
   const handleTouchMove = useCallback((evt: any) => {
@@ -508,7 +515,7 @@ export const HomeScreen: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (showAddFoodSheet || showGoalsOverlay) {
+    if (showAddFoodSheet || showGoalsOverlay || showCalendarOverlay) {
       setShowBorderRing(false);
       // Lock scroll while overlays are open
       setScrollEnabled(false);
@@ -524,7 +531,7 @@ export const HomeScreen: React.FC = () => {
       // Restore scroll once overlays are closed
       setScrollEnabled(!scrollLockRef.current);
     }
-  }, [showAddFoodSheet, showGoalsOverlay]);
+  }, [showAddFoodSheet, showGoalsOverlay, showCalendarOverlay]);
 
   // ✅ called by TimerWidget to lock/unlock ScrollView
   const handleTimerInteractionChange = useCallback((interacting: boolean) => {
@@ -543,12 +550,12 @@ export const HomeScreen: React.FC = () => {
       }}
     >
       <View
-        onTouchStart={showAddFoodSheet || showGoalsOverlay || showProfileOverlay ? undefined : handleTouchStart}
-        onTouchMove={showAddFoodSheet || showGoalsOverlay || showProfileOverlay ? undefined : handleTouchMove}
+        onTouchStart={showAddFoodSheet || showGoalsOverlay || showProfileOverlay || showCalendarOverlay ? undefined : handleTouchStart}
+        onTouchMove={showAddFoodSheet || showGoalsOverlay || showProfileOverlay || showCalendarOverlay ? undefined : handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
         style={{ flex: 1 }}
-        pointerEvents={showAddFoodSheet || showGoalsOverlay || showProfileOverlay ? 'none' : 'auto'}
+        pointerEvents={showAddFoodSheet || showGoalsOverlay || showProfileOverlay || showCalendarOverlay ? 'none' : 'auto'}
       >
         <ScrollingGridBackground />
         <ScrollView
@@ -571,6 +578,8 @@ export const HomeScreen: React.FC = () => {
             streak={streak}
             topInset={insets.top}
             onProfilePress={handleProfilePress}
+            onDatePress={handleDatePress}
+            calendarOpen={showCalendarOverlay}
             hideProfile={hideProfileIcon}
           />
 
@@ -651,6 +660,13 @@ export const HomeScreen: React.FC = () => {
       </View>
 
       {showBorderRing && <AuraOverlay isActive={showBorderRing} />}
+
+      <CalendarOverlay
+        visible={showCalendarOverlay}
+        onClose={() => setShowCalendarOverlay(false)}
+        targetCalories={macros?.calories ?? 0}
+        todayCalories={consumed.calories}
+      />
 
       <ProfileOverlay
         visible={showProfileOverlay}

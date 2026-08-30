@@ -22,6 +22,7 @@ import {
 import { estimateDurationLabel } from '../../workout/startWorkoutSelectors';
 import { WorkoutExercise } from '../../workout/types';
 import { rootNavigationRef } from '../../navigation/rootNavigationRef';
+import { ScrollingGridBackground } from '../ScrollingGridBackground';
 import { BODY_MAP_VIEWBOX } from '../startWorkout/bodyMapPaths';
 import { SelectableBodyMapFront } from './SelectableBodyMapFront';
 import { SelectableBodyMapBack } from './SelectableBodyMapBack';
@@ -148,6 +149,7 @@ export const MuscleSelectScreen: React.FC<MuscleSelectScreenProps> = ({
 
     return (
         <View style={styles.root}>
+            <ScrollingGridBackground />
             <MuscleSelectTopBar
                 side={side}
                 onSideChange={flipSide}

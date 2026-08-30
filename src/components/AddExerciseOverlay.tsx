@@ -16,12 +16,20 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../constants/fonts';
-import { Button } from './Button';
 import { getExercisesList, searchExercises, Exercise, getExerciseDetails, ExerciseDetails } from '../services/exerciseService';
 import { useRegisterOverlay } from '../contexts/OverlayContext';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import Reanimated, {
+    interpolate,
+    interpolateColor,
+    useAnimatedStyle,
+    useSharedValue,
+    withSequence,
+    withSpring,
+    withTiming,
+} from 'react-native-reanimated';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -64,6 +72,121 @@ function getBodyPartVisual(bodyPart?: string): BodyPartVisual {
     return match?.visual ?? DEFAULT_BODY_PART_VISUAL;
 }
 
+function exerciseMatchKeys(exercise: Pick<Exercise, 'id' | 'name'>): string[] {
+    const keys: string[] = [];
+    if (exercise.id) keys.push(exercise.id);
+    const nameKey = exercise.name?.trim().toLowerCase();
+    if (nameKey) keys.push(nameKey);
+    return keys;
+}
+
+interface AnimatedExerciseRowProps {
+    exercise: Exercise;
+    isAdded: boolean;
+    onOpen: () => void;
+    onAdd: () => void;
+    onRemove: () => void;
+}
+
+const AnimatedExerciseRow: React.FC<AnimatedExerciseRowProps> = ({
+    exercise,
+    isAdded,
+    onOpen,
+    onAdd,
+    onRemove,
+}) => {
+    const visual = getBodyPartVisual(exercise.bodyPart);
+    const added = useSharedValue(isAdded ? 1 : 0);
+    const pressScale = useSharedValue(1);
+
+    useEffect(() => {
+        added.value = withSpring(isAdded ? 1 : 0, { damping: 14, stiffness: 220 });
+    }, [added, isAdded]);
+
+    const rowStyle = useAnimatedStyle(() => ({
+        borderColor: interpolateColor(added.value, [0, 1], ['#EDEDED', '#526EFF']),
+        backgroundColor: interpolateColor(added.value, [0, 1], ['#FFFFFF', '#F5F7FF']),
+        transform: [{ scale: interpolate(added.value, [0, 0.4, 1], [1, 1.02, 1]) }],
+    }));
+
+    const addBtnStyle = useAnimatedStyle(() => ({
+        opacity: interpolate(added.value, [0, 1], [1, 0]),
+        transform: [{ scale: interpolate(added.value, [0, 1], [1, 0.55]) }],
+    }));
+
+    const removeBtnStyle = useAnimatedStyle(() => ({
+        opacity: interpolate(added.value, [0, 1], [0, 1]),
+        transform: [{ scale: interpolate(added.value, [0, 1], [0.55, 1]) }],
+    }));
+
+    const toggleWrapStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: pressScale.value }],
+    }));
+
+    const handleToggle = () => {
+        pressScale.value = withSequence(
+            withTiming(0.84, { duration: 70 }),
+            withSpring(1, { damping: 12, stiffness: 280 })
+        );
+        if (isAdded) onRemove();
+        else onAdd();
+    };
+
+    return (
+        <TouchableOpacity
+            style={styles.exerciseItemHit}
+            onPress={onOpen}
+            activeOpacity={0.85}
+        >
+            <Reanimated.View style={[styles.exerciseItem, rowStyle]}>
+                <View style={[styles.exerciseAvatar, { backgroundColor: visual.bg }]}>
+                    <Ionicons name={visual.icon} size={22} color={visual.tint} />
+                </View>
+                <View style={styles.exerciseTitleContainer}>
+                    <Text style={styles.exerciseName} numberOfLines={2}>
+                        {exercise.name}
+                    </Text>
+                    {!!exercise.bodyPart && (
+                        <View style={styles.bodyPartChip}>
+                            <View
+                                style={[
+                                    styles.bodyPartDot,
+                                    { backgroundColor: visual.tint },
+                                ]}
+                            />
+                            <Text style={styles.exerciseBodyPart}>
+                                {exercise.bodyPart.toLowerCase()}
+                            </Text>
+                        </View>
+                    )}
+                </View>
+                <TouchableOpacity
+                    onPress={handleToggle}
+                    activeOpacity={0.85}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={isAdded ? `Remove ${exercise.name}` : `Add ${exercise.name}`}
+                >
+                    <Reanimated.View style={[styles.toggleButtonSlot, toggleWrapStyle]}>
+                        <Reanimated.View
+                            pointerEvents="none"
+                            style={[styles.toggleButton, styles.toggleButtonDefault, addBtnStyle]}
+                        >
+                            <Ionicons name="add" size={22} color="#526EFF" />
+                        </Reanimated.View>
+                        <Reanimated.View
+                            pointerEvents="none"
+                            style={[styles.toggleButton, styles.toggleButtonRemove, removeBtnStyle]}
+                        >
+                            <Ionicons name="trash-outline" size={20} color="#FF5252" />
+                        </Reanimated.View>
+                    </Reanimated.View>
+                </TouchableOpacity>
+            </Reanimated.View>
+        </TouchableOpacity>
+    );
+};
+
 interface AddExerciseOverlayProps {
     visible: boolean;
     onClose: () => void;
@@ -102,7 +225,8 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
     const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null); // Store the original exercise for adding
     const [exerciseDetails, setExerciseDetails] = useState<ExerciseDetails | null>(null);
     const [loadingDetails, setLoadingDetails] = useState(false);
-    const [selectedExerciseNames, setSelectedExerciseNames] = useState<Set<string>>(new Set());
+    const [optimisticAddedKeys, setOptimisticAddedKeys] = useState<Set<string>>(new Set());
+    const [optimisticRemovedKeys, setOptimisticRemovedKeys] = useState<Set<string>>(new Set());
     const [bodyPartFilter, setBodyPartFilter] = useState<string | null>(null);
     const loadedForOpenRef = useRef(false);
     const wasVisibleRef = useRef(false);
@@ -130,13 +254,45 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
             setSelectedExerciseId(null);
             setSelectedExercise(null);
             setExerciseDetails(null);
-            setSelectedExerciseNames(new Set());
+            setOptimisticAddedKeys(new Set());
+            setOptimisticRemovedKeys(new Set());
             setBodyPartFilter(null);
         }
 
         loadedForOpenRef.current = false;
         wasVisibleRef.current = false;
     }, [visible]);
+
+    useEffect(() => {
+        if (!visible) return;
+
+        const idSet = new Set(currentExerciseIds);
+        const nameSet = new Set(currentExerciseNames.map((name) => name.trim().toLowerCase()));
+
+        setOptimisticAddedKeys((prev) => {
+            const next = new Set(prev);
+            let changed = false;
+            next.forEach((key) => {
+                if (idSet.has(key) || nameSet.has(key)) {
+                    next.delete(key);
+                    changed = true;
+                }
+            });
+            return changed ? next : prev;
+        });
+
+        setOptimisticRemovedKeys((prev) => {
+            const next = new Set(prev);
+            let changed = false;
+            next.forEach((key) => {
+                if (!idSet.has(key) && !nameSet.has(key)) {
+                    next.delete(key);
+                    changed = true;
+                }
+            });
+            return changed ? next : prev;
+        });
+    }, [visible, currentExerciseIds, currentExerciseNames]);
 
     // Search exercises when search query changes (skip the initial empty query on open).
     useEffect(() => {
@@ -318,27 +474,17 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
         if (onSelectExerciseAndNavigate) {
             onSelectExerciseAndNavigate(selectedExercise, newExercise, [newExercise], 0);
         } else {
+            const keys = exerciseMatchKeys(selectedExercise);
+            setOptimisticAddedKeys((prev) => new Set([...prev, ...keys]));
+            setOptimisticRemovedKeys((prev) => {
+                const next = new Set(prev);
+                keys.forEach((key) => next.delete(key));
+                return next;
+            });
             onSelectExercise(selectedExercise);
         }
         onSelectionCommitted?.(1);
-
-        // Animate out before closing
-        Animated.parallel([
-            Animated.timing(slideAnim, {
-                toValue: SCREEN_HEIGHT,
-                duration: 300,
-                easing: Easing.out(Easing.cubic),
-                useNativeDriver: true,
-            }),
-            Animated.timing(backdropOpacity, {
-                toValue: 0,
-                duration: 250,
-                easing: Easing.out(Easing.ease),
-                useNativeDriver: true,
-            }),
-        ]).start(() => {
-            onClose();
-        });
+        handleBackFromDetail();
     };
 
     const handleBackFromDetail = () => {
@@ -351,17 +497,28 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
     };
 
     const handleAddExercise = (exercise: Exercise) => {
-        const key = exercise.name.trim().toLowerCase();
-        setSelectedExerciseNames((prev) => {
+        const keys = exerciseMatchKeys(exercise);
+        setOptimisticAddedKeys((prev) => new Set([...prev, ...keys]));
+        setOptimisticRemovedKeys((prev) => {
             const next = new Set(prev);
-            if (next.has(key)) {
-                next.delete(key);
-            } else {
-                next.add(key);
-            }
+            keys.forEach((key) => next.delete(key));
             return next;
         });
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onSelectExercise(exercise);
+        onSelectionCommitted?.(1);
+    };
+
+    const handleRemoveAddedExercise = (exercise: Exercise) => {
+        const keys = exerciseMatchKeys(exercise);
+        setOptimisticRemovedKeys((prev) => new Set([...prev, ...keys]));
+        setOptimisticAddedKeys((prev) => {
+            const next = new Set(prev);
+            keys.forEach((key) => next.delete(key));
+            return next;
+        });
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onRemoveExercise?.(exercise);
     };
 
     const animateOutAndClose = () => {
@@ -383,34 +540,23 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
         });
     };
 
-    const handleConfirmSelectedExercises = () => {
-        if (selectedExerciseNames.size === 0) return;
-
-        const selectedItems = displayedExercises.filter((exercise) =>
-            selectedExerciseNames.has(exercise.name.trim().toLowerCase())
-        );
-
-        if (selectedItems.length === 0) {
-            return;
-        }
-
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        selectedItems.forEach((exercise) => {
-            onSelectExercise(exercise);
-        });
-        onSelectionCommitted?.(selectedItems.length);
-
-        animateOutAndClose();
-    };
-
     // Use exercises directly from Supabase (already filtered server-side when searching)
     const displayedExercises = exercises;
     const currentExerciseIdSet = new Set(currentExerciseIds);
     const currentExerciseNameSet = new Set(
         currentExerciseNames.map((name) => name.trim().toLowerCase())
     );
-    const selectedCount = selectedExerciseNames.size;
-    const floatingButtonBottom = Math.max(insets.bottom - 15, 4);
+
+    const isExerciseAdded = (exercise: Exercise) => {
+        const keys = exerciseMatchKeys(exercise);
+        if (keys.some((key) => optimisticRemovedKeys.has(key))) return false;
+        if (keys.some((key) => optimisticAddedKeys.has(key))) return true;
+        const nameKey = exercise.name?.trim().toLowerCase();
+        return (
+            (!!exercise.id && currentExerciseIdSet.has(exercise.id)) ||
+            (!!nameKey && currentExerciseNameSet.has(nameKey))
+        );
+    };
 
     // Body-part filter chips derived from whatever is currently loaded.
     const availableBodyParts = Array.from(
@@ -663,10 +809,7 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
                                         <ScrollView
                                             ref={scrollViewRef}
                                             style={styles.scrollView}
-                                            contentContainerStyle={[
-                                                styles.scrollContent,
-                                                selectedCount > 0 ? { paddingBottom: 88 + floatingButtonBottom } : null,
-                                            ]}
+                                            contentContainerStyle={styles.scrollContent}
                                             showsVerticalScrollIndicator={false}
                                             onScroll={handleScroll}
                                             scrollEventThrottle={400}
@@ -694,76 +837,16 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
                                                         {hasMore && !bodyPartFilter ? '+' : ''}{' '}
                                                         {filteredExercises.length === 1 ? 'exercise' : 'exercises'}
                                                     </Text>
-                                                    {filteredExercises.map((exercise, index) => {
-                                                        const exerciseNameKey = exercise.name?.trim().toLowerCase();
-                                                        const isAlreadyAdded = (!!exercise.id && currentExerciseIdSet.has(exercise.id))
-                                                            || (!!exerciseNameKey && currentExerciseNameSet.has(exerciseNameKey));
-                                                        const isSelected =
-                                                            !!exerciseNameKey && selectedExerciseNames.has(exerciseNameKey);
-                                                        const visual = getBodyPartVisual(exercise.bodyPart);
-                                                        return (
-                                                            <TouchableOpacity
-                                                                key={`exercise-${index}-${exercise.id || exercise.name || 'item'}`}
-                                                                style={[
-                                                                    styles.exerciseItem,
-                                                                    isSelected && styles.exerciseItemSelected,
-                                                                    isAlreadyAdded && styles.exerciseItemAdded,
-                                                                ]}
-                                                                onPress={() => handleExerciseTitlePress(exercise)}
-                                                                activeOpacity={0.85}
-                                                            >
-                                                                <View style={[styles.exerciseAvatar, { backgroundColor: visual.bg }]}>
-                                                                    <Ionicons name={visual.icon} size={22} color={visual.tint} />
-                                                                </View>
-                                                                <View style={styles.exerciseTitleContainer}>
-                                                                    <Text style={styles.exerciseName} numberOfLines={2}>
-                                                                        {exercise.name}
-                                                                    </Text>
-                                                                    {!!exercise.bodyPart && (
-                                                                        <View style={styles.bodyPartChip}>
-                                                                            <View
-                                                                                style={[
-                                                                                    styles.bodyPartDot,
-                                                                                    { backgroundColor: visual.tint },
-                                                                                ]}
-                                                                            />
-                                                                            <Text style={styles.exerciseBodyPart}>
-                                                                                {exercise.bodyPart.toLowerCase()}
-                                                                            </Text>
-                                                                        </View>
-                                                                    )}
-                                                                </View>
-                                                                {isAlreadyAdded ? (
-                                                                    <TouchableOpacity
-                                                                        style={[styles.toggleButton, styles.toggleButtonRemove]}
-                                                                        onPress={() => onRemoveExercise?.(exercise)}
-                                                                        activeOpacity={0.7}
-                                                                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                                                                    >
-                                                                        <Ionicons name="trash-outline" size={20} color="#FF5252" />
-                                                                    </TouchableOpacity>
-                                                                ) : (
-                                                                    <TouchableOpacity
-                                                                        style={[
-                                                                            styles.toggleButton,
-                                                                            isSelected
-                                                                                ? styles.toggleButtonSelected
-                                                                                : styles.toggleButtonDefault,
-                                                                        ]}
-                                                                        onPress={() => handleAddExercise(exercise)}
-                                                                        activeOpacity={0.7}
-                                                                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                                                                    >
-                                                                        <Ionicons
-                                                                            name={isSelected ? 'checkmark' : 'add'}
-                                                                            size={22}
-                                                                            color={isSelected ? '#FFFFFF' : '#526EFF'}
-                                                                        />
-                                                                    </TouchableOpacity>
-                                                                )}
-                                                            </TouchableOpacity>
-                                                        );
-                                                    })}
+                                                    {filteredExercises.map((exercise, index) => (
+                                                        <AnimatedExerciseRow
+                                                            key={`exercise-${index}-${exercise.id || exercise.name || 'item'}`}
+                                                            exercise={exercise}
+                                                            isAdded={isExerciseAdded(exercise)}
+                                                            onOpen={() => handleExerciseTitlePress(exercise)}
+                                                            onAdd={() => handleAddExercise(exercise)}
+                                                            onRemove={() => handleRemoveAddedExercise(exercise)}
+                                                        />
+                                                    ))}
                                                     {loadingMore && (
                                                         <View style={styles.loadingMoreContainer}>
                                                             <ActivityIndicator size="small" color="#526EFF" />
@@ -773,23 +856,6 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
                                                 </>
                                             )}
                                         </ScrollView>
-                                    )}
-                                    {selectedCount > 0 && !loading && (
-                                        <View
-                                            style={[
-                                                styles.floatingAddSelectedContainer,
-                                                { bottom: floatingButtonBottom },
-                                            ]}
-                                            pointerEvents="box-none"
-                                        >
-                                            <Button
-                                                title={`add selected (${selectedCount})`}
-                                                onPress={handleConfirmSelectedExercises}
-                                                containerStyle={styles.floatingAddSelectedButtonContainer}
-                                                buttonBodyStyle={styles.floatingAddSelectedButtonBody}
-                                                textStyle={styles.floatingAddSelectedButtonText}
-                                            />
-                                        </View>
                                     )}
                                 </View>
                             )}
@@ -873,22 +939,6 @@ const styles = StyleSheet.create({
         borderWidth: 2,
         borderColor: '#CCCCCC',
     },
-    floatingAddSelectedContainer: {
-        position: 'absolute',
-        left: 20,
-        right: 20,
-    },
-    floatingAddSelectedButtonContainer: {
-        width: '100%',
-    },
-    floatingAddSelectedButtonBody: {
-        width: '100%',
-        marginTop: 0,
-        marginBottom: 0,
-    },
-    floatingAddSelectedButtonText: {
-        color: '#FFFFFF',
-    },
     searchIcon: {
         marginRight: 12,
     },
@@ -922,12 +972,14 @@ const styles = StyleSheet.create({
         marginTop: 4,
         marginBottom: 12,
     },
+    exerciseItemHit: {
+        marginBottom: 10,
+    },
     exerciseItem: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: 12,
         paddingHorizontal: 12,
-        marginBottom: 10,
         backgroundColor: '#FFFFFF',
         borderRadius: 16,
         borderWidth: 2,
@@ -976,7 +1028,14 @@ const styles = StyleSheet.create({
         color: '#757575',
         textTransform: 'lowercase',
     },
+    toggleButtonSlot: {
+        width: 40,
+        height: 40,
+    },
     toggleButton: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
         width: 40,
         height: 40,
         borderRadius: 20,

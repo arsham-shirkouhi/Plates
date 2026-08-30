@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 16,
-        backgroundColor: WORKOUT_COLORS.background,
+        backgroundColor: 'transparent',
     },
     sideSlot: {
         width: SIDE_SLOT,

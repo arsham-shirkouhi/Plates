@@ -14,7 +14,9 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Reanimated, {
     Easing,
-    FadeOut,
+    FadeInDown,
+    FadeOutLeft,
+    FadeOutRight,
     Keyframe,
     LinearTransition,
 } from 'react-native-reanimated';
@@ -46,18 +48,9 @@ const cardLayout = LinearTransition.duration(SWAP_DURATION).easing(
     Easing.inOut(Easing.cubic)
 );
 
-/** Quick-add pop: start a bit large, shrink into place. */
-const cardPopIn = new Keyframe({
-    0: {
-        opacity: 0,
-        transform: [{ scale: 1.12 }],
-    },
-    100: {
-        opacity: 1,
-        transform: [{ scale: 1 }],
-        easing: Easing.out(Easing.cubic),
-    },
-}).duration(220);
+const cardEnter = FadeInDown.duration(280).easing(Easing.out(Easing.cubic));
+const cardExit = FadeOutRight.duration(220).easing(Easing.in(Easing.cubic));
+const recExit = FadeOutLeft.duration(200).easing(Easing.in(Easing.cubic));
 
 /** Recommended rows land one at a time after the screen arrives. */
 const recEnter = new Keyframe({
@@ -315,6 +308,7 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
     );
 
     const removeExercise = useCallback((exercise: WorkoutExercise) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setAdded((current) => current.filter((item) => item !== exercise));
         setRecommended((current) => [exercise, ...current]);
     }, []);
@@ -411,55 +405,57 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
-                    {added.length > 0 ? (
-                        <View style={styles.section}>
+                    <View>
+                        {added.length > 0 ? (
                             <Text style={styles.sectionHeading}>your workout</Text>
-                            {added.map((item, index) => (
-                                <AddedCard
-                                    key={item.id}
-                                    item={item}
-                                    isEditing={editingIds.has(item.id)}
-                                    canMoveUp={index > 0 && !swapping}
-                                    canMoveDown={index < added.length - 1 && !swapping}
-                                    onMoveUp={() => moveExercise(index, -1)}
-                                    onMoveDown={() => moveExercise(index, 1)}
-                                    onToggleEdit={() => toggleEditing(item.id)}
-                                    onRemove={() => removeExercise(item)}
-                                    onChangeSets={(delta) => changeSets(item, delta)}
-                                    onChangeReps={(delta) => changeReps(item, delta)}
-                                    onChangeRest={(delta) => changeRest(item, delta)}
-                                />
-                            ))}
-                        </View>
-                    ) : null}
+                        ) : null}
+                        {added.map((item, index) => (
+                            <AddedCard
+                                key={item.id}
+                                item={item}
+                                isEditing={editingIds.has(item.id)}
+                                canMoveUp={index > 0 && !swapping}
+                                canMoveDown={index < added.length - 1 && !swapping}
+                                onMoveUp={() => moveExercise(index, -1)}
+                                onMoveDown={() => moveExercise(index, 1)}
+                                onToggleEdit={() => toggleEditing(item.id)}
+                                onRemove={() => removeExercise(item)}
+                                onChangeSets={(delta) => changeSets(item, delta)}
+                                onChangeReps={(delta) => changeReps(item, delta)}
+                                onChangeRest={(delta) => changeRest(item, delta)}
+                            />
+                        ))}
+                    </View>
 
-                    {recommended.length > 0 ? (
-                        <View style={styles.section}>
+                    <View>
+                        {visibleRecommended.length > 0 ? (
                             <Text style={styles.sectionHeading}>recommended</Text>
-                            {visibleRecommended.map((item) => (
-                                <Reanimated.View
-                                    key={item.id}
-                                    entering={recEnter}
+                        ) : null}
+                        {visibleRecommended.map((item) => (
+                            <Reanimated.View
+                                key={item.id}
+                                layout={cardLayout}
+                                entering={recEnter}
+                                exiting={recExit}
+                            >
+                                <TouchableOpacity
+                                    style={styles.row}
+                                    onPress={() => addExercise(item)}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={`Add ${item.name}`}
+                                    activeOpacity={0.6}
                                 >
-                                    <TouchableOpacity
-                                        style={styles.row}
-                                        onPress={() => addExercise(item)}
-                                        accessibilityRole="button"
-                                        accessibilityLabel={`Add ${item.name}`}
-                                        activeOpacity={0.6}
-                                    >
-                                        <View style={styles.rowCopy}>
-                                            <Text style={styles.rowTitle}>{item.name.toLowerCase()}</Text>
-                                            <Text style={styles.rowMeta}>{formatExerciseMeta(item)}</Text>
-                                        </View>
-                                        <View style={styles.addButton}>
-                                            <Ionicons name="add" size={28} color={WORKOUT_COLORS.accent} />
-                                        </View>
-                                    </TouchableOpacity>
-                                </Reanimated.View>
-                            ))}
-                        </View>
-                    ) : null}
+                                    <View style={styles.rowCopy}>
+                                        <Text style={styles.rowTitle}>{item.name.toLowerCase()}</Text>
+                                        <Text style={styles.rowMeta}>{formatExerciseMeta(item)}</Text>
+                                    </View>
+                                    <View style={styles.addButton}>
+                                        <Ionicons name="add" size={28} color={WORKOUT_COLORS.accent} />
+                                    </View>
+                                </TouchableOpacity>
+                            </Reanimated.View>
+                        ))}
+                    </View>
                 </ScrollView>
 
                 {isSearching ? (
@@ -545,8 +541,8 @@ function AddedCard({
     return (
         <Reanimated.View
             layout={cardLayout}
-            entering={cardPopIn}
-            exiting={FadeOut.duration(160)}
+            entering={cardEnter}
+            exiting={cardExit}
             style={styles.addedCard}
         >
             <View style={styles.addedAccent} />

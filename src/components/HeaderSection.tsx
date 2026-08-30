@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { fonts } from '../constants/fonts';
@@ -8,6 +8,8 @@ interface HeaderSectionProps {
     streak: number;
     topInset?: number;
     onProfilePress?: (origin: ProfileIconOrigin) => void;
+    onDatePress?: () => void;
+    calendarOpen?: boolean;
     hideProfile?: boolean;
 }
 
@@ -15,12 +17,28 @@ export const HeaderSection: React.FC<HeaderSectionProps> = ({
     streak,
     topInset = 0,
     onProfilePress,
+    onDatePress,
+    calendarOpen = false,
     hideProfile = false,
 }) => {
     // Animation values for circle positions
     const profileCircleLeft = useRef(new Animated.Value(0)).current;
     const greenCircleLeft = useRef(new Animated.Value(10)).current;
     const profileCircleRef = useRef<View>(null);
+    const chevronRotate = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.timing(chevronRotate, {
+            toValue: calendarOpen ? 1 : 0,
+            duration: 200,
+            useNativeDriver: true,
+        }).start();
+    }, [calendarOpen, chevronRotate]);
+
+    const chevronSpin = chevronRotate.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['0deg', '180deg'],
+    });
 
     const handlePressIn = () => {
         // Animate circles to stack on blue circle (at left: 20)
@@ -74,10 +92,17 @@ export const HeaderSection: React.FC<HeaderSectionProps> = ({
                     <Text style={styles.streakLabel}>
                         keep your <Text style={styles.streakNumber}>{streak}</Text> day streak!
                     </Text>
-                    <View style={styles.dateRow}>
+                    <TouchableOpacity
+                        style={styles.dateRow}
+                        onPress={onDatePress}
+                        activeOpacity={0.7}
+                        disabled={!onDatePress}
+                    >
                         <Text style={styles.dateText}>today</Text>
-                        <Ionicons name="chevron-down" size={20} color="#fff" style={styles.chevron} />
-                    </View>
+                        <Animated.View style={[styles.chevron, { transform: [{ rotate: chevronSpin }] }]}>
+                            <Ionicons name="chevron-down" size={20} color="#fff" />
+                        </Animated.View>
+                    </TouchableOpacity>
                 </View>
 
                 {/* User icon */}

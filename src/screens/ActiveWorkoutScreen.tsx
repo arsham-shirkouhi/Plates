@@ -38,6 +38,7 @@ export const ActiveWorkoutScreen: React.FC = () => {
         state,
         startWorkout,
         addExercises,
+        removeExercise,
         expand,
         wrapUpSummary,
         requestWrapUp,
@@ -170,7 +171,22 @@ export const ActiveWorkoutScreen: React.FC = () => {
     }, [startWorkoutPrompt, state.workout, mergeParams]);
 
     const handleSelectExercise = (exercise: { id: string; name: string }) => {
+        const alreadyAdded = state.workout?.exercises.some(
+            (item) =>
+                item.exerciseId === exercise.id ||
+                item.name.trim().toLowerCase() === exercise.name.trim().toLowerCase()
+        );
+        if (alreadyAdded) return;
         addExercises([{ exerciseId: exercise.id, name: exercise.name }]);
+    };
+
+    const handleRemoveExercise = (exercise: { id: string; name: string }) => {
+        const match = state.workout?.exercises.find(
+            (item) =>
+                item.exerciseId === exercise.id ||
+                item.name.trim().toLowerCase() === exercise.name.trim().toLowerCase()
+        );
+        if (match) removeExercise(match.id);
     };
 
     const handleStartFromRoutine = useCallback(
@@ -242,6 +258,7 @@ export const ActiveWorkoutScreen: React.FC = () => {
                         visible={showAddExerciseOverlay}
                         onClose={() => setShowAddExerciseOverlay(false)}
                         onSelectExercise={handleSelectExercise}
+                        onRemoveExercise={handleRemoveExercise}
                         currentExerciseIds={state.workout.exercises.map((exercise) => exercise.exerciseId)}
                         currentExerciseNames={state.workout.exercises.map((exercise) => exercise.name)}
                     />

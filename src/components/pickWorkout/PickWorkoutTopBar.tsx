@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: padding,
         paddingVertical: padding,
-        backgroundColor: WORKOUT_COLORS.background,
+        backgroundColor: 'transparent',
     },
     sideLeft: {
         flex: 1,
