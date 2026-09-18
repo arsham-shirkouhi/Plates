@@ -189,6 +189,8 @@ simulator (needs Xcode), `a` = Android emulator.
 - **2026-09-17 — Codex:** Fixed Supabase client validation to accept modern `sb_publishable_...` keys (the prior JWT-only check triggered Expo's error overlay); rebuilt the iOS bundle successfully and restarted Expo on port 8081. `.env` still uses `NEXT_PUBLIC_*` names, so the Terminal launch supplies temporary Expo-compatible aliases.
 - **2026-09-17 — Codex:** Supabase Auth works but the remote `users` table is missing the self-insert RLS policy. Added non-destructive `supabase-users-rls-policy.sql`; Harry must run it once in the Supabase SQL Editor, then reload Expo. No commit.
 - **2026-09-17 — Codex:** Fixed workout-start overlay regression after the SDK 57 upgrade: RN 0.85+ removed `StyleSheet.absoluteFillObject`, so replaced its 27 app usages with `StyleSheet.absoluteFill`; iOS bundle builds, Expo restarted on port 8081. No commit.
+- **2026-09-17 — Codex:** Corrected `.env` Supabase keys to Expo's `EXPO_PUBLIC_*` names. Another process committed the feature as `423da65` and switched to `main`; restored the clean checkout to `feature/workoutx-api-integration` and restarted Expo from that branch.
+- **2026-09-17 — Codex:** Researched food data options: recommend USDA FoodData Central for canonical nutrients plus Edamam server-side for recipe/NLP nutrition and allergy-filtered recipes; use Open Food Facts only as barcode/label enrichment with conservative allergy handling, never as a guarantee. No implementation yet.
 
 ## 10. What to do next (as of the top of §9)
 
