@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
         overflow: 'visible',
     },
     backdrop: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
     },
     card: {
         backgroundColor: '#FFFFFF',
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
         overflow: 'visible',
     },
     pressShadow: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
         backgroundColor: '#252525',
         borderRadius: 10,
         transform: [{ translateY: SHADOW_OFFSET }],

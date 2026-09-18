@@ -500,7 +500,7 @@ const styles = StyleSheet.create({
         padding: 24,
     },
     bodyAreaModalBackdrop: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
         backgroundColor: 'rgba(37, 37, 37, 0.45)',
     },
     bodyAreaModalCard: {

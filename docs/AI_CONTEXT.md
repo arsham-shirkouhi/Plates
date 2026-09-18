@@ -183,6 +183,12 @@ simulator (needs Xcode), `a` = Android emulator.
 - **2026-09-17 — Claude:** Harry back after a break. Supabase creds
   received. Next up: full local smoke test (§5), report bugs, patch on this
   branch. **Do not commit yet.**
+- **2026-09-17 — Codex:** Read the supplied context materials, confirmed the WorkoutX public key/base URL are configured, opened the workspace in VS Code, and started Expo on local port 8081 for Harry to smoke-test; Supabase variables are currently absent from `.env`.
+- **2026-09-17 — Codex:** Harry added Supabase values under `NEXT_PUBLIC_*` names; Expo is currently running on LAN port 8081 with temporary `EXPO_PUBLIC_*` aliases, but `.env` should be renamed to the Expo variable names before the next restart.
+- **2026-09-17 — Codex:** Upgraded Expo SDK 54 → 57 (RN 0.86.3), migrated legacy splash config to `expo-splash-screen`, regenerated Android, and verified an iOS Expo bundle builds; Expo is running on port 8081 with a QR code in Terminal. No commit. Expo Doctor retains only the standard native-directory/CNG sync notice; `tsc` has many pre-existing app-wide errors to address separately.
+- **2026-09-17 — Codex:** Fixed Supabase client validation to accept modern `sb_publishable_...` keys (the prior JWT-only check triggered Expo's error overlay); rebuilt the iOS bundle successfully and restarted Expo on port 8081. `.env` still uses `NEXT_PUBLIC_*` names, so the Terminal launch supplies temporary Expo-compatible aliases.
+- **2026-09-17 — Codex:** Supabase Auth works but the remote `users` table is missing the self-insert RLS policy. Added non-destructive `supabase-users-rls-policy.sql`; Harry must run it once in the Supabase SQL Editor, then reload Expo. No commit.
+- **2026-09-17 — Codex:** Fixed workout-start overlay regression after the SDK 57 upgrade: RN 0.85+ removed `StyleSheet.absoluteFillObject`, so replaced its 27 app usages with `StyleSheet.absoluteFill`; iOS bundle builds, Expo restarted on port 8081. No commit.
 
 ## 10. What to do next (as of the top of §9)
 

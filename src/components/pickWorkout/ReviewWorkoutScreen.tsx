@@ -831,7 +831,7 @@ const styles = StyleSheet.create({
         position: 'relative',
     },
     searchOverlay: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
         zIndex: 30,
         elevation: 30,
         paddingHorizontal: padding,
