@@ -4,13 +4,34 @@ import {
     getMockExercisesPage,
     searchMockExercises,
 } from '../workout/mockWorkoutData';
+import {
+    fetchExercises as workoutxFetchExercises,
+    fetchExerciseById as workoutxFetchExerciseById,
+    fetchExercisesByBodyPart as workoutxFetchExercisesByBodyPart,
+    fetchExercisesByName as workoutxFetchExercisesByName,
+    isWorkoutXConfigured,
+    WorkoutXError,
+} from './workoutxClient';
+import { WorkoutXExercise } from '../types/workoutx';
+import { workoutxBodyPartsForMuscle, MuscleGroup } from '../workout/muscleGroups';
 
 export interface Exercise {
     id: string;
     name: string;
     bodyPart?: string;
+    /** Optional inline thumbnail from WorkoutX (same URL as gifUrl). */
+    gifUrl?: string;
+    /** Optional target muscle from WorkoutX. */
+    target?: string;
+    /** Optional equipment from WorkoutX. */
+    equipment?: string;
 }
 
+/**
+ * Detailed view of an exercise. Legacy Supabase-shaped fields (Title/Desc/…)
+ * are preserved so existing UI keeps working; new WorkoutX-shaped fields
+ * (gifUrl/target/equipment/instructions/secondaryMuscles) are additive.
+ */
 export interface ExerciseDetails {
     id: string;
     Title: string;
@@ -19,6 +40,12 @@ export interface ExerciseDetails {
     BodyPart?: string;
     Equipment?: string;
     Level?: string;
+    // --- WorkoutX additions ---
+    gifUrl?: string;
+    target?: string;
+    equipment?: string;
+    instructions?: string[];
+    secondaryMuscles?: string[];
 }
 
 /** When Supabase has no exercises table, skip network and use mock catalog. */
@@ -107,12 +134,62 @@ function mapRemoteRows(data: unknown[]): Exercise[] {
         }));
 }
 
+// -------------------- WorkoutX adapters --------------------
+
+function workoutxToExercise(row: WorkoutXExercise): Exercise {
+    return {
+        id: String(row.id),
+        name: (row.name ?? '').toLowerCase(),
+        bodyPart: row.bodyPart ?? '',
+        gifUrl: row.gifUrl,
+        target: row.target,
+        equipment: row.equipment,
+    };
+}
+
+function workoutxToDetails(row: WorkoutXExercise): ExerciseDetails {
+    const name = row.name ?? '';
+    return {
+        id: String(row.id),
+        Title: name,
+        Desc: Array.isArray(row.instructions) ? row.instructions.join('\n\n') : '',
+        Type: row.difficulty ?? '',
+        BodyPart: row.bodyPart ?? '',
+        Equipment: row.equipment ?? '',
+        Level: row.difficulty ?? '',
+        gifUrl: row.gifUrl,
+        target: row.target,
+        equipment: row.equipment,
+        instructions: Array.isArray(row.instructions) ? row.instructions : [],
+        secondaryMuscles: Array.isArray(row.secondaryMuscles) ? row.secondaryMuscles : [],
+    };
+}
+
+function logWorkoutXFailure(op: string, err: unknown): void {
+    if (err instanceof WorkoutXError) {
+        console.warn(`[exerciseService] WorkoutX ${op} failed (${err.kind}${err.status ? ` ${err.status}` : ''}): ${err.message}`);
+    } else {
+        console.warn(`[exerciseService] WorkoutX ${op} failed:`, err);
+    }
+}
+
+// -------------------- public API --------------------
+
 /**
- * Fetch exercises from the exercises table with pagination
- * @param limit - Number of exercises to fetch (default: 20)
- * @param offset - Number of exercises to skip (default: 0)
+ * Fetch a page of exercises. Prefers WorkoutX; falls back to Supabase, then
+ * to the local mock catalog.
  */
 export const getExercisesList = async (limit: number = 20, offset: number = 0): Promise<Exercise[]> => {
+    if (isWorkoutXConfigured()) {
+        try {
+            const rows = await workoutxFetchExercises(limit, offset);
+            if (rows.length > 0) return rows.map(workoutxToExercise);
+        } catch (err) {
+            logWorkoutXFailure('getExercisesList', err);
+            // fall through to Supabase / mock
+        }
+    }
+
     if (exercisesRemoteStatus === 'unavailable') {
         return getMockExercisesPage(limit, offset);
     }
@@ -154,9 +231,62 @@ export const getExercisesList = async (limit: number = 20, offset: number = 0): 
 };
 
 /**
- * Search exercises by name
+ * Fetch exercises for a given WorkoutX body part (e.g. "chest", "upper arms").
+ * Returns [] if WorkoutX is not configured or the call fails.
+ */
+export const getExercisesByBodyPart = async (
+    bodyPart: string,
+    limit: number = 50,
+    offset: number = 0
+): Promise<Exercise[]> => {
+    if (!isWorkoutXConfigured()) return [];
+    try {
+        const rows = await workoutxFetchExercisesByBodyPart(bodyPart, limit, offset);
+        return rows.map(workoutxToExercise);
+    } catch (err) {
+        logWorkoutXFailure(`getExercisesByBodyPart(${bodyPart})`, err);
+        return [];
+    }
+};
+
+/**
+ * Fetch exercises for one of the app's internal muscle groups. Fans out to
+ * one or more WorkoutX `bodyPart` queries and de-duplicates the results.
+ */
+export const getExercisesForMuscleGroup = async (
+    group: MuscleGroup,
+    perBodyPartLimit: number = 50
+): Promise<Exercise[]> => {
+    const bodyParts = workoutxBodyPartsForMuscle(group);
+    if (bodyParts.length === 0) return [];
+    const results = await Promise.all(
+        bodyParts.map((bp) => getExercisesByBodyPart(bp, perBodyPartLimit, 0))
+    );
+    const seen = new Set<string>();
+    const merged: Exercise[] = [];
+    for (const bucket of results) {
+        for (const ex of bucket) {
+            if (seen.has(ex.id)) continue;
+            seen.add(ex.id);
+            merged.push(ex);
+        }
+    }
+    return merged;
+};
+
+/**
+ * Search exercises by name.
  */
 export const searchExercises = async (query: string): Promise<Exercise[]> => {
+    if (isWorkoutXConfigured() && query.trim().length > 0) {
+        try {
+            const rows = await workoutxFetchExercisesByName(query.trim().toLowerCase());
+            if (rows.length > 0) return rows.map(workoutxToExercise);
+        } catch (err) {
+            logWorkoutXFailure(`searchExercises(${query})`, err);
+        }
+    }
+
     if (exercisesRemoteStatus === 'unavailable') {
         return searchMockExercises(query);
     }
@@ -196,9 +326,19 @@ export const searchExercises = async (query: string): Promise<Exercise[]> => {
 };
 
 /**
- * Get full exercise details by ID
+ * Get full exercise details by ID. Prefers WorkoutX; falls back to Supabase,
+ * then to the local mock catalog.
  */
 export const getExerciseDetails = async (exerciseId: string): Promise<ExerciseDetails | null> => {
+    if (isWorkoutXConfigured()) {
+        try {
+            const row = await workoutxFetchExerciseById(exerciseId);
+            if (row) return workoutxToDetails(row);
+        } catch (err) {
+            logWorkoutXFailure(`getExerciseDetails(${exerciseId})`, err);
+        }
+    }
+
     if (exercisesRemoteStatus === 'unavailable') {
         return getMockExerciseDetails(exerciseId);
     }

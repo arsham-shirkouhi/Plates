@@ -318,13 +318,13 @@ export const WorkoutCountdownOverlay: React.FC<WorkoutCountdownOverlayProps> = (
 
 const styles = StyleSheet.create({
     root: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
         zIndex: 40,
         elevation: 40,
         overflow: 'hidden',
     },
     cover: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
         backgroundColor: '#FFFFFF',
         alignItems: 'center',
         justifyContent: 'center',
@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
     },
     plateShadow: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
         borderRadius: PLATE_SIZE / 2,
         backgroundColor: 'transparent',
         shadowColor: '#000000',
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
         elevation: 8,
     },
     plateEdge: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
         borderRadius: PLATE_SIZE / 2,
         backgroundColor: '#000000',
         transform: [{ translateX: 4 }, { translateY: 5 }],

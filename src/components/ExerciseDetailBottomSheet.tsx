@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
         height: '100%',
     },
     backdrop: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
         backgroundColor: 'rgba(0, 0, 0, 0.4)',
     },
     backdropTouchable: {

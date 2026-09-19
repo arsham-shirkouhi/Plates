@@ -1,4 +1,8 @@
-import { Exercise, getExercisesList } from './exerciseService';
+import {
+    Exercise,
+    getExercisesList,
+    getExercisesForMuscleGroup,
+} from './exerciseService';
 import { getCompletedWorkouts } from './workoutHistoryService';
 import { mapBodyPartToMuscleGroup, MuscleGroup } from '../workout/muscleGroups';
 import { buildWorkoutTitleFromGroups } from '../workout/muscleSelectSelectors';
@@ -79,6 +83,36 @@ function libraryForMuscle(muscle: MuscleGroup, library: Exercise[]): Exercise[] 
     return library.filter((exercise) => mapBodyPartToMuscleGroup(exercise.bodyPart, exercise.name) === muscle);
 }
 
+/**
+ * Build a per-muscle exercise library. For each selected muscle group we call
+ * WorkoutX's body-part-filtered endpoint (via getExercisesForMuscleGroup) in
+ * parallel; if that returns nothing we fall back to the generic pool.
+ */
+async function buildLibraryForGroups(selectedGroups: MuscleGroup[]): Promise<Exercise[]> {
+    const perGroup = await Promise.all(
+        selectedGroups.map(async (group) => {
+            const list = await getExercisesForMuscleGroup(group, 40);
+            return list;
+        })
+    );
+
+    const merged: Exercise[] = [];
+    const seen = new Set<string>();
+    for (const bucket of perGroup) {
+        for (const ex of bucket) {
+            if (seen.has(ex.id)) continue;
+            seen.add(ex.id);
+            merged.push(ex);
+        }
+    }
+
+    if (merged.length > 0) return merged;
+
+    // Fallback: broad list from WorkoutX / Supabase / mocks.
+    const broad = await getExercisesList(100, 0);
+    return broad.length > 0 ? broad : MOCK_EXERCISES;
+}
+
 export async function countExercisesForMuscleGroups(
     selectedGroups: MuscleGroup[],
     userId?: string | null
@@ -94,8 +128,7 @@ export async function assembleExerciseTemplates(
     if (selectedGroups.length === 0) return [];
 
     const frequency = await buildExerciseFrequency(userId);
-    const remoteLibrary = await getExercisesList(100, 0);
-    const library = remoteLibrary.length > 0 ? remoteLibrary : MOCK_EXERCISES;
+    const library = await buildLibraryForGroups(selectedGroups);
 
     const picked: MockExerciseTemplate[] = [];
     const pickedIds = new Set<string>();
