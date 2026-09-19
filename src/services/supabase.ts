@@ -51,35 +51,17 @@ if (supabaseUrl && !supabaseUrl.startsWith('https://')) {
     console.error('');
 }
 
-// Validate anon key format (should be a JWT-like string)
-if (supabaseAnonKey && !supabaseAnonKey.startsWith('eyJ')) {
-    console.error('');
-    console.error('⚠️ WARNING: Supabase anon key format looks unusual');
-    console.error('   Expected: Key should start with "eyJ" (JWT format)');
-    console.error('   Current: Key starts with:', supabaseAnonKey.substring(0, 15) + '...');
-    console.error('');
-    
-    // Check for common mistakes
-    if (supabaseAnonKey.startsWith('sb_publish')) {
-        console.error('   ❌ "sb_publish" is NOT the anon key!');
-        console.error('   This looks like a publishable key from a different service.');
-        console.error('');
-    } else if (supabaseAnonKey.startsWith('sb_')) {
-        console.error('   ❌ Keys starting with "sb_" are not Supabase anon keys');
-        console.error('');
+// Supabase supports both legacy JWT anon keys and current publishable keys.
+const isSupportedPublicKey = (key: string): boolean =>
+    key.startsWith('eyJ') || key.startsWith('sb_publishable_');
+
+if (supabaseAnonKey && !isSupportedPublicKey(supabaseAnonKey)) {
+    // Keep this a warning: validation must not turn an otherwise usable app
+    // startup into an Expo red-screen error.
+    console.warn('⚠️ Supabase public key format looks unusual. Expected a legacy anon key (eyJ...) or publishable key (sb_publishable_...).');
+    if (supabaseAnonKey.startsWith('sb_secret_')) {
+        console.warn('❌ Supabase secret keys must never be used in a mobile app. Use the publishable key instead.');
     }
-    
-    console.error('   📝 HOW TO GET THE CORRECT KEY:');
-    console.error('   1. Go to https://app.supabase.com');
-    console.error('   2. Select your project');
-    console.error('   3. Go to Settings > API');
-    console.error('   4. Look for "Project API keys" section');
-    console.error('   5. Copy the "anon" or "anon public" key (starts with "eyJ...")');
-    console.error('   6. DO NOT use "service_role" key (that\'s secret!)');
-    console.error('');
-    console.error('   ⚠️ If this was working before, your key may have been rotated.');
-    console.error('   Check your Supabase dashboard for the current anon key.');
-    console.error('');
 }
 
 // Create Supabase client with error handling
@@ -97,4 +79,3 @@ export const supabase = createClient(
         },
     }
 );
-

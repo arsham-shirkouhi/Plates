@@ -682,12 +682,12 @@ export const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
 
 const styles = StyleSheet.create({
     container: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
         zIndex: 40,
         elevation: 40,
     },
     backdrop: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
         backgroundColor: 'rgba(37, 37, 37, 0.35)',
     },
     card: {

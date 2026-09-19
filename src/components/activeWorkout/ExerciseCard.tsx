@@ -15,13 +15,18 @@ import Reanimated, {
     withTiming,
 } from 'react-native-reanimated';
 import { fonts } from '../../constants/fonts';
-import { SUPERSET_COLORS, WORKOUT_COLORS } from '../../workout/constants';
+import { EXERCISE_EXPAND_MS, SUPERSET_COLORS, WORKOUT_COLORS } from '../../workout/constants';
 import { WorkoutExercise } from '../../workout/types';
 import { formatRestDuration } from '../../workout/workoutSelectors';
 import { SetTableHeader } from './SetTableHeader';
 import { SetRow } from './SetRow';
+import { Confetti, ConfettiParticle } from '../Confetti';
 
-const COLLAPSE_MS = 160;
+const COMPLETION_CONFETTI_COLORS = ['#526EFF', '#34C759', '#FFB020', '#FF5A7A', '#8E7BFF'];
+
+// The card animates its own height over this duration; the cards below reflow
+// natively in real time, so they move in lockstep with no competing animation.
+const COLLAPSE_MS = EXERCISE_EXPAND_MS;
 const SIZE_MS = 140;
 const collapseEasing = Easing.inOut(Easing.cubic);
 
@@ -108,6 +113,40 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
     const measuredHeight = useSharedValue(0);
     const collapseProgress = useSharedValue(1); // 1 = expanded, 0 = collapsed
 
+    const [confetti, setConfetti] = useState<ConfettiParticle[]>([]);
+    const confettiIdRef = useRef(0);
+    const confettiTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const cardSizeRef = useRef({ width: 0, height: 0 });
+
+    useEffect(() => {
+        return () => {
+            if (confettiTimerRef.current) clearTimeout(confettiTimerRef.current);
+        };
+    }, []);
+
+    const burstCompletionConfetti = () => {
+        const { width, height } = cardSizeRef.current;
+        const originX = width > 0 ? width / 2 : 160;
+        const originY = height > 0 ? Math.min(height / 2, 90) : 60;
+        const particles: ConfettiParticle[] = Array.from({ length: 20 }, () => {
+            confettiIdRef.current += 1;
+            return {
+                id: confettiIdRef.current,
+                originX,
+                originY,
+                angle: Math.random() * 360,
+                color: COMPLETION_CONFETTI_COLORS[
+                    Math.floor(Math.random() * COMPLETION_CONFETTI_COLORS.length)
+                ],
+                travel: 90 + Math.random() * 60,
+                sizeScale: 1.15,
+            };
+        });
+        setConfetti(particles);
+        if (confettiTimerRef.current) clearTimeout(confettiTimerRef.current);
+        confettiTimerRef.current = setTimeout(() => setConfetti([]), 850);
+    };
+
     useEffect(() => {
         collapseProgress.value = withTiming(collapsed ? 0 : 1, {
             duration: COLLAPSE_MS,
@@ -147,6 +186,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
         if (wasAllComplete.current) return;
         wasAllComplete.current = true;
         setCollapsed(true);
+        burstCompletionConfetti();
     }, [allSetsComplete]);
 
     const collapsedSummary = totalSets > 0
@@ -154,7 +194,20 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
         : 'no sets';
 
     return (
-        <View style={[styles.card, railColor ? { borderLeftColor: railColor, borderLeftWidth: 4 } : null]}>
+        <View
+            style={styles.cardOuter}
+            onLayout={(event) => {
+                const { width, height } = event.nativeEvent.layout;
+                cardSizeRef.current = { width, height };
+            }}
+        >
+        <View
+            style={[
+                styles.card,
+                allSetsComplete && styles.cardComplete,
+                railColor ? { borderLeftColor: railColor, borderLeftWidth: 4 } : null,
+            ]}
+        >
             <View style={[styles.headerRow, collapsed && styles.headerRowCollapsed]}>
                 <TouchableOpacity
                     style={styles.titleWrap}
@@ -169,7 +222,9 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                     <View style={styles.titleTextWrap}>
                         <Text style={styles.title}>{exercise.name.toLowerCase()}</Text>
                         {collapsed ? (
-                            <Text style={styles.collapsedSummary}>{collapsedSummary}</Text>
+                            <Text style={[styles.collapsedSummary, allSetsComplete && styles.collapsedSummaryComplete]}>
+                                {allSetsComplete ? `✓ ${collapsedSummary}` : collapsedSummary}
+                            </Text>
                         ) : null}
                     </View>
                 </TouchableOpacity>
@@ -260,10 +315,19 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
             </Reanimated.View>
             </Reanimated.View>
         </View>
+        {confetti.length > 0 ? (
+            <View style={styles.confettiLayer} pointerEvents="none">
+                <Confetti particles={confetti} />
+            </View>
+        ) : null}
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
+    cardOuter: {
+        position: 'relative',
+    },
     card: {
         backgroundColor: '#fff',
         borderRadius: 16,
@@ -272,6 +336,14 @@ const styles = StyleSheet.create({
         marginHorizontal: 16,
         marginBottom: 14,
         overflow: 'hidden',
+    },
+    cardComplete: {
+        backgroundColor: '#EAF7EE',
+        borderColor: '#34C759',
+    },
+    confettiLayer: {
+        ...StyleSheet.absoluteFillObject,
+        zIndex: 1000,
     },
     headerRow: {
         flexDirection: 'row',
@@ -321,6 +393,10 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: WORKOUT_COLORS.placeholder,
         marginTop: 2,
+    },
+    collapsedSummaryComplete: {
+        color: '#2E9E4F',
+        fontFamily: fonts.bold,
     },
     menuButton: {
         width: 32,

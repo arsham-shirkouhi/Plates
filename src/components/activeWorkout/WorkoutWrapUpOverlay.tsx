@@ -820,7 +820,7 @@ const styles = StyleSheet.create({
         zIndex: 0,
     },
     confettiLayer: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
         zIndex: 2,
     },
     safeArea: {

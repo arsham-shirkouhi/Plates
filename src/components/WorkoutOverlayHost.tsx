@@ -42,7 +42,7 @@ export const WorkoutOverlayHost: React.FC = () => {
 
 const styles = StyleSheet.create({
     layer: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
     },
     layerBlocking: {
         zIndex: 100,

@@ -15,7 +15,6 @@ import Reanimated, {
     FadeInDown,
     FadeOutRight,
     interpolate,
-    LinearTransition,
     useAnimatedStyle,
     useSharedValue,
     withTiming,
@@ -49,7 +48,11 @@ const SHEET_MAX_WIDTH = 540;
 const WIDGET_FLOAT_BOTTOM = 10;
 const SHELL_CORNER_RADIUS = 22;
 const MINI_CORNER_RADIUS = 36;
-const exerciseLayout = LinearTransition.duration(240).easing(Easing.inOut(Easing.cubic));
+// NOTE: intentionally no `layout`/LinearTransition on the exercise-card wrappers.
+// A collapsing card animates its own height (see ExerciseCard), which natively
+// reflows the cards below it in real time. Adding a layout animation on top made
+// the siblings move via two competing timelines at once — the overlapping/jittery
+// motion. Letting native reflow be the single driver keeps them glued together.
 const exerciseEnter = FadeInDown.duration(280).easing(Easing.out(Easing.cubic));
 const exerciseExit = FadeOutRight.duration(220).easing(Easing.in(Easing.cubic));
 
@@ -225,7 +228,7 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
         <View style={styles.host} pointerEvents="box-none" collapsable={false}>
             <Reanimated.View
                 pointerEvents={isFullscreen ? 'auto' : 'none'}
-                style={[StyleSheet.absoluteFillObject, styles.backdrop, backdropStyle]}
+                style={[StyleSheet.absoluteFill, styles.backdrop, backdropStyle]}
             />
 
             <Reanimated.View
@@ -252,7 +255,6 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
                         {workout.exercises.map((exercise) => (
                             <Reanimated.View
                                 key={exercise.id}
-                                layout={exerciseLayout}
                                 entering={skipEnterRef.current ? undefined : exerciseEnter}
                                 exiting={exerciseExit}
                                 onLayout={(event) => {
@@ -363,7 +365,7 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
 
 const styles = StyleSheet.create({
     host: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
     },
     backdrop: {
         backgroundColor: WORKOUT_COLORS.backdrop,
@@ -402,7 +404,7 @@ const styles = StyleSheet.create({
         paddingBottom: 24,
     },
     miniLayer: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
         justifyContent: 'center',
     },
     bottomFade: {

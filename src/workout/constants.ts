@@ -4,6 +4,13 @@ export const WORKOUT_STORAGE_KEY = '@plates/active-workout/v1';
 
 export const MINI_BAR_HEIGHT = 72;
 
+/**
+ * Pace for an exercise card's expand/collapse. ExerciseCard animates its own body
+ * height over this duration; the cards below it reflow natively in real time, so
+ * they stay glued to it without a second (competing) layout animation.
+ */
+export const EXERCISE_EXPAND_MS = 200;
+
 export const DEFAULT_WORKOUT_SETTINGS: WorkoutSettings = {
     excludeWarmupFromVolume: true,
     excludeWarmupFromSetCount: true,

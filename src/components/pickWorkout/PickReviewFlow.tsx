@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
         backgroundColor: WORKOUT_COLORS.background,
     },
     page: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
     },
     reviewPage: {
         backgroundColor: WORKOUT_COLORS.background,
@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
         elevation: 12,
     },
     dim: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
         backgroundColor: '#000',
     },
 });

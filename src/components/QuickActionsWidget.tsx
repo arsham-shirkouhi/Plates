@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
     overflow: 'visible',
   },
   actionShadow: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: '#252525',
     borderRadius: 12,
     transform: [{ translateY: SHADOW_OFFSET }],

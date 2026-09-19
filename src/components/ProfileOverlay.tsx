@@ -295,7 +295,7 @@ const styles = StyleSheet.create({
         overflow: 'visible',
     },
     dim: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
         backgroundColor: '#252525',
     },
     pageBurst: {
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
     },
     pageFill: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
         backgroundColor: '#fff',
     },
     content: {

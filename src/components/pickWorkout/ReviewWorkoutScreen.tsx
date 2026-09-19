@@ -14,9 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Reanimated, {
     Easing,
-    FadeInDown,
-    FadeOutLeft,
-    FadeOutRight,
+    FadeIn,
+    FadeOut,
     Keyframe,
     LinearTransition,
 } from 'react-native-reanimated';
@@ -41,16 +40,27 @@ const MUSCLE_VISUALS: Record<MuscleGroup, { icon: IoniconName; tint: string; bg:
     legs: { icon: 'walk-outline', tint: '#3949AB', bg: '#E8EAF6' },
 };
 
-const SWAP_DURATION = 250;
+const SWAP_DURATION = 300;
 
-/** Cards physically slide from old slot → new slot on the UI thread. */
+/**
+ * Both lists live in one parent, so moving a row between "your workout" and
+ * "recommended" is a single layout animation: the row keeps its identity and
+ * physically slides + resizes into its new slot. No enter/exit fades fire on a
+ * move, which is what previously caused the overlapping/clashing look.
+ */
 const cardLayout = LinearTransition.duration(SWAP_DURATION).easing(
     Easing.inOut(Easing.cubic)
 );
 
-const cardEnter = FadeInDown.duration(280).easing(Easing.out(Easing.cubic));
-const cardExit = FadeOutRight.duration(220).easing(Easing.in(Easing.cubic));
-const recExit = FadeOutLeft.duration(200).easing(Easing.in(Easing.cubic));
+// Only used for rows that genuinely mount (the initial reveal, or an item that
+// enters the recommended list for the first time) — never on a move.
+const cardEnter = FadeIn.duration(220).easing(Easing.out(Easing.cubic));
+
+// The edit panel keeps itself mounted through an exit animation so, on collapse,
+// the card shrinks and clips the panel away (mirroring the expand) instead of the
+// panel vanishing instantly — which made the list below chop up before settling.
+const editPanelEnter = FadeIn.duration(SWAP_DURATION).easing(Easing.out(Easing.cubic));
+const editPanelExit = FadeOut.duration(SWAP_DURATION).easing(Easing.in(Easing.cubic));
 
 /** Recommended rows land one at a time after the screen arrives. */
 const recEnter = new Keyframe({
@@ -156,6 +166,10 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
         pending.exercises.map((exercise) => withDefaults(exercise))
     );
     const [revealedIds, setRevealedIds] = useState<Set<string>>(() => new Set());
+    // Once the initial staggered reveal is done, recommended rows returning after
+    // a delete should fade in like the added card (a true mirror of the add),
+    // instead of using the intro cascade's rise+scale pop.
+    const [introDone, setIntroDone] = useState(false);
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<Exercise[]>([]);
     const [searching, setSearching] = useState(false);
@@ -176,9 +190,15 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
             }, REVEAL_START_MS + index * REVEAL_STAGGER_MS)
         );
 
+        const introTimer = setTimeout(
+            () => setIntroDone(true),
+            REVEAL_START_MS + ids.length * REVEAL_STAGGER_MS + 320
+        );
+
         return () => {
             if (swapTimer.current) clearTimeout(swapTimer.current);
             timers.forEach(clearTimeout);
+            clearTimeout(introTimer);
         };
         // Intro cascade only on first mount.
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -311,6 +331,14 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setAdded((current) => current.filter((item) => item !== exercise));
         setRecommended((current) => [exercise, ...current]);
+        // Guarantee the row is visible in the recommended list so it slides back
+        // into place (search-added items would otherwise not be in revealedIds).
+        setRevealedIds((current) => {
+            if (current.has(exercise.id)) return current;
+            const next = new Set(current);
+            next.add(exercise.id);
+            return next;
+        });
     }, []);
 
     const moveExercise = useCallback(
@@ -351,15 +379,21 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
                     return (
                         <View
                             key={muscle}
-                            style={[styles.chip, { backgroundColor: visual.bg, borderColor: visual.tint }]}
+                            style={[
+                                styles.chip,
+                                {
+                                    backgroundColor: WORKOUT_COLORS.completedRow,
+                                    borderColor: WORKOUT_COLORS.accent,
+                                },
+                            ]}
                         >
                             <Ionicons
                                 name={visual.icon}
                                 size={15}
-                                color={visual.tint}
+                                color={WORKOUT_COLORS.accent}
                                 style={styles.chipIcon}
                             />
-                            <Text style={[styles.chipText, { color: visual.tint }]}>
+                            <Text style={[styles.chipText, { color: WORKOUT_COLORS.accent }]}>
                                 {MUSCLE_GROUP_LABELS[muscle]}
                             </Text>
                         </View>
@@ -405,38 +439,54 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
+                    {/*
+                      Both lists share ONE parent so every row keeps its identity
+                      when it moves between "your workout" and "recommended". React
+                      reuses the keyed wrapper across the section boundary, and
+                      `cardLayout` (LinearTransition) physically slides + resizes it
+                      into place — a single smooth motion with no cross-fade/overlap.
+                    */}
                     <View>
                         {added.length > 0 ? (
-                            <Text style={styles.sectionHeading}>your workout</Text>
+                            <Text key="heading-added" style={styles.sectionHeading}>
+                                your workout
+                            </Text>
                         ) : null}
                         {added.map((item, index) => (
-                            <AddedCard
-                                key={item.id}
-                                item={item}
-                                isEditing={editingIds.has(item.id)}
-                                canMoveUp={index > 0 && !swapping}
-                                canMoveDown={index < added.length - 1 && !swapping}
-                                onMoveUp={() => moveExercise(index, -1)}
-                                onMoveDown={() => moveExercise(index, 1)}
-                                onToggleEdit={() => toggleEditing(item.id)}
-                                onRemove={() => removeExercise(item)}
-                                onChangeSets={(delta) => changeSets(item, delta)}
-                                onChangeReps={(delta) => changeReps(item, delta)}
-                                onChangeRest={(delta) => changeRest(item, delta)}
-                            />
+                            <Reanimated.View key={item.id} layout={cardLayout} style={styles.itemWrapper}>
+                                <AddedCard
+                                    item={item}
+                                    isEditing={editingIds.has(item.id)}
+                                    canMoveUp={index > 0 && !swapping}
+                                    canMoveDown={index < added.length - 1 && !swapping}
+                                    onMoveUp={() => moveExercise(index, -1)}
+                                    onMoveDown={() => moveExercise(index, 1)}
+                                    onToggleEdit={() => toggleEditing(item.id)}
+                                    onRemove={() => removeExercise(item)}
+                                    onChangeSets={(delta) => changeSets(item, delta)}
+                                    onChangeReps={(delta) => changeReps(item, delta)}
+                                    onChangeRest={(delta) => changeRest(item, delta)}
+                                />
+                            </Reanimated.View>
                         ))}
-                    </View>
 
-                    <View>
                         {visibleRecommended.length > 0 ? (
-                            <Text style={styles.sectionHeading}>recommended</Text>
+                            <Text
+                                key="heading-recommended"
+                                style={[
+                                    styles.sectionHeading,
+                                    added.length > 0 && styles.sectionHeadingDivider,
+                                ]}
+                            >
+                                recommended
+                            </Text>
                         ) : null}
                         {visibleRecommended.map((item) => (
                             <Reanimated.View
                                 key={item.id}
                                 layout={cardLayout}
-                                entering={recEnter}
-                                exiting={recExit}
+                                entering={introDone ? cardEnter : recEnter}
+                                style={styles.itemWrapper}
                             >
                                 <TouchableOpacity
                                     style={styles.row}
@@ -539,13 +589,7 @@ function AddedCard({
     onChangeRest: (delta: number) => void;
 }) {
     return (
-        <Reanimated.View
-            layout={cardLayout}
-            entering={cardEnter}
-            exiting={cardExit}
-            style={styles.addedCard}
-        >
-            <View style={styles.addedAccent} />
+        <View style={styles.addedCard}>
             <View style={styles.addedTop}>
                 <View style={styles.rowCopy}>
                     <Text style={styles.rowTitle} numberOfLines={1}>
@@ -567,23 +611,19 @@ function AddedCard({
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                     <Ionicons
-                        name={isEditing ? 'checkmark' : 'create-outline'}
+                        name={isEditing ? 'checkmark' : 'pencil-outline'}
                         size={20}
                         color={isEditing ? WORKOUT_COLORS.accent : WORKOUT_COLORS.text}
                     />
                 </TouchableOpacity>
-                <TouchableOpacity
-                    onPress={onRemove}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Remove ${item.name}`}
-                    style={styles.iconButton}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                    <Ionicons name="close" size={20} color={WORKOUT_COLORS.text} />
-                </TouchableOpacity>
+                <RotatingAddRemoveButton onRemove={onRemove} label={`Remove ${item.name}`} />
             </View>
             {isEditing ? (
-                <View style={styles.editPanel}>
+                <Reanimated.View
+                    style={styles.editPanel}
+                    entering={editPanelEnter}
+                    exiting={editPanelExit}
+                >
                     <View style={styles.stepperRow}>
                         <Stepper
                             label="sets"
@@ -653,9 +693,73 @@ function AddedCard({
                             </Text>
                         </TouchableOpacity>
                     </View>
-                </View>
+                </Reanimated.View>
             ) : null}
-        </Reanimated.View>
+        </View>
+    );
+}
+
+const SPIN_MS = 150;
+/** A short beat so the ＋→✕ spin plays as the row slides into the workout list. */
+const SPIN_START_DELAY = 40;
+
+/**
+ * The remove control on an added exercise. It reuses the same "add" (＋) glyph
+ * from the recommended rows and rotates it 45° so it reads as an ✕.
+ *
+ * - On add, the ＋ visibly spins into an ✕ (kicked off once the card has faded
+ *   in, so the motion is actually seen and not masked by the entrance fade).
+ * - On close, the exact same spin runs in reverse (✕ → ＋) before the card is
+ *   handed back to the recommended list, so removal mirrors the add.
+ */
+function RotatingAddRemoveButton({ onRemove, label }: { onRemove: () => void; label: string }) {
+    const spin = useRef(new RNAnimated.Value(0)).current;
+    const removingRef = useRef(false);
+
+    useEffect(() => {
+        const anim = RNAnimated.timing(spin, {
+            toValue: 1,
+            duration: SPIN_MS,
+            delay: SPIN_START_DELAY,
+            easing: RNEasing.out(RNEasing.cubic),
+            useNativeDriver: true,
+        });
+        anim.start();
+        return () => anim.stop();
+    }, [spin]);
+
+    const handlePress = () => {
+        if (removingRef.current) return;
+        removingRef.current = true;
+        // Reverse the spin (✕ → ＋) first, then remove once it settles.
+        RNAnimated.timing(spin, {
+            toValue: 0,
+            duration: SPIN_MS,
+            easing: RNEasing.in(RNEasing.cubic),
+            useNativeDriver: true,
+        }).start(({ finished }) => {
+            if (finished) onRemove();
+        });
+    };
+
+    const rotate = spin.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['0deg', '45deg'],
+    });
+
+    return (
+        <TouchableOpacity
+            onPress={handlePress}
+            accessibilityRole="button"
+            accessibilityLabel={label}
+            style={styles.iconButton}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.6}
+        >
+            <RNAnimated.View style={{ transform: [{ rotate }] }}>
+                <Ionicons name="add" size={28} color={WORKOUT_COLORS.accent} />
+            </RNAnimated.View>
+        </TouchableOpacity>
     );
 }
 
@@ -831,7 +935,7 @@ const styles = StyleSheet.create({
         position: 'relative',
     },
     searchOverlay: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
         zIndex: 30,
         elevation: 30,
         paddingHorizontal: padding,
@@ -866,6 +970,14 @@ const styles = StyleSheet.create({
     section: {
         marginBottom: 8,
     },
+    /**
+     * Clip each row to its animated frame so that when the edit panel expands the
+     * card grows top-down (revealed by the layout animation) instead of the panel
+     * appearing instantly and overlapping the card below during the transition.
+     */
+    itemWrapper: {
+        overflow: 'hidden',
+    },
     sectionHeading: {
         fontFamily: fonts.bold,
         fontSize: 14,
@@ -873,7 +985,11 @@ const styles = StyleSheet.create({
         textTransform: 'lowercase',
         letterSpacing: 0.5,
         marginTop: 8,
-        marginBottom: 4,
+        marginBottom: 8,
+    },
+    /** Extra gap so "recommended" reads as its own block below the workout. */
+    sectionHeadingDivider: {
+        marginTop: 40,
     },
     addButton: {
         width: 32,
@@ -891,22 +1007,8 @@ const styles = StyleSheet.create({
     },
     addedCard: {
         paddingVertical: 12,
-        paddingLeft: 16,
-        paddingRight: 12,
-        marginBottom: 10,
-        borderRadius: buttonRadius,
-        backgroundColor: WORKOUT_COLORS.surfaceSecondary,
-        borderWidth,
-        borderColor: WORKOUT_COLORS.border,
-        overflow: 'hidden',
-    },
-    addedAccent: {
-        position: 'absolute',
-        left: 0,
-        top: 0,
-        bottom: 0,
-        width: 4,
-        backgroundColor: WORKOUT_COLORS.accent,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: WORKOUT_COLORS.divider,
     },
     addedTop: {
         flexDirection: 'row',

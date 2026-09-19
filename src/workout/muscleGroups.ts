@@ -30,6 +30,7 @@ export const NEUTRAL_MUSCLE_RECENCY: MuscleRecencyMap = {
 };
 
 const BODY_PART_ALIASES: Record<string, MuscleGroup> = {
+    // App-native names
     chest: 'chest',
     shoulders: 'shoulders',
     shoulder: 'shoulders',
@@ -37,6 +38,7 @@ const BODY_PART_ALIASES: Record<string, MuscleGroup> = {
     arm: 'arms',
     biceps: 'arms',
     triceps: 'arms',
+    forearms: 'arms',
     back: 'back',
     lats: 'back',
     core: 'core',
@@ -48,6 +50,14 @@ const BODY_PART_ALIASES: Record<string, MuscleGroup> = {
     hamstrings: 'legs',
     glutes: 'legs',
     calves: 'legs',
+    // WorkoutX API bodyPart values (https://api.workoutxapp.com)
+    'upper arms': 'arms',
+    'lower arms': 'arms',
+    'upper legs': 'legs',
+    'lower legs': 'legs',
+    waist: 'core',
+    neck: 'back',
+    cardio: 'legs',
 };
 
 export function mapBodyPartToMuscleGroup(bodyPart?: string, exerciseName?: string): MuscleGroup | null {
@@ -69,6 +79,30 @@ export function mapBodyPartToMuscleGroup(bodyPart?: string, exerciseName?: strin
     if (/(squat|lunge|leg|calf|rdl|press)/.test(normalizedName)) return 'legs';
 
     return null;
+}
+
+/**
+ * Reverse mapping: for a given internal muscle group, what WorkoutX `bodyPart`
+ * strings should we query to cover it? Returns the exact strings accepted by
+ * `GET /v1/exercises/bodyPart/{bodyPart}`.
+ */
+export function workoutxBodyPartsForMuscle(group: MuscleGroup): string[] {
+    switch (group) {
+        case 'chest':
+            return ['chest'];
+        case 'shoulders':
+            return ['shoulders'];
+        case 'arms':
+            return ['upper arms', 'lower arms'];
+        case 'back':
+            return ['back'];
+        case 'core':
+            return ['waist'];
+        case 'legs':
+            return ['upper legs', 'lower legs'];
+        default:
+            return [];
+    }
 }
 
 /** Selected muscle highlight on body map */

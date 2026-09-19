@@ -115,12 +115,27 @@ export const PickWorkoutScreen: React.FC<PickWorkoutScreenProps> = ({
         if (!bodyReady) return;
 
         introStartedRef.current = true;
-        Animated.timing(introAnim, {
-            toValue: 1,
-            duration: 340,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-        }).start();
+
+        // Wait two frames before fading in so the (heavy) body SVG has a chance
+        // to fully rasterize while it is still invisible. Kicking off the fade on
+        // the same frame the SVG first paints drops the opening frames and makes
+        // the animation look choppy.
+        let secondFrame = 0;
+        const firstFrame = requestAnimationFrame(() => {
+            secondFrame = requestAnimationFrame(() => {
+                Animated.timing(introAnim, {
+                    toValue: 1,
+                    duration: 420,
+                    easing: Easing.bezier(0.22, 1, 0.36, 1),
+                    useNativeDriver: true,
+                }).start();
+            });
+        });
+
+        return () => {
+            cancelAnimationFrame(firstFrame);
+            if (secondFrame) cancelAnimationFrame(secondFrame);
+        };
     }, [bodyReady, introAnim]);
 
     useEffect(() => {
@@ -286,6 +301,8 @@ export const PickWorkoutScreen: React.FC<PickWorkoutScreenProps> = ({
                             ]}
                         >
                             <Animated.View
+                                renderToHardwareTextureAndroid
+                                shouldRasterizeIOS
                                 style={{
                                     flex: 1,
                                     opacity: Animated.multiply(bodyFadeAnim, introAnim),
