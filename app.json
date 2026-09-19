@@ -30,7 +30,9 @@
     },
     "scheme": "plates",
     "plugins": [
-      "expo-font"
+      "expo-font",
+      "expo-status-bar",
+      "expo-web-browser"
     ]
   }
 }

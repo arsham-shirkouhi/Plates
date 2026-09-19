@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Alert, ScrollView, StyleSheet, TouchableOpacity, Dimensions, Animated } from 'react-native';
+import { View, Alert, Platform, ScrollView, StyleSheet, TouchableOpacity, Dimensions, Animated } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -469,7 +469,7 @@ export const HomeScreen: React.FC = () => {
           const triggerHaptic = () => {
             try {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            } catch {}
+            } catch { }
           };
 
           triggerHaptic();
@@ -610,6 +610,20 @@ export const HomeScreen: React.FC = () => {
                   expandWorkout();
                   return;
                 }
+
+                const startWorkout = () => openWorkoutOverlay({ startWorkoutPrompt: true });
+
+                // `Alert` is a no-op on react-native-web, so fall back to the
+                // browser's native confirm dialog when running on web.
+                if (Platform.OS === 'web') {
+                  const confirmed =
+                    typeof window !== 'undefined' && typeof window.confirm === 'function'
+                      ? window.confirm('Ready to log your exercises and track your session?')
+                      : true;
+                  if (confirmed) startWorkout();
+                  return;
+                }
+
                 Alert.alert(
                   'Start a workout?',
                   'Ready to log your exercises and track your session?',
@@ -617,7 +631,7 @@ export const HomeScreen: React.FC = () => {
                     { text: 'Not now', style: 'cancel' },
                     {
                       text: 'Start',
-                      onPress: () => openWorkoutOverlay({ startWorkoutPrompt: true }),
+                      onPress: startWorkout,
                     },
                   ],
                   { cancelable: true }
