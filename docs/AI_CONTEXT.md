@@ -191,6 +191,7 @@ simulator (needs Xcode), `a` = Android emulator.
 - **2026-09-17 — Codex:** Fixed workout-start overlay regression after the SDK 57 upgrade: RN 0.85+ removed `StyleSheet.absoluteFillObject`, so replaced its 27 app usages with `StyleSheet.absoluteFill`; iOS bundle builds, Expo restarted on port 8081. No commit.
 - **2026-09-17 — Codex:** Corrected `.env` Supabase keys to Expo's `EXPO_PUBLIC_*` names. Another process committed the feature as `423da65` and switched to `main`; restored the clean checkout to `feature/workoutx-api-integration` and restarted Expo from that branch.
 - **2026-09-17 — Codex:** Researched food data options: recommend USDA FoodData Central for canonical nutrients plus Edamam server-side for recipe/NLP nutrition and allergy-filtered recipes; use Open Food Facts only as barcode/label enrichment with conservative allergy handling, never as a guarantee. No implementation yet.
+- **2026-09-18 — Codex:** Profiled USDA Foundation and FNDDS releases and documented the food-data trial plan in `docs/FOOD_DATA_EDA.md`: use FNDDS for typed logging and USDA Branded Foods for exact barcode lookup; keep Open Food Facts only as a later low-confidence fallback. No implementation yet.
 
 ## 10. What to do next (as of the top of §9)
 
