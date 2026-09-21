@@ -87,3 +87,6 @@ build/
 # Misc
 *.orig
 .cache/
+
+# Local assistant handoff material; never part of the product repository.
+Downloads and context from claude/
