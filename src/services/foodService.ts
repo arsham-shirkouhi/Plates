@@ -10,6 +10,12 @@ export interface FoodItem {
     protein: number; // grams
     carbs: number; // grams
     fats: number; // grams
+    /** Display-only provenance for imported foods. Local quick-add entries omit it. */
+    source?: string;
+    sourceFoodId?: string;
+    barcode?: string;
+    servingGrams?: number;
+    servingLabel?: string;
 }
 
 // Common food items database

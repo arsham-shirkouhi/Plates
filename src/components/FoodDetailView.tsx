@@ -12,15 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { fonts } from '../constants/fonts';
 import * as Haptics from 'expo-haptics';
 import { Button } from './Button';
-
-interface FoodItem {
-    id: string;
-    name: string;
-    calories: number;
-    protein: number;
-    carbs: number;
-    fats: number;
-}
+import { FoodItem } from '../services/foodService';
 
 interface FoodDetailViewProps {
     food: FoodItem;
@@ -55,16 +47,27 @@ export const FoodDetailView: React.FC<FoodDetailViewProps> = ({
     hideButton = false,
     headerTitle = 'add food',
 }) => {
-    const isButtonDisabled = !selectedServingSize || !numberOfServings || !selectedMeal;
+    const hasFixedPackageServing = Boolean(food.sourceFoodId && food.servingLabel);
+    const isButtonDisabled = (!hasFixedPackageServing && !selectedServingSize) || !numberOfServings || !selectedMeal;
 
     const handleAddFood = () => {
         // Validate required fields
-        if (!selectedServingSize || !numberOfServings || !selectedMeal) {
+        if ((!hasFixedPackageServing && !selectedServingSize) || !numberOfServings || !selectedMeal) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             return;
         }
 
-        onAddFood(food);
+        const servings = Number.parseFloat(numberOfServings) || 1;
+        onAddFood({
+            ...food,
+            calories: Math.round(food.calories * servings),
+            protein: Math.round(food.protein * servings),
+            carbs: Math.round(food.carbs * servings),
+            fats: Math.round(food.fats * servings),
+            servingLabel: hasFixedPackageServing
+                ? `${servings} × ${food.servingLabel}`
+                : food.servingLabel,
+        });
     };
 
     const handleMealPress = (meal: 'breakfast' | 'lunch' | 'dinner' | 'snack') => {
@@ -105,26 +108,26 @@ export const FoodDetailView: React.FC<FoodDetailViewProps> = ({
                             <View style={styles.macroItem}>
                                 <View style={[styles.macroDot, styles.proteinDot]} />
                                 <Text style={styles.macroLabel}>
-                                    <Text style={styles.macroLetter}>P</Text> {food.protein}g
+                                    <Text style={styles.macroLetter}>P</Text> {Math.round(food.protein)}g
                                 </Text>
                             </View>
                             <Text style={styles.macroSeparator}>|</Text>
                             <View style={styles.macroItem}>
                                 <View style={[styles.macroDot, styles.carbsDot]} />
                                 <Text style={styles.macroLabel}>
-                                    <Text style={styles.macroLetter}>C</Text> {food.carbs}g
+                                    <Text style={styles.macroLetter}>C</Text> {Math.round(food.carbs)}g
                                 </Text>
                             </View>
                             <Text style={styles.macroSeparator}>|</Text>
                             <View style={styles.macroItem}>
                                 <View style={[styles.macroDot, styles.fatsDot]} />
                                 <Text style={styles.macroLabel}>
-                                    <Text style={styles.macroLetter}>F</Text> {food.fats}g
+                                    <Text style={styles.macroLetter}>F</Text> {Math.round(food.fats)}g
                                 </Text>
                             </View>
                         </View>
                         <View style={styles.caloriesRow}>
-                            <Text style={styles.caloriesText}>{food.calories}kcal</Text>
+                            <Text style={styles.caloriesText}>{Math.round(food.calories)}kcal</Text>
                         </View>
                         {/* Bottom divider line */}
                         <View style={styles.macroDivider} />
@@ -135,22 +138,29 @@ export const FoodDetailView: React.FC<FoodDetailViewProps> = ({
                         {/* Serving Size */}
                         <View style={styles.inputSection}>
                             <Text style={styles.inputLabel}>serving size</Text>
-                            <TouchableOpacity
-                                style={styles.inputButton}
-                                activeOpacity={0.7}
-                                onPress={() => {
-                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                    onShowUnitSelector();
-                                }}
-                            >
-                                <Text style={[
-                                    styles.inputButtonText,
-                                    !selectedServingSize && styles.inputButtonPlaceholder
-                                ]}>
-                                    {selectedServingSize || 'Select unit'}
-                                </Text>
-                                <Ionicons name="chevron-down" size={20} color="#666" />
-                            </TouchableOpacity>
+                            {hasFixedPackageServing ? (
+                                <View style={styles.fixedServing}>
+                                    <Text style={styles.inputButtonText}>{food.servingLabel}</Text>
+                                    <Text style={styles.labelVerified}>package label</Text>
+                                </View>
+                            ) : (
+                                <TouchableOpacity
+                                    style={styles.inputButton}
+                                    activeOpacity={0.7}
+                                    onPress={() => {
+                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                        onShowUnitSelector();
+                                    }}
+                                >
+                                    <Text style={[
+                                        styles.inputButtonText,
+                                        !selectedServingSize && styles.inputButtonPlaceholder
+                                    ]}>
+                                        {selectedServingSize || 'Select unit'}
+                                    </Text>
+                                    <Ionicons name="chevron-down" size={20} color="#666" />
+                                </TouchableOpacity>
+                            )}
                         </View>
 
                         {/* Number of Servings */}
@@ -365,6 +375,17 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         minHeight: 50,
     },
+    fixedServing: {
+        minHeight: 50,
+        borderWidth: 2,
+        borderColor: '#252525',
+        borderRadius: 10,
+        paddingHorizontal: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#F5F5F5',
+    },
     inputButtonText: {
         fontSize: 18,
         fontFamily: fonts.regular,
@@ -373,6 +394,12 @@ const styles = StyleSheet.create({
     },
     inputButtonPlaceholder: {
         color: '#999',
+    },
+    labelVerified: {
+        fontFamily: fonts.regular,
+        fontSize: 12,
+        color: '#666',
+        textTransform: 'lowercase',
     },
     inputWrapper: {
         backgroundColor: '#F5F5F5',
@@ -431,4 +458,3 @@ const styles = StyleSheet.create({
         width: '100%',
     },
 });
-

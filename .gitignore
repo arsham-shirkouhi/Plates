@@ -19,6 +19,9 @@ yarn.lock
 dist/
 web-build/
 
+# Supabase CLI local project metadata (may contain connection details).
+supabase/.temp/
+
 # Native
 *.orig.*
 *.jks

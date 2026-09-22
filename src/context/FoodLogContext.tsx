@@ -122,7 +122,7 @@ export const FoodLogProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 food,
                 loggedAt: new Date(),
                 meal: options?.meal ?? suggestMealForNow(),
-                portion: options?.portion ?? '1 serving',
+                portion: options?.portion ?? food.servingLabel ?? '1 serving',
             };
             commit((prev) => [entry, ...prev]);
             return entry;

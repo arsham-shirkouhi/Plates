@@ -29,6 +29,18 @@
       "expo-status-bar",
       "expo-web-browser",
       [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Plates to use your camera to scan barcodes and analyze meal photos."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow Plates to use your camera to analyze meal photos."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/images/plates_app_icon.png",

@@ -19,10 +19,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { fonts } from '../constants/fonts';
 import * as Haptics from 'expo-haptics';
-import { searchFoods } from '../services/foodService';
+import { FoodItem, searchFoods } from '../services/foodService';
+import { analyzeFoodPhoto, lookupUsdaBarcode, searchUsdaFoods } from '../services/usdaFoodService';
 import { FoodDetailView } from './FoodDetailView';
+import { BarcodeScannerModal } from './BarcodeScannerModal';
+import { PhotoMealReviewModal } from './PhotoMealReviewModal';
 import { useOverlay } from '../contexts/OverlayContext';
 import { MealType } from '../food/types';
+import * as ImagePicker from 'expo-image-picker';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -31,15 +35,6 @@ const SHEET_HEIGHT_EXPANDED = SCREEN_HEIGHT * 0.85; // 85% when searching
 const DETAIL_DROPDOWN_WIDTH = SCREEN_WIDTH - 40; // Screen width minus padding (20 on each side)
 const TOASTER_OFFSET = 50; // Extra offset to start from below (like toast in toaster)
 const TOP_SECTION_HEIGHT = 180; // Height of handle bar + search + buttons area
-
-interface FoodItem {
-    id: string;
-    name: string;
-    calories: number;
-    protein: number; // grams
-    carbs: number; // grams
-    fats: number; // grams
-}
 
 interface AddFoodBottomSheetProps {
     visible: boolean;
@@ -64,6 +59,13 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
     const OVERLAY_ID = 'AddFoodBottomSheet';
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<FoodItem[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [searchMessage, setSearchMessage] = useState<string | null>(null);
+    const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+    const [showPhotoReview, setShowPhotoReview] = useState(false);
+    const [photoFoods, setPhotoFoods] = useState<FoodItem[]>([]);
+    const [isAnalyzingPhoto, setIsAnalyzingPhoto] = useState(false);
+    const [photoError, setPhotoError] = useState<string | null>(null);
     const [addedItems, setAddedItems] = useState<Set<string>>(new Set());
     const [selectedFoodDetail, setSelectedFoodDetail] = useState<FoodItem | null>(null);
     // Function to determine meal based on time of day
@@ -123,6 +125,7 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
     const calIconBounce = useRef(new Animated.Value(0)).current;
     const detailAddButtonTranslateY = useRef(new Animated.Value(0)).current;
     const detailAddButtonShadowHeight = useRef(new Animated.Value(4)).current;
+    const searchRequestId = useRef(0);
 
     // Detail overlay state
     const [detailServingSize, setDetailServingSize] = useState('');
@@ -301,6 +304,8 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
                 // Reset state after animation completes
                 setSearchQuery('');
                 setSearchResults([]);
+                setIsSearching(false);
+                setSearchMessage(null);
                 setAddedItems(new Set());
                 setSelectedMeal(null);
                 setSelectedFoodDetail(null);
@@ -381,6 +386,8 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
         // Reset all state immediately
         setSearchQuery('');
         setSearchResults([]);
+        setIsSearching(false);
+        setSearchMessage(null);
         setAddedItems(new Set());
         setSelectedMeal(null);
         setSelectedFoodDetail(null);
@@ -428,8 +435,8 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
     const handleOpenFoodDetail = (food: FoodItem) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setSelectedFoodDetail(food);
-        setDetailServingSize('');
-        setDetailNumberOfServings('');
+        setDetailServingSize(food.servingLabel ?? '');
+        setDetailNumberOfServings('1');
         setDetailMeal(selectedMeal);
     };
 
@@ -455,11 +462,31 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
 
     const handleSearch = (query: string) => {
         setSearchQuery(query);
+        const requestId = ++searchRequestId.current;
         if (query.trim() === '') {
             setSearchResults([]);
+            setIsSearching(false);
+            setSearchMessage(null);
         } else {
-            const results = searchFoods(query);
-            setSearchResults(results);
+            setIsSearching(true);
+            setSearchMessage(null);
+            setTimeout(() => {
+                void searchUsdaFoods(query)
+                    .then((results) => {
+                        if (requestId !== searchRequestId.current) return;
+                        setSearchResults(results);
+                        setSearchMessage(results.length === 0 ? 'no USDA foods found' : null);
+                    })
+                    .catch(() => {
+                        if (requestId !== searchRequestId.current) return;
+                        const offlineResults = searchFoods(query);
+                        setSearchResults(offlineResults);
+                        setSearchMessage('USDA search is being set up — showing offline suggestions');
+                    })
+                    .finally(() => {
+                        if (requestId === searchRequestId.current) setIsSearching(false);
+                    });
+            }, 300);
         }
     };
 
@@ -499,8 +526,27 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
 
     const handleScanBarcode = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        // TODO: Implement barcode scanning
-        console.log('Scan barcode');
+        setShowBarcodeScanner(true);
+    };
+
+    const handleBarcodeScanned = async (barcode: string) => {
+        try {
+            const food = await lookupUsdaBarcode(barcode);
+            setShowBarcodeScanner(false);
+            if (food) {
+                setSearchQuery(food.name);
+                setSearchResults([food]);
+                setSearchMessage(null);
+                handleOpenFoodDetail(food);
+            } else {
+                setSearchQuery(barcode);
+                setSearchResults([]);
+                setSearchMessage('barcode not found — you can add it manually');
+            }
+        } catch {
+            setShowBarcodeScanner(false);
+            setSearchMessage('barcode lookup is being set up — please try search for now');
+        }
     };
 
     const handleTakePhotoPressIn = () => {
@@ -537,10 +583,40 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
         ]).start();
     };
 
-    const handleTakePhoto = () => {
+    const handleTakePhoto = async () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        // TODO: Implement photo taking
-        console.log('Take photo');
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+            setSearchMessage('camera permission is needed to analyze a meal photo');
+            return;
+        }
+
+        const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ['images'],
+            quality: 0.55,
+            base64: true,
+            allowsEditing: false,
+        });
+        if (result.canceled || !result.assets[0]?.base64) return;
+
+        const asset = result.assets[0];
+        setShowPhotoReview(true);
+        setIsAnalyzingPhoto(true);
+        setPhotoError(null);
+        setPhotoFoods([]);
+        try {
+            const mimeType = asset.mimeType || 'image/jpeg';
+            const foods = await analyzeFoodPhoto(`data:${mimeType};base64,${asset.base64}`);
+            if (foods.length === 0) {
+                setPhotoError('No foods could be confidently matched. You can still use search or barcode scanning.');
+            } else {
+                setPhotoFoods(foods);
+            }
+        } catch (error) {
+            setPhotoError(error instanceof Error ? error.message : 'Photo analysis is unavailable right now.');
+        } finally {
+            setIsAnalyzingPhoto(false);
+        }
     };
 
     // Show all quick add items (users can add multiple)
@@ -832,7 +908,18 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
                                                 isAdded={addedItems.has(item.id)}
                                             />
                                         ))}
+                                    {searchQuery.trim() !== '' && isSearching && (
+                                        <View style={styles.noResultsContainer}>
+                                            <Text style={styles.noResultsText}>searching USDA foods…</Text>
+                                        </View>
+                                    )}
+                                    {searchQuery.trim() !== '' && !isSearching && searchMessage && (
+                                        <View style={styles.searchMessageContainer}>
+                                            <Text style={styles.searchMessageText}>{searchMessage}</Text>
+                                        </View>
+                                    )}
                                     {searchQuery.trim() !== '' &&
+                                        !isSearching &&
                                         searchResults.length === 0 && (
                                             <View style={styles.noResultsContainer}>
                                                 <Text style={styles.noResultsText}>no results found</Text>
@@ -897,6 +984,23 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
                         </View>
                     </View>
                 )}
+                <BarcodeScannerModal
+                    visible={showBarcodeScanner}
+                    onClose={() => setShowBarcodeScanner(false)}
+                    onBarcodeScanned={handleBarcodeScanned}
+                />
+                <PhotoMealReviewModal
+                    visible={showPhotoReview}
+                    foods={photoFoods}
+                    isAnalyzing={isAnalyzingPhoto}
+                    error={photoError}
+                    onClose={() => setShowPhotoReview(false)}
+                    onConfirm={(foods) => {
+                        setShowPhotoReview(false);
+                        foods.forEach((food) => onAddFood(food, selectedMeal));
+                        handleClose();
+                    }}
+                />
 
             </View>
         </Modal>
@@ -983,7 +1087,7 @@ const QuickAddItem: React.FC<QuickAddItemProps> = ({ item, onAdd, onPress, isAdd
             >
                 <View style={styles.quickAddItemTextContainer}>
                     <Text style={styles.quickAddItemName}>{item.name}</Text>
-                    <Text style={styles.quickAddItemServing}>1 serving</Text>
+                    <Text style={styles.quickAddItemServing}>{item.servingLabel || '1 serving'}</Text>
                 </View>
                 <View style={styles.caloriesContainer}>
                     <Text style={styles.quickAddItemCalories}>{item.calories} kcal</Text>
@@ -1270,6 +1374,18 @@ const styles = StyleSheet.create({
         fontFamily: fonts.regular,
         color: '#999',
         textTransform: 'lowercase',
+    },
+    searchMessageContainer: {
+        paddingHorizontal: 24,
+        paddingTop: 16,
+        alignItems: 'center',
+    },
+    searchMessageText: {
+        fontSize: 13,
+        fontFamily: fonts.regular,
+        color: '#777',
+        textAlign: 'center',
+        lineHeight: 18,
     },
     unitSelectorOverlay: {
         position: 'absolute',
