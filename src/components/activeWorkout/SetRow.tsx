@@ -8,13 +8,13 @@ import {
     Alert,
     LayoutChangeEvent,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../../constants/fonts';
 import { SET_TYPE_META, WORKOUT_COLORS } from '../../workout/constants';
 import { WorkoutSet, WorkoutSetType } from '../../workout/types';
 import { formatPreviousSet } from '../../workout/workoutSelectors';
 import { Confetti, ConfettiParticle } from '../Confetti';
+import { COMPLETE_BG, COMPLETE_INK, FlatBox, FlatTick } from './FlatMark';
 
 const CONFETTI_COLORS = ['#526EFF', '#F9C117', '#FF5151', '#2ED573', '#B06BFF', '#FF8A3D'];
 
@@ -22,6 +22,7 @@ interface SetRowProps {
     set: WorkoutSet;
     index: number;
     showRpe?: boolean;
+    exerciseComplete?: boolean;
     onChange: (patch: Partial<Pick<WorkoutSet, 'weight' | 'reps' | 'rpe'>>) => void;
     onToggleComplete: () => void;
     onApplyPrevious: () => void;
@@ -33,6 +34,7 @@ export const SetRow: React.FC<SetRowProps> = ({
     set,
     index,
     showRpe = false,
+    exerciseComplete = false,
     onChange,
     onToggleComplete,
     onApplyPrevious,
@@ -103,7 +105,12 @@ export const SetRow: React.FC<SetRowProps> = ({
     };
 
     return (
-        <View style={[styles.row, set.completed && styles.completedRow]}>
+        <View
+            style={[
+                styles.row,
+                set.completed && (exerciseComplete ? styles.completedRowGreen : styles.completedRow),
+            ]}
+        >
             <TouchableOpacity style={styles.setCell} onPress={openSetTypeMenu}>
                 {badge ? (
                     <View style={[styles.badge, { backgroundColor: SET_TYPE_META[set.type].color }]}>
@@ -174,11 +181,14 @@ export const SetRow: React.FC<SetRowProps> = ({
                 onPress={handleToggleComplete}
                 onLayout={handleCheckLayout}
             >
-                <Ionicons
-                    name={set.completed ? 'checkmark-circle' : 'ellipse-outline'}
-                    size={22}
-                    color={set.completed ? WORKOUT_COLORS.accent : WORKOUT_COLORS.placeholder}
-                />
+                {set.completed ? (
+                    <FlatTick
+                        color={exerciseComplete ? COMPLETE_INK : WORKOUT_COLORS.accent}
+                        size={18}
+                    />
+                ) : (
+                    <FlatBox color={WORKOUT_COLORS.placeholder} size={18} />
+                )}
             </TouchableOpacity>
 
             <Confetti particles={confetti} />
@@ -197,6 +207,9 @@ const styles = StyleSheet.create({
     },
     completedRow: {
         backgroundColor: WORKOUT_COLORS.completedRow,
+    },
+    completedRowGreen: {
+        backgroundColor: COMPLETE_BG,
     },
     setCell: {
         width: 34,

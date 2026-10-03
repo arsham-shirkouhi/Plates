@@ -26,8 +26,6 @@ import Reanimated, {
     interpolateColor,
     useAnimatedStyle,
     useSharedValue,
-    withSequence,
-    withSpring,
     withTiming,
 } from 'react-native-reanimated';
 
@@ -97,37 +95,25 @@ const AnimatedExerciseRow: React.FC<AnimatedExerciseRowProps> = ({
 }) => {
     const visual = getBodyPartVisual(exercise.bodyPart);
     const added = useSharedValue(isAdded ? 1 : 0);
-    const pressScale = useSharedValue(1);
 
     useEffect(() => {
-        added.value = withSpring(isAdded ? 1 : 0, { damping: 14, stiffness: 220 });
+        added.value = withTiming(isAdded ? 1 : 0, { duration: 70 });
     }, [added, isAdded]);
 
     const rowStyle = useAnimatedStyle(() => ({
         borderColor: interpolateColor(added.value, [0, 1], ['#EDEDED', '#526EFF']),
         backgroundColor: interpolateColor(added.value, [0, 1], ['#FFFFFF', '#F5F7FF']),
-        transform: [{ scale: interpolate(added.value, [0, 0.4, 1], [1, 1.02, 1]) }],
     }));
 
     const addBtnStyle = useAnimatedStyle(() => ({
         opacity: interpolate(added.value, [0, 1], [1, 0]),
-        transform: [{ scale: interpolate(added.value, [0, 1], [1, 0.55]) }],
     }));
 
     const removeBtnStyle = useAnimatedStyle(() => ({
         opacity: interpolate(added.value, [0, 1], [0, 1]),
-        transform: [{ scale: interpolate(added.value, [0, 1], [0.55, 1]) }],
-    }));
-
-    const toggleWrapStyle = useAnimatedStyle(() => ({
-        transform: [{ scale: pressScale.value }],
     }));
 
     const handleToggle = () => {
-        pressScale.value = withSequence(
-            withTiming(0.84, { duration: 70 }),
-            withSpring(1, { damping: 12, stiffness: 280 })
-        );
         if (isAdded) onRemove();
         else onAdd();
     };
@@ -167,7 +153,7 @@ const AnimatedExerciseRow: React.FC<AnimatedExerciseRowProps> = ({
                     accessibilityRole="button"
                     accessibilityLabel={isAdded ? `Remove ${exercise.name}` : `Add ${exercise.name}`}
                 >
-                    <Reanimated.View style={[styles.toggleButtonSlot, toggleWrapStyle]}>
+                    <Reanimated.View style={styles.toggleButtonSlot}>
                         <Reanimated.View
                             pointerEvents="none"
                             style={[styles.toggleButton, styles.toggleButtonDefault, addBtnStyle]}

@@ -12,8 +12,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Reanimated, {
     Easing,
     Extrapolation,
-    FadeInDown,
-    FadeOutRight,
     interpolate,
     useAnimatedStyle,
     useSharedValue,
@@ -36,6 +34,7 @@ import { ActiveWorkoutBottomActions } from './ActiveWorkoutBottomActions';
 import { ActiveWorkoutMiniBar } from './ActiveWorkoutMiniBar';
 import { RestTimerBar } from './RestTimerBar';
 import { ExerciseCard } from './ExerciseCard';
+import { EmptyExerciseState } from './EmptyExerciseState';
 import { Confetti, ConfettiParticle } from '../Confetti';
 
 const CONFETTI_COLORS = ['#526EFF', '#F9C117', '#FF5151', '#2ED573', '#B06BFF', '#FF8A3D'];
@@ -48,13 +47,6 @@ const SHEET_MAX_WIDTH = 540;
 const WIDGET_FLOAT_BOTTOM = 10;
 const SHELL_CORNER_RADIUS = 22;
 const MINI_CORNER_RADIUS = 36;
-// NOTE: intentionally no `layout`/LinearTransition on the exercise-card wrappers.
-// A collapsing card animates its own height (see ExerciseCard), which natively
-// reflows the cards below it in real time. Adding a layout animation on top made
-// the siblings move via two competing timelines at once — the overlapping/jittery
-// motion. Letting native reflow be the single driver keeps them glued together.
-const exerciseEnter = FadeInDown.duration(280).easing(Easing.out(Easing.cubic));
-const exerciseExit = FadeOutRight.duration(220).easing(Easing.in(Easing.cubic));
 
 interface ActiveWorkoutOverlayProps {
     onAddExercises: () => void;
@@ -122,11 +114,6 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
     const exerciseOffsetsRef = useRef<Record<string, number>>({});
     const isFullscreenRef = useRef(isFullscreen);
     isFullscreenRef.current = isFullscreen;
-    const skipEnterRef = useRef(true);
-
-    useEffect(() => {
-        skipEnterRef.current = false;
-    }, []);
 
     const elapsedSeconds = useWorkoutTimer(workout?.startedAt);
     const [restCelebrateAt, setRestCelebrateAt] = useState(0);
@@ -248,15 +235,19 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
                     <ScrollView
                         ref={scrollRef}
                         style={styles.scroll}
-                        contentContainerStyle={styles.scrollContent}
+                        contentContainerStyle={[
+                            styles.scrollContent,
+                            workout.exercises.length === 0 && styles.scrollContentEmpty,
+                        ]}
                         keyboardShouldPersistTaps="handled"
                         showsVerticalScrollIndicator={false}
                     >
+                        {workout.exercises.length === 0 ? (
+                            <EmptyExerciseState onAddPress={onAddExercises} />
+                        ) : null}
                         {workout.exercises.map((exercise) => (
-                            <Reanimated.View
+                            <View
                                 key={exercise.id}
-                                entering={skipEnterRef.current ? undefined : exerciseEnter}
-                                exiting={exerciseExit}
                                 onLayout={(event) => {
                                     exerciseOffsetsRef.current[exercise.id] = event.nativeEvent.layout.y;
                                 }}
@@ -289,7 +280,7 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
                                     }}
                                     onAddToSuperset={() => addToSuperset([exercise.id])}
                                 />
-                            </Reanimated.View>
+                            </View>
                         ))}
                     </ScrollView>
 
@@ -402,6 +393,10 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingTop: 8,
         paddingBottom: 24,
+    },
+    scrollContentEmpty: {
+        flexGrow: 1,
+        justifyContent: 'center',
     },
     miniLayer: {
         ...StyleSheet.absoluteFill,

@@ -7,9 +7,13 @@ import {
     TextInput,
     Alert,
 } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import Reanimated, {
     Easing,
+    Extrapolation,
+    interpolate,
+    interpolateColor,
+    runOnJS,
     useAnimatedStyle,
     useSharedValue,
     withTiming,
@@ -20,9 +24,14 @@ import { WorkoutExercise } from '../../workout/types';
 import { formatRestDuration } from '../../workout/workoutSelectors';
 import { SetTableHeader } from './SetTableHeader';
 import { SetRow } from './SetRow';
+import { COMPLETE_BG, COMPLETE_BORDER, COMPLETE_INK, FlatMinus, FlatPlus, FlatTick } from './FlatMark';
 import { Confetti, ConfettiParticle } from '../Confetti';
 
-const COMPLETION_CONFETTI_COLORS = ['#526EFF', '#34C759', '#FFB020', '#FF5A7A', '#8E7BFF'];
+const DUST_COLORS = ['#8A8A8A', '#B0B0B0', '#6E6E6E', '#C8C8C8', '#9A9A9A', '#D4D4D4'];
+
+const COMPLETE_FADE_MS = 280;
+const REMOVE_MS = 200;
+const REMOVE_EASING = Easing.bezier(0.7, 0.0, 0.9, 0.15);
 
 // The card animates its own height over this duration; the cards below reflow
 // natively in real time, so they move in lockstep with no competing animation.
@@ -72,7 +81,71 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
         ? SUPERSET_COLORS[supersetColorIndex % SUPERSET_COLORS.length]
         : undefined;
 
+    const exitingRef = useRef(false);
+    const exitProgress = useSharedValue(0);
+    const shellHeight = useSharedValue(0);
+    const cardSizeRef = useRef({ width: 0, height: 0 });
+    const [dust, setDust] = useState<ConfettiParticle[]>([]);
+    const dustIdRef = useRef(0);
+    const removeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        return () => {
+            if (removeTimerRef.current) clearTimeout(removeTimerRef.current);
+        };
+    }, []);
+
+    const burstDust = () => {
+        const { width, height } = cardSizeRef.current;
+        const originX = width > 0 ? width / 2 : 160;
+        const originY = height > 0 ? height / 2 : 60;
+        const particles: ConfettiParticle[] = Array.from({ length: 26 }, () => {
+            dustIdRef.current += 1;
+            return {
+                id: dustIdRef.current,
+                originX: originX + (Math.random() - 0.5) * Math.max(width * 0.45, 80),
+                originY: originY + (Math.random() - 0.5) * Math.max(height * 0.5, 40),
+                angle: Math.random() * 360,
+                color: DUST_COLORS[Math.floor(Math.random() * DUST_COLORS.length)],
+                travel: 22 + Math.random() * 38,
+                sizeScale: 0.55 + Math.random() * 0.85,
+            };
+        });
+        setDust(particles);
+    };
+
+    const finishRemove = () => {
+        if (removeTimerRef.current) clearTimeout(removeTimerRef.current);
+        removeTimerRef.current = setTimeout(() => {
+            onRemoveExercise();
+        }, 180);
+    };
+
+    const startExitAnimation = () => {
+        burstDust();
+        exitProgress.value = withTiming(
+            1,
+            { duration: REMOVE_MS, easing: REMOVE_EASING },
+            (finished) => {
+                if (finished) runOnJS(finishRemove)();
+            }
+        );
+    };
+
+    const requestRemove = () => {
+        if (exitingRef.current) return;
+        exitingRef.current = true;
+        if (!collapsed) {
+            setCollapsed(true);
+            if (removeTimerRef.current) clearTimeout(removeTimerRef.current);
+            removeTimerRef.current = setTimeout(startExitAnimation, COLLAPSE_MS + 50);
+            return;
+        }
+        startExitAnimation();
+    };
+
     const openMenu = () => {
+        if (exitingRef.current) return;
         Alert.alert(exercise.name, undefined, [
             {
                 text: 'Add Note',
@@ -80,7 +153,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
             },
             { text: 'Add Warm-up Sets', onPress: onAddWarmupSets },
             { text: 'Add to Superset', onPress: onAddToSuperset },
-            { text: 'Remove Exercise', style: 'destructive', onPress: onRemoveExercise },
+            { text: 'Remove Exercise', style: 'destructive', onPress: requestRemove },
             { text: 'Cancel', style: 'cancel' },
         ]);
     };
@@ -113,40 +186,6 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
     const measuredHeight = useSharedValue(0);
     const collapseProgress = useSharedValue(1); // 1 = expanded, 0 = collapsed
 
-    const [confetti, setConfetti] = useState<ConfettiParticle[]>([]);
-    const confettiIdRef = useRef(0);
-    const confettiTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const cardSizeRef = useRef({ width: 0, height: 0 });
-
-    useEffect(() => {
-        return () => {
-            if (confettiTimerRef.current) clearTimeout(confettiTimerRef.current);
-        };
-    }, []);
-
-    const burstCompletionConfetti = () => {
-        const { width, height } = cardSizeRef.current;
-        const originX = width > 0 ? width / 2 : 160;
-        const originY = height > 0 ? Math.min(height / 2, 90) : 60;
-        const particles: ConfettiParticle[] = Array.from({ length: 20 }, () => {
-            confettiIdRef.current += 1;
-            return {
-                id: confettiIdRef.current,
-                originX,
-                originY,
-                angle: Math.random() * 360,
-                color: COMPLETION_CONFETTI_COLORS[
-                    Math.floor(Math.random() * COMPLETION_CONFETTI_COLORS.length)
-                ],
-                travel: 90 + Math.random() * 60,
-                sizeScale: 1.15,
-            };
-        });
-        setConfetti(particles);
-        if (confettiTimerRef.current) clearTimeout(confettiTimerRef.current);
-        confettiTimerRef.current = setTimeout(() => setConfetti([]), 850);
-    };
-
     useEffect(() => {
         collapseProgress.value = withTiming(collapsed ? 0 : 1, {
             duration: COLLAPSE_MS,
@@ -155,6 +194,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
     }, [collapsed, collapseProgress]);
 
     const toggleCollapsed = () => {
+        if (exitingRef.current) return;
         setCollapsed((current) => !current);
     };
 
@@ -177,6 +217,14 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
     const completedSets = exercise.sets.filter((set) => set.completed).length;
     const allSetsComplete = totalSets > 0 && completedSets === totalSets;
     const wasAllComplete = useRef(false);
+    const completeProgress = useSharedValue(allSetsComplete ? 1 : 0);
+
+    useEffect(() => {
+        completeProgress.value = withTiming(allSetsComplete ? 1 : 0, {
+            duration: COMPLETE_FADE_MS,
+            easing: Easing.out(Easing.cubic),
+        });
+    }, [allSetsComplete, completeProgress]);
 
     useEffect(() => {
         if (!allSetsComplete) {
@@ -186,27 +234,101 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
         if (wasAllComplete.current) return;
         wasAllComplete.current = true;
         setCollapsed(true);
-        burstCompletionConfetti();
     }, [allSetsComplete]);
 
+    const cardCompleteStyle = useAnimatedStyle(() => ({
+        backgroundColor: interpolateColor(
+            completeProgress.value,
+            [0, 1],
+            ['#FFFFFF', COMPLETE_BG]
+        ),
+        borderColor: interpolateColor(
+            completeProgress.value,
+            [0, 1],
+            [WORKOUT_COLORS.border, COMPLETE_BORDER]
+        ),
+    }));
+
+    const titleCompleteStyle = useAnimatedStyle(() => ({
+        color: interpolateColor(
+            completeProgress.value,
+            [0, 1],
+            [WORKOUT_COLORS.accent, COMPLETE_INK]
+        ),
+    }));
+
+    const summaryCompleteStyle = useAnimatedStyle(() => ({
+        color: interpolateColor(
+            completeProgress.value,
+            [0, 1],
+            [WORKOUT_COLORS.placeholder, COMPLETE_INK]
+        ),
+    }));
+
+    const doneLabelStyle = useAnimatedStyle(() => ({
+        opacity: completeProgress.value,
+        transform: [{ translateX: (1 - completeProgress.value) * 8 }],
+    }));
+
+    const exitSlotStyle = useAnimatedStyle(() => {
+        const progress = exitProgress.value;
+        const height = shellHeight.value;
+        const closed = 14 - (height + 14);
+        return {
+            marginBottom: interpolate(
+                progress,
+                [0, 0.28, 1],
+                [14, 14, closed],
+                Extrapolation.CLAMP
+            ),
+        };
+    });
+
+    const exitSpinStyle = useAnimatedStyle(() => {
+        const progress = exitProgress.value;
+        const scale = interpolate(
+            progress,
+            [0, 0.14, 1],
+            [1, 1.08, 0.02],
+            Extrapolation.CLAMP
+        );
+        const rotate = interpolate(
+            progress,
+            [0, 0.14, 1],
+            [0, -5, 38],
+            Extrapolation.CLAMP
+        );
+        const opacity = interpolate(
+            progress,
+            [0, 0.55, 1],
+            [1, 1, 0],
+            Extrapolation.CLAMP
+        );
+        return {
+            opacity,
+            transform: [{ rotate: `${rotate}deg` }, { scale }],
+        };
+    });
+
     const collapsedSummary = totalSets > 0
-        ? `${completedSets}/${totalSets} sets done`
+        ? `${completedSets}/${totalSets} sets`
         : 'no sets';
 
     return (
-        <View
-            style={styles.cardOuter}
-            onLayout={(event) => {
-                const { width, height } = event.nativeEvent.layout;
-                cardSizeRef.current = { width, height };
-            }}
-        >
-        <View
+        <Reanimated.View style={[styles.exitSlot, exitSlotStyle]}>
+        <Reanimated.View
             style={[
                 styles.card,
-                allSetsComplete && styles.cardComplete,
+                cardCompleteStyle,
+                exitSpinStyle,
                 railColor ? { borderLeftColor: railColor, borderLeftWidth: 4 } : null,
             ]}
+            onLayout={(event) => {
+                if (exitProgress.value > 0) return;
+                const { width, height } = event.nativeEvent.layout;
+                shellHeight.value = height;
+                cardSizeRef.current = { width, height };
+            }}
         >
             <View style={[styles.headerRow, collapsed && styles.headerRowCollapsed]}>
                 <TouchableOpacity
@@ -216,18 +338,22 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                     accessibilityRole="button"
                     accessibilityLabel={collapsed ? `Expand ${exercise.name}` : `Collapse ${exercise.name}`}
                 >
-                    <View style={styles.thumbnail}>
-                        <Ionicons name="barbell-outline" size={18} color={WORKOUT_COLORS.accent} />
-                    </View>
                     <View style={styles.titleTextWrap}>
-                        <Text style={styles.title}>{exercise.name.toLowerCase()}</Text>
+                        <Reanimated.Text style={[styles.title, titleCompleteStyle]}>
+                            {exercise.name.toLowerCase()}
+                        </Reanimated.Text>
                         {collapsed ? (
-                            <Text style={[styles.collapsedSummary, allSetsComplete && styles.collapsedSummaryComplete]}>
-                                {allSetsComplete ? `✓ ${collapsedSummary}` : collapsedSummary}
-                            </Text>
+                            <Reanimated.Text style={[styles.collapsedSummary, summaryCompleteStyle]}>
+                                {collapsedSummary}
+                            </Reanimated.Text>
                         ) : null}
                     </View>
                 </TouchableOpacity>
+                {allSetsComplete ? (
+                    <Reanimated.View style={[styles.doneTick, doneLabelStyle]} pointerEvents="none">
+                        <FlatTick color={COMPLETE_INK} size={18} />
+                    </Reanimated.View>
+                ) : null}
                 <TouchableOpacity onPress={openMenu} style={styles.menuButton}>
                     <Ionicons name="ellipsis-horizontal" size={20} color={WORKOUT_COLORS.text} />
                 </TouchableOpacity>
@@ -281,6 +407,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                     set={set}
                     index={index}
                     showRpe={showRpe}
+                    exerciseComplete={allSetsComplete}
                     onChange={(patch) => onUpdateSet(set.id, patch)}
                     onToggleComplete={() => onToggleSetComplete(set.id)}
                     onApplyPrevious={() => onApplyPreviousSet(set.id)}
@@ -295,12 +422,23 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                     onPress={handleRemoveLastSet}
                     disabled={!canRemoveSet}
                 >
-                    <MaterialCommunityIcons
-                        name="minus-thick"
-                        size={16}
-                        color={canRemoveSet ? WORKOUT_COLORS.muted : WORKOUT_COLORS.placeholder}
+                    <FlatMinus
+                        size={14}
+                        color={
+                            !canRemoveSet
+                                ? WORKOUT_COLORS.placeholder
+                                : allSetsComplete
+                                  ? COMPLETE_INK
+                                  : WORKOUT_COLORS.muted
+                        }
                     />
-                    <Text style={[styles.setActionText, !canRemoveSet && styles.setActionTextDisabled]}>
+                    <Text
+                        style={[
+                            styles.setActionText,
+                            allSetsComplete && styles.setActionTextComplete,
+                            !canRemoveSet && styles.setActionTextDisabled,
+                        ]}
+                    >
                         remove
                     </Text>
                 </TouchableOpacity>
@@ -308,42 +446,49 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                 <View style={styles.setActionDivider} />
 
                 <TouchableOpacity style={styles.setActionButton} onPress={handleAddSet}>
-                    <MaterialCommunityIcons name="plus-thick" size={16} color={WORKOUT_COLORS.accent} />
-                    <Text style={[styles.setActionText, styles.addSetText]}>add</Text>
+                    <FlatPlus
+                        size={14}
+                        color={allSetsComplete ? COMPLETE_INK : WORKOUT_COLORS.accent}
+                    />
+                    <Text
+                        style={[
+                            styles.setActionText,
+                            styles.addSetText,
+                            allSetsComplete && styles.setActionTextComplete,
+                        ]}
+                    >
+                        add
+                    </Text>
                 </TouchableOpacity>
             </View>
             </Reanimated.View>
             </Reanimated.View>
-        </View>
-        {confetti.length > 0 ? (
-            <View style={styles.confettiLayer} pointerEvents="none">
-                <Confetti particles={confetti} />
+        </Reanimated.View>
+        {dust.length > 0 ? (
+            <View style={styles.dustLayer} pointerEvents="none">
+                <Confetti particles={dust} />
             </View>
         ) : null}
-        </View>
+        </Reanimated.View>
     );
 };
 
 const styles = StyleSheet.create({
-    cardOuter: {
-        position: 'relative',
+    exitSlot: {
+        marginHorizontal: 16,
+        overflow: 'visible',
+        zIndex: 2,
+    },
+    dustLayer: {
+        ...StyleSheet.absoluteFill,
+        zIndex: 8,
     },
     card: {
         backgroundColor: '#fff',
         borderRadius: 16,
         borderWidth: 2,
         borderColor: WORKOUT_COLORS.border,
-        marginHorizontal: 16,
-        marginBottom: 14,
         overflow: 'hidden',
-    },
-    cardComplete: {
-        backgroundColor: '#EAF7EE',
-        borderColor: '#34C759',
-    },
-    confettiLayer: {
-        ...StyleSheet.absoluteFillObject,
-        zIndex: 1000,
     },
     headerRow: {
         flexDirection: 'row',
@@ -368,20 +513,13 @@ const styles = StyleSheet.create({
     },
     titleWrap: {
         flex: 1,
+        minWidth: 0,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
     },
     titleTextWrap: {
         flex: 1,
-    },
-    thumbnail: {
-        width: 34,
-        height: 34,
-        borderRadius: 10,
-        backgroundColor: '#EEF1FF',
-        alignItems: 'center',
-        justifyContent: 'center',
+        minWidth: 0,
     },
     title: {
         fontFamily: fonts.bold,
@@ -394,9 +532,10 @@ const styles = StyleSheet.create({
         color: WORKOUT_COLORS.placeholder,
         marginTop: 2,
     },
-    collapsedSummaryComplete: {
-        color: '#2E9E4F',
-        fontFamily: fonts.bold,
+    doneTick: {
+        marginRight: 4,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     menuButton: {
         width: 32,
@@ -457,5 +596,8 @@ const styles = StyleSheet.create({
     },
     addSetText: {
         color: WORKOUT_COLORS.accent,
+    },
+    setActionTextComplete: {
+        color: COMPLETE_INK,
     },
 });

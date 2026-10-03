@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { fonts } from '../../constants/fonts';
 import { WORKOUT_COLORS } from '../../workout/constants';
+import { FlatTick } from './FlatMark';
 
 interface SetTableHeaderProps {
     showRpe?: boolean;
@@ -15,7 +16,9 @@ export const SetTableHeader: React.FC<SetTableHeaderProps> = ({ showRpe = false 
             <Text style={[styles.cell, styles.inputCell]}>kg</Text>
             <Text style={[styles.cell, styles.inputCell]}>reps</Text>
             {showRpe ? <Text style={[styles.cell, styles.rpeCell]}>rpe</Text> : null}
-            <Text style={[styles.cell, styles.checkCell]}>✓</Text>
+            <View style={styles.checkCell}>
+                <FlatTick color={WORKOUT_COLORS.muted} size={12} />
+            </View>
         </View>
     );
 };
@@ -37,5 +40,5 @@ const styles = StyleSheet.create({
     previousCell: { flex: 1.2 },
     inputCell: { width: 52, textAlign: 'center' },
     rpeCell: { width: 40, textAlign: 'center' },
-    checkCell: { width: 28, textAlign: 'center' },
+    checkCell: { width: 28, alignItems: 'center', justifyContent: 'center' },
 });

@@ -192,6 +192,16 @@ simulator (needs Xcode), `a` = Android emulator.
 - **2026-09-17 — Codex:** Corrected `.env` Supabase keys to Expo's `EXPO_PUBLIC_*` names. Another process committed the feature as `423da65` and switched to `main`; restored the clean checkout to `feature/workoutx-api-integration` and restarted Expo from that branch.
 - **2026-09-17 — Codex:** Researched food data options: recommend USDA FoodData Central for canonical nutrients plus Edamam server-side for recipe/NLP nutrition and allergy-filtered recipes; use Open Food Facts only as barcode/label enrichment with conservative allergy handling, never as a guarantee. No implementation yet.
 - **2026-09-18 — Codex:** Profiled USDA Foundation and FNDDS releases and documented the food-data trial plan in `docs/FOOD_DATA_EDA.md`: use FNDDS for typed logging and USDA Branded Foods for exact barcode lookup; keep Open Food Facts only as a later low-confidence fallback. No implementation yet.
+- **2026-10-02 — Cursor:** `npx expo start` failed after `git pull` on `main` because `expo-camera` / `expo-image-picker` were in `package.json` but not installed. Ran `npm install` (9 packages added). Restart Expo to continue.
+- **2026-10-02 — Cursor:** Removed the bouncy add-exercise springs. Overlay rows now fade color/icon only (`withTiming`); new workout cards fade in instead of dropping in.
+- **2026-10-02 — Cursor:** Completed exercise cards fade into green (bg/border/title). Dropped barbell tiles, checkmarks, and confetti; typographic “done” + set count only.
+- **2026-10-02 — Cursor:** Empty workout list shows the mascot with a light bob and “add an exercise”. Remove-exercise now sucks the card away with gray dust.
+- **2026-10-03 — Cursor:** Empty workout state now uses `cal-workout-empty-state.svg` (Cal + dumbbells) with “add first exercise” under it.
+- **2026-10-03 — Cursor:** Empty-state copy is “add first exercises!” and the Cal SVG is larger (340).
+- **2026-10-03 — Cursor:** Empty-state Cal has a harsh #252525 drop shadow (6px offset), same language as the buttons.
+- **2026-10-03 — Cursor:** Empty-state press matches the buttons: Cal + label drop 6px and the hard shadow fades out in 120ms.
+- **2026-10-03 — Cursor:** Tightened the gap between Cal and “add first exercises!”.
+- **2026-10-03 — Cursor:** Restored the black outline paths on the Cal empty-state SVG.
 
 ## 10. What to do next (as of the top of §9)
 
