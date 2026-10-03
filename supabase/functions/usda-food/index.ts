@@ -115,6 +115,8 @@ function normalizeForGrams(food: FdcFood, grams: number, isPackageServing = fals
 interface PhotoIngredient {
   name?: string;
   estimated_grams?: number;
+  needs_details?: boolean;
+  question?: string;
 }
 
 function imageParts(imageDataUrl: string): { mimeType: string; data: string } | null {
@@ -129,12 +131,15 @@ async function identifyPhotoIngredients(imageDataUrl: string, apiKey: string): P
     throw new Error('Please choose a smaller photo of your meal.');
   }
 
-  const geminiResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent', {
+  // Google limits 2.5 Flash-Lite to projects that used it previously. Use the
+  // current low-cost multimodal successor so new Gemini projects can analyze
+  // meal photos while retaining the same GenerateContent + JSON response flow.
+  const geminiResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent', {
     method: 'POST',
     headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       systemInstruction: {
-        parts: [{ text: 'Identify visible edible components in this meal photo. Return only ingredients you can see. Estimate cooked edible weight in grams. Do not invent hidden ingredients, sauces, oils, brands, or nutrition. When uncertain, use a conservative generic name and estimate.' }],
+        parts: [{ text: 'Identify visible edible components in this meal photo. Return only ingredients you can see and estimate cooked edible weight in grams. Do not invent hidden ingredients, sauces, oils, brand names, flavors, or nutrition. For a packaged product where the brand, flavor, or nutrition label is not clearly readable, set needs_details to true and ask the user to scan the barcode or enter the nutrition label. For an unspecified beverage (including coffee), set needs_details to true and ask for the drink type, size, milk, and sweetener. A generic visible-food estimate is allowed only when the photo gives enough evidence.' }],
       },
       contents: [{
         role: 'user',
@@ -162,6 +167,8 @@ async function identifyPhotoIngredients(imageDataUrl: string, apiKey: string): P
                 properties: {
                   name: { type: 'string' },
                   estimated_grams: { type: 'number', minimum: 1, maximum: 2000 },
+                  needs_details: { type: 'boolean', description: 'True when product or drink details cannot be read from the photo.' },
+                  question: { type: 'string', description: 'A concise question that tells the user which visible-food detail is needed.' },
                 },
               },
             },
@@ -170,7 +177,14 @@ async function identifyPhotoIngredients(imageDataUrl: string, apiKey: string): P
       },
     }),
   });
-  if (!geminiResponse.ok) throw new Error('Photo analysis is temporarily unavailable.');
+  if (!geminiResponse.ok) {
+    const providerError = await geminiResponse.json().catch(() => null) as { error?: { message?: unknown } } | null;
+    const message = typeof providerError?.error?.message === 'string'
+      ? providerError.error.message
+      : `Gemini returned HTTP ${geminiResponse.status}.`;
+    console.error(`Gemini photo analysis failed (${geminiResponse.status}): ${message}`);
+    throw new Error(`Gemini photo analysis failed: ${message}`);
+  }
   const parsed = await geminiResponse.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
   const text = parsed.candidates?.[0]?.content?.parts?.map((part) => part.text ?? '').join('') ?? '';
   const result = JSON.parse(text) as { ingredients?: PhotoIngredient[] };
@@ -181,7 +195,7 @@ async function findUsdaFood(query: string, apiKey: string): Promise<FdcFood | nu
   const fdcResponse = await fetch(`${FDC_BASE_URL}/foods/search?api_key=${encodeURIComponent(apiKey)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, dataType: ['Survey (FNDDS)', 'Foundation'], pageSize: 1 }),
+    body: JSON.stringify({ query, dataType: ['Survey (FNDDS)', 'Foundation', 'Branded'], pageSize: 1 }),
   });
   if (!fdcResponse.ok) return null;
   const payload = await fdcResponse.json() as { foods?: FdcFood[] };
@@ -224,7 +238,21 @@ Deno.serve(async (request) => {
     if (!body.imageDataUrl) return response({ error: 'A meal photo is required.' }, 400);
     try {
       const ingredients = await identifyPhotoIngredients(body.imageDataUrl, geminiApiKey);
-      const matches = await Promise.all(ingredients.map(async (ingredient) => {
+      const matches = await Promise.all(ingredients.map(async (ingredient, index) => {
+        // A photo alone cannot verify a package's flavor, formulation, or label.
+        // Keep an editable draft instead of silently matching it to a wrong product.
+        if (ingredient.needs_details) {
+          const grams = Math.round(numberOrZero(ingredient.estimated_grams)) || 100;
+          return {
+            id: `photo-${index}`,
+            source: 'usda_fndds' as FoodSource,
+            name: ingredient.name ?? 'food item',
+            servingGrams: grams,
+            servingLabel: `${grams}g needs review`,
+            photoQuestion: ingredient.question ?? 'Please add the brand, flavor, serving size, or nutrition-label values.',
+            nutrients: { calories: 0, protein: 0, carbs: 0, fats: 0 },
+          };
+        }
         const food = await findUsdaFood(ingredient.name!, apiKey);
         const grams = Math.round(numberOrZero(ingredient.estimated_grams));
         return food ? normalizeForGrams(food, grams) : null;

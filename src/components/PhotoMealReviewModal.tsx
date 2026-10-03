@@ -38,6 +38,12 @@ function withGrams(food: FoodItem, gramsText: string): FoodItem {
     };
 }
 
+function withNumber(food: FoodItem, field: 'calories' | 'protein' | 'carbs' | 'fats', value: string): FoodItem {
+    const number = Number.parseFloat(value);
+    if (!Number.isFinite(number) || number < 0) return food;
+    return { ...food, [field]: Math.round(number) };
+}
+
 export const PhotoMealReviewModal: React.FC<PhotoMealReviewModalProps> = ({
     visible,
     foods,
@@ -61,6 +67,14 @@ export const PhotoMealReviewModal: React.FC<PhotoMealReviewModalProps> = ({
 
     const updateGrams = (index: number, value: string) => {
         setItems((current) => current.map((item, itemIndex) => itemIndex === index ? withGrams(item, value) : item));
+    };
+
+    const updateItem = (index: number, updates: Partial<FoodItem>) => {
+        setItems((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...updates } : item));
+    };
+
+    const updateNutrient = (index: number, field: 'calories' | 'protein' | 'carbs' | 'fats', value: string) => {
+        setItems((current) => current.map((item, itemIndex) => itemIndex === index ? withNumber(item, field, value) : item));
     };
 
     const searchManualFood = async (query: string) => {
@@ -88,6 +102,20 @@ export const PhotoMealReviewModal: React.FC<PhotoMealReviewModalProps> = ({
         }]);
         setManualQuery('');
         setManualResults([]);
+    };
+
+    const addCustomFood = () => {
+        setItems((current) => [...current, {
+            id: `custom-${Date.now()}`,
+            name: 'custom food',
+            calories: 0,
+            protein: 0,
+            carbs: 0,
+            fats: 0,
+            servingGrams: 100,
+            servingLabel: '100g custom',
+            photoQuestion: 'Enter the nutrition-label values or your best estimate.',
+        }]);
     };
 
     const total = items.reduce((sum, item) => sum + item.calories, 0);
@@ -120,15 +148,22 @@ export const PhotoMealReviewModal: React.FC<PhotoMealReviewModalProps> = ({
                         </View>
                     ) : (
                         <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-                            <Text style={styles.notice}>Photo values are estimates. Packaged foods are more accurate with barcode scanning.</Text>
+                            <Text style={styles.notice}>Photo values are drafts. For packaged food, scan the barcode or enter its nutrition label—Gemini cannot verify a product’s flavor or formulation from a photo alone.</Text>
                             {items.map((item, index) => (
                                 <View key={`${item.id}-${index}`} style={styles.itemCard}>
                                     <View style={styles.itemTopLine}>
-                                        <Text style={styles.itemName}>{item.name}</Text>
+                                        <TextInput
+                                            value={item.name}
+                                            onChangeText={(value) => updateItem(index, { name: value })}
+                                            placeholder="food name"
+                                            placeholderTextColor="#8A8A8A"
+                                            style={styles.itemNameInput}
+                                        />
                                         <TouchableOpacity onPress={() => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index))} hitSlop={10}>
                                             <Ionicons name="trash-outline" size={20} color="#666" />
                                         </TouchableOpacity>
                                     </View>
+                                    {item.photoQuestion && <Text style={styles.question}>{item.photoQuestion}</Text>}
                                     <View style={styles.amountRow}>
                                         <TextInput
                                             value={String(item.servingGrams || 100)}
@@ -137,14 +172,34 @@ export const PhotoMealReviewModal: React.FC<PhotoMealReviewModalProps> = ({
                                             style={styles.gramsInput}
                                         />
                                         <Text style={styles.gramsLabel}>g estimated</Text>
-                                        <Text style={styles.kcal}>{Math.round(item.calories)} kcal</Text>
                                     </View>
-                                    <Text style={styles.macros}>P {Math.round(item.protein)}g  ·  C {Math.round(item.carbs)}g  ·  F {Math.round(item.fats)}g</Text>
+                                    <View style={styles.nutritionRow}>
+                                        {([
+                                            ['calories', 'kcal'],
+                                            ['protein', 'protein'],
+                                            ['carbs', 'carbs'],
+                                            ['fats', 'fat'],
+                                        ] as const).map(([field, label]) => (
+                                            <View key={field} style={styles.nutritionField}>
+                                                <TextInput
+                                                    value={String(Math.round(item[field]))}
+                                                    onChangeText={(value) => updateNutrient(index, field, value)}
+                                                    keyboardType="decimal-pad"
+                                                    style={styles.nutritionInput}
+                                                />
+                                                <Text style={styles.nutritionLabel}>{label}{field === 'calories' ? '' : ' g'}</Text>
+                                            </View>
+                                        ))}
+                                    </View>
                                 </View>
                             ))}
 
                             <View style={styles.manualSection}>
                                 <Text style={styles.manualTitle}>add a missing ingredient</Text>
+                                <TouchableOpacity style={styles.customButton} onPress={addCustomFood}>
+                                    <Ionicons name="create-outline" size={18} color="#252525" />
+                                    <Text style={styles.customButtonText}>enter a custom food or nutrition label</Text>
+                                </TouchableOpacity>
                                 <TextInput
                                     value={manualQuery}
                                     onChangeText={searchManualFood}
@@ -190,14 +245,19 @@ const styles = StyleSheet.create({
     stateText: { color: '#666', textAlign: 'center', lineHeight: 19 },
     itemCard: { borderWidth: 1, borderColor: '#E5E2DC', borderRadius: 14, padding: 13, marginBottom: 10, backgroundColor: '#FFF' },
     itemTopLine: { flexDirection: 'row', gap: 8, justifyContent: 'space-between', alignItems: 'center' },
-    itemName: { flex: 1, fontSize: 15, fontWeight: '600', color: '#252525' },
+    itemNameInput: { flex: 1, fontSize: 15, fontWeight: '600', color: '#252525', paddingVertical: 1 },
+    question: { color: '#8A4B0F', backgroundColor: '#FFF4D8', borderRadius: 9, padding: 8, marginTop: 9, fontSize: 12, lineHeight: 17 },
     amountRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10 },
     gramsInput: { width: 58, borderBottomWidth: 1, borderColor: '#999', paddingVertical: 2, textAlign: 'center', fontWeight: '700', color: '#252525' },
     gramsLabel: { color: '#666', marginLeft: 6, fontSize: 13 },
-    kcal: { marginLeft: 'auto', color: '#252525', fontWeight: '700' },
-    macros: { marginTop: 8, color: '#666', fontSize: 12 },
+    nutritionRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+    nutritionField: { flex: 1 },
+    nutritionInput: { borderWidth: 1, borderColor: '#D6D3CD', borderRadius: 8, height: 36, paddingHorizontal: 6, textAlign: 'center', color: '#252525', fontWeight: '700' },
+    nutritionLabel: { color: '#666', fontSize: 10, textAlign: 'center', marginTop: 4 },
     manualSection: { marginTop: 6, marginBottom: 18 },
     manualTitle: { fontSize: 15, color: '#252525', fontWeight: '700', marginBottom: 8 },
+    customButton: { flexDirection: 'row', gap: 7, alignItems: 'center', borderWidth: 1, borderColor: '#252525', borderRadius: 11, minHeight: 42, paddingHorizontal: 12, marginBottom: 10 },
+    customButtonText: { color: '#252525', fontWeight: '600', fontSize: 13 },
     manualInput: { borderWidth: 1, borderColor: '#D6D3CD', borderRadius: 12, paddingHorizontal: 12, height: 44, color: '#252525' },
     searchSpinner: { marginTop: 10 },
     manualResult: { minHeight: 44, borderBottomWidth: 1, borderColor: '#EEEAE3', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },

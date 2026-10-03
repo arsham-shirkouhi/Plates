@@ -6,6 +6,7 @@ import {
     TouchableOpacity,
     TextInput,
     Animated,
+    Alert,
     Dimensions,
     Keyboard,
     Platform,
@@ -27,6 +28,7 @@ import { PhotoMealReviewModal } from './PhotoMealReviewModal';
 import { useOverlay } from '../contexts/OverlayContext';
 import { MealType } from '../food/types';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -585,35 +587,44 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
 
     const handleTakePhoto = async () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        const permission = await ImagePicker.requestCameraPermissionsAsync();
-        if (!permission.granted) {
-            setSearchMessage('camera permission is needed to analyze a meal photo');
-            return;
-        }
-
-        const result = await ImagePicker.launchCameraAsync({
-            mediaTypes: ['images'],
-            quality: 0.55,
-            base64: true,
-            allowsEditing: false,
-        });
-        if (result.canceled || !result.assets[0]?.base64) return;
-
-        const asset = result.assets[0];
-        setShowPhotoReview(true);
-        setIsAnalyzingPhoto(true);
-        setPhotoError(null);
-        setPhotoFoods([]);
         try {
-            const mimeType = asset.mimeType || 'image/jpeg';
-            const foods = await analyzeFoodPhoto(`data:${mimeType};base64,${asset.base64}`);
+            const permission = await ImagePicker.requestCameraPermissionsAsync();
+            if (!permission.granted) {
+                Alert.alert('Camera access needed', 'Allow camera access in iPhone Settings → Expo Go → Camera, then try again.');
+                return;
+            }
+
+            const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ['images'],
+                quality: 0.55,
+                base64: true,
+                allowsEditing: false,
+            });
+            if (result.canceled || !result.assets[0]?.uri) return;
+
+            const asset = result.assets[0];
+            setShowPhotoReview(true);
+            setIsAnalyzingPhoto(true);
+            setPhotoError(null);
+            setPhotoFoods([]);
+            // Normalize iPhone HEIC/large camera files to a small JPEG. This keeps
+            // the function request well below Gemini's inline-image limit.
+            const normalized = await ImageManipulator.manipulateAsync(
+                asset.uri,
+                [{ resize: { width: 1280 } }],
+                { base64: true, compress: 0.65, format: ImageManipulator.SaveFormat.JPEG },
+            );
+            if (!normalized.base64) throw new Error('Unable to prepare that photo for analysis.');
+            const foods = await analyzeFoodPhoto(`data:image/jpeg;base64,${normalized.base64}`);
             if (foods.length === 0) {
                 setPhotoError('No foods could be confidently matched. You can still use search or barcode scanning.');
             } else {
                 setPhotoFoods(foods);
             }
         } catch (error) {
-            setPhotoError(error instanceof Error ? error.message : 'Photo analysis is unavailable right now.');
+            const message = error instanceof Error ? error.message : 'Unable to open the camera or analyze that photo.';
+            setPhotoError(message);
+            Alert.alert('Photo logging unavailable', message);
         } finally {
             setIsAnalyzingPhoto(false);
         }

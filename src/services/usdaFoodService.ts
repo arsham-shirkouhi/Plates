@@ -11,6 +11,7 @@ interface UsdaFoodPayload {
     barcode?: string;
     servingGrams: number;
     servingLabel: string;
+    photoQuestion?: string;
     nutrients: {
         calories: number;
         protein: number;
@@ -45,7 +46,17 @@ function toFoodItem(food: UsdaFoodPayload): FoodItem {
         barcode: food.barcode,
         servingGrams: food.servingGrams,
         servingLabel: food.servingLabel,
+        photoQuestion: food.photoQuestion,
     };
+}
+
+async function edgeFunctionMessage(error: unknown): Promise<string | null> {
+    if (!error || typeof error !== 'object' || !('context' in error)) return null;
+    const context = (error as { context?: unknown }).context;
+    if (!context || typeof context !== 'object' || !('clone' in context)) return null;
+    const response = context as Response;
+    const payload = await response.clone().json().catch(() => null) as { error?: unknown } | null;
+    return typeof payload?.error === 'string' ? payload.error : null;
 }
 
 async function invokeUsdaFood(body: Record<string, unknown>): Promise<FoodItem[]> {
@@ -55,7 +66,8 @@ async function invokeUsdaFood(body: Record<string, unknown>): Promise<FoodItem[]
 
     const { data, error } = await supabase.functions.invoke<UsdaFoodResponse>('usda-food', { body });
     if (error) {
-        throw new UsdaFoodServiceError('USDA food search is not available yet. Please try again shortly.', 'network');
+        const message = await edgeFunctionMessage(error);
+        throw new UsdaFoodServiceError(message ?? 'USDA food search is not available yet. Please try again shortly.', 'network');
     }
     if (!data || !Array.isArray(data.foods)) {
         throw new UsdaFoodServiceError(data?.error ?? 'USDA returned an invalid food response.', 'invalid-response');

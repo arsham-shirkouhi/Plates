@@ -16,6 +16,8 @@ export interface FoodItem {
     barcode?: string;
     servingGrams?: number;
     servingLabel?: string;
+    /** Clarification requested by photo analysis before treating an estimate as final. */
+    photoQuestion?: string;
 }
 
 // Common food items database
