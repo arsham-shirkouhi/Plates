@@ -65,6 +65,7 @@ export const styles = StyleSheet.create({
     widgetRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
+        alignItems: 'flex-start',
         marginTop: 16,
     },
     widgetSpacer: {

@@ -1,11 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Alert } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { fonts } from '../../constants/fonts';
-import { WORKOUT_COLORS } from '../../workout/constants';
 import { StartWorkoutRoutine } from '../../workout/startWorkoutTypes';
 import { formatRoutineSubtitle } from '../../workout/startWorkoutSelectors';
+import { HardListCard, HardStamp } from '../ui/HardListCard';
+import { PlatesIcon } from '../icons/PlatesIcon';
+import { WORKOUT_COLORS } from '../../workout/constants';
 
 interface RoutineListRowProps {
     routine: StartWorkoutRoutine;
@@ -24,7 +24,6 @@ export const RoutineListRow: React.FC<RoutineListRowProps> = ({
     onEdit,
     onDuplicate,
     onDelete,
-    isLast = false,
 }) => {
     const handleLongPress = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -47,53 +46,16 @@ export const RoutineListRow: React.FC<RoutineListRowProps> = ({
     };
 
     return (
-        <TouchableOpacity
-            style={[styles.row, !isLast && styles.rowBorder]}
+        <HardListCard
+            title={routine.name}
+            meta={formatRoutineSubtitle(routine)}
+            stamp={<HardStamp icon="dumbbell" fill={WORKOUT_COLORS.accent} />}
+            trailing={
+                <PlatesIcon name="play" size={18} color={WORKOUT_COLORS.text} fill={WORKOUT_COLORS.accent} />
+            }
             onPress={onPress}
             onLongPress={handleLongPress}
-            activeOpacity={0.75}
-            accessibilityRole="button"
             accessibilityLabel={`Start ${routine.name}`}
-            accessibilityHint="Long press for more options"
-        >
-            <View style={styles.copy}>
-                <Text style={styles.title}>{routine.name}</Text>
-                <Text style={styles.subtitle} numberOfLines={1}>
-                    {formatRoutineSubtitle(routine)}
-                </Text>
-            </View>
-            <Ionicons name="play" size={18} color={WORKOUT_COLORS.accent} />
-        </TouchableOpacity>
+        />
     );
 };
-
-const styles = StyleSheet.create({
-    row: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 14,
-        backgroundColor: WORKOUT_COLORS.background,
-    },
-    rowBorder: {
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: '#E0E0E0',
-    },
-    copy: {
-        flex: 1,
-        marginRight: 12,
-        minWidth: 0,
-    },
-    title: {
-        fontFamily: fonts.bold,
-        fontSize: 16,
-        color: WORKOUT_COLORS.text,
-        textTransform: 'lowercase',
-        marginBottom: 2,
-    },
-    subtitle: {
-        fontFamily: fonts.regular,
-        fontSize: 13,
-        color: WORKOUT_COLORS.placeholder,
-        textTransform: 'lowercase',
-    },
-});

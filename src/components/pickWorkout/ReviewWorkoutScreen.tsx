@@ -5,7 +5,6 @@ import {
     StyleSheet,
     TouchableOpacity,
     ScrollView,
-    TextInput,
     Animated as RNAnimated,
     Easing as RNEasing,
 } from 'react-native';
@@ -28,17 +27,7 @@ import { searchExercises, Exercise } from '../../services/exerciseService';
 import { createUniqueId } from '../../workout/workoutSelectors';
 import { useAuth } from '../../context/AuthContext';
 import { PendingReviewWorkout } from './PickWorkoutScreen';
-
-type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
-
-const MUSCLE_VISUALS: Record<MuscleGroup, { icon: IoniconName; tint: string; bg: string }> = {
-    chest: { icon: 'body-outline', tint: '#526EFF', bg: '#EAEEFF' },
-    shoulders: { icon: 'barbell-outline', tint: '#F4511E', bg: '#FBE9E7' },
-    arms: { icon: 'barbell-outline', tint: '#8E24AA', bg: '#F3E5F5' },
-    back: { icon: 'body-outline', tint: '#00897B', bg: '#E0F2F1' },
-    core: { icon: 'flame-outline', tint: '#FB8C00', bg: '#FFF3E0' },
-    legs: { icon: 'walk-outline', tint: '#3949AB', bg: '#E8EAF6' },
-};
+import { HardSearchBar } from '../ui/HardSearchBar';
 
 const SWAP_DURATION = 300;
 
@@ -374,63 +363,19 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
             <ReviewHeader onBack={onBack} />
 
             <View style={styles.chipRow}>
-                {pending.selectedMuscles.map((muscle) => {
-                    const visual = MUSCLE_VISUALS[muscle];
-                    return (
-                        <View
-                            key={muscle}
-                            style={[
-                                styles.chip,
-                                {
-                                    backgroundColor: WORKOUT_COLORS.completedRow,
-                                    borderColor: WORKOUT_COLORS.accent,
-                                },
-                            ]}
-                        >
-                            <Ionicons
-                                name={visual.icon}
-                                size={15}
-                                color={WORKOUT_COLORS.accent}
-                                style={styles.chipIcon}
-                            />
-                            <Text style={[styles.chipText, { color: WORKOUT_COLORS.accent }]}>
-                                {MUSCLE_GROUP_LABELS[muscle]}
-                            </Text>
-                        </View>
-                    );
-                })}
+                {pending.selectedMuscles.map((muscle) => (
+                    <View key={muscle} style={styles.chip}>
+                        <Text style={styles.chipText}>{MUSCLE_GROUP_LABELS[muscle]}</Text>
+                    </View>
+                ))}
             </View>
 
             <View style={styles.searchArea}>
-                <View style={styles.searchWrap}>
-                    <Ionicons
-                        name="search"
-                        size={20}
-                        color={WORKOUT_COLORS.placeholder}
-                        style={styles.searchIcon}
-                    />
-                    <TextInput
-                        style={styles.searchInput}
-                        value={query}
-                        onChangeText={setQuery}
-                        placeholder="search exercises"
-                        placeholderTextColor={WORKOUT_COLORS.placeholder}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        returnKeyType="search"
-                    />
-                    {query.length > 0 ? (
-                        <TouchableOpacity
-                            onPress={() => setQuery('')}
-                            style={styles.clearButton}
-                            accessibilityRole="button"
-                            accessibilityLabel="Clear search"
-                            activeOpacity={0.7}
-                        >
-                            <Ionicons name="close-circle" size={20} color={WORKOUT_COLORS.placeholder} />
-                        </TouchableOpacity>
-                    ) : null}
-                </View>
+                <HardSearchBar
+                    value={query}
+                    onChangeText={setQuery}
+                    placeholder="search exercises"
+                />
             </View>
 
             <View style={styles.body}>
@@ -493,15 +438,13 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
                                     onPress={() => addExercise(item)}
                                     accessibilityRole="button"
                                     accessibilityLabel={`Add ${item.name}`}
-                                    activeOpacity={0.6}
+                                    activeOpacity={0.7}
                                 >
                                     <View style={styles.rowCopy}>
                                         <Text style={styles.rowTitle}>{item.name.toLowerCase()}</Text>
                                         <Text style={styles.rowMeta}>{formatExerciseMeta(item)}</Text>
                                     </View>
-                                    <View style={styles.addButton}>
-                                        <Ionicons name="add" size={28} color={WORKOUT_COLORS.accent} />
-                                    </View>
+                                    <Ionicons name="add" size={28} color="#ADADAD" />
                                 </TouchableOpacity>
                             </Reanimated.View>
                         ))}
@@ -522,11 +465,11 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
                                     results.map((item, index) => (
                                         <TouchableOpacity
                                             key={`res-${item.id}-${index}`}
-                                            style={styles.dropdownRow}
+                                            style={styles.row}
                                             onPress={() => addFromSearch(item)}
                                             accessibilityRole="button"
                                             accessibilityLabel={`Add ${item.name}`}
-                                            activeOpacity={0.6}
+                                            activeOpacity={0.7}
                                         >
                                             <View style={styles.rowCopy}>
                                                 <Text style={styles.rowTitle}>{item.name.toLowerCase()}</Text>
@@ -536,13 +479,7 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
                                                     </Text>
                                                 ) : null}
                                             </View>
-                                            <View style={styles.addButton}>
-                                                <Ionicons
-                                                    name="add"
-                                                    size={28}
-                                                    color={WORKOUT_COLORS.accent}
-                                                />
-                                            </View>
+                                            <Ionicons name="add" size={28} color="#ADADAD" />
                                         </TouchableOpacity>
                                     ))
                                 ) : (
@@ -886,48 +823,20 @@ const styles = StyleSheet.create({
         paddingBottom: padding,
     },
     chip: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderWidth: 1.5,
-        borderRadius: 999,
         paddingHorizontal: 12,
         paddingVertical: 7,
-    },
-    chipIcon: {
-        marginRight: 6,
+        borderRadius: 999,
+        backgroundColor: '#F2F2F2',
     },
     chipText: {
         fontFamily: fonts.bold,
-        fontSize: 14,
+        fontSize: 13,
+        color: '#616161',
         textTransform: 'lowercase',
     },
     searchArea: {
         marginHorizontal: padding,
         marginBottom: 8,
-    },
-    searchWrap: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderWidth: 2,
-        borderColor: '#CCCCCC',
-        borderRadius: 12,
-        backgroundColor: WORKOUT_COLORS.background,
-    },
-    searchIcon: {
-        marginRight: 12,
-    },
-    searchInput: {
-        flex: 1,
-        fontFamily: fonts.regular,
-        fontSize: 18,
-        color: WORKOUT_COLORS.text,
-        textTransform: 'lowercase',
-        padding: 0,
-    },
-    clearButton: {
-        marginLeft: 8,
     },
     body: {
         flex: 1,
@@ -943,25 +852,46 @@ const styles = StyleSheet.create({
     },
     searchDropdown: {
         maxHeight: '70%',
-        borderWidth: 2,
-        borderColor: WORKOUT_COLORS.border,
-        borderRadius: 12,
         backgroundColor: WORKOUT_COLORS.background,
+        borderRadius: 12,
         overflow: 'hidden',
-        elevation: 8,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.12,
-        shadowRadius: 8,
     },
-    dropdownRow: {
+    row: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 12,
-        paddingVertical: 12,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: WORKOUT_COLORS.divider,
+        paddingVertical: 14,
+        paddingHorizontal: 7,
+        borderBottomWidth: 2,
+        borderBottomColor: '#F0F0F0',
+    },
+    rowCopy: {
+        flex: 1,
+        marginRight: 12,
+        minWidth: 0,
+    },
+    rowTitle: {
+        fontFamily: fonts.regular,
+        fontSize: 18,
+        color: WORKOUT_COLORS.text,
+        textTransform: 'lowercase',
+    },
+    rowMeta: {
+        fontFamily: fonts.regular,
+        fontSize: 14,
+        color: '#999',
+        textTransform: 'lowercase',
+        marginTop: 2,
+    },
+    addedCard: {
+        paddingVertical: 14,
+        paddingHorizontal: 7,
+        borderBottomWidth: 2,
+        borderBottomColor: '#F0F0F0',
+    },
+    addedTop: {
+        flexDirection: 'row',
+        alignItems: 'center',
     },
     scrollContent: {
         paddingHorizontal: padding,
@@ -990,29 +920,6 @@ const styles = StyleSheet.create({
     /** Extra gap so "recommended" reads as its own block below the workout. */
     sectionHeadingDivider: {
         marginTop: 40,
-    },
-    addButton: {
-        width: 32,
-        height: 32,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    row: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingVertical: 12,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: WORKOUT_COLORS.divider,
-    },
-    addedCard: {
-        paddingVertical: 12,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: WORKOUT_COLORS.divider,
-    },
-    addedTop: {
-        flexDirection: 'row',
-        alignItems: 'center',
     },
     iconButton: {
         width: 32,
@@ -1094,24 +1001,6 @@ const styles = StyleSheet.create({
     },
     reorderLabelDisabled: {
         color: WORKOUT_COLORS.placeholder,
-    },
-    rowCopy: {
-        flex: 1,
-        minWidth: 0,
-        marginRight: 8,
-    },
-    rowTitle: {
-        fontFamily: fonts.bold,
-        fontSize: 16,
-        color: WORKOUT_COLORS.text,
-        textTransform: 'lowercase',
-    },
-    rowMeta: {
-        fontFamily: fonts.regular,
-        fontSize: 14,
-        color: WORKOUT_COLORS.placeholder,
-        textTransform: 'lowercase',
-        marginTop: 2,
     },
     footer: {
         padding: padding,

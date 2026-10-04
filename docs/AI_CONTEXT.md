@@ -202,6 +202,43 @@ simulator (needs Xcode), `a` = Android emulator.
 - **2026-10-03 — Cursor:** Empty-state press matches the buttons: Cal + label drop 6px and the hard shadow fades out in 120ms.
 - **2026-10-03 — Cursor:** Tightened the gap between Cal and “add first exercises!”.
 - **2026-10-03 — Cursor:** Restored the black outline paths on the Cal empty-state SVG.
+- **2026-10-03 — Cursor:** Empty workout list is no longer a ScrollView; it only scrolls once exercise cards overflow.
+- **2026-10-04 — Cursor:** Empty state pops in (scale + rise spring) when the last exercise is removed.
+- **2026-10-04 — Cursor:** Revamped add-exercise picker: hard #252525 cards/shadows, body-part stamps via `PlatesIcon`, equipment/target meta, check-to-add. Placeholders until Harry’s custom icon set.
+- **2026-10-04 — Cursor:** Shared `HardSearchBar` + `HardListCard` now used for every search and picker list (add exercise, review workout, routines, add food, muscle name picker).
+- **2026-10-04 — Cursor:** Reverted add-food search/list to the lighter original rows — hard cards felt too congested there.
+- **2026-10-04 — Cursor:** Login/signup (shared `TextInput`) now match HardSearchBar: white field, 2.5 #252525 border, 4px hard offset.
+- **2026-10-04 — Cursor:** Slimmed exercise picker/review rows to food-log style (name + one meta + plus). Search bar stays hard-shadow.
+- **2026-10-04 — Cursor:** Add-exercise: dropped header rule, restored body-part stamp, thicker plus / blue tick when added.
+- **2026-10-04 — Cursor:** Plus/tick back to normal weight (blue check). Filter tags now use per-muscle color + stamp.
+- **2026-10-04 — Cursor:** Add-exercise plus now fires 2–4 blue particles along a random quadratic curve to the “N added” label, shrinking on the way.
+- **2026-10-04 — Cursor:** Add particles a bit larger/longer, tinted with that exercise’s body-part stamp color.
+- **2026-10-04 — Cursor:** Pinned “N added” above the exercise list so fly particles stay on-screen when scrolled.
+- **2026-10-04 — Cursor:** Extra space under the count row. Filter chips dropped the black stamp border (plain colored icons). Selecting a tag bursts body-part-colored particles from it.
+- **2026-10-04 — Cursor:** Exercise-row stamps lost the black border too; pulled the first list row up under the count.
+- **2026-10-04 — Cursor:** Add particles spawn immediately on plus (no measure/rAF delay) and travel faster.
+- **2026-10-04 — Cursor:** Bicep/tricep stamps use Harry’s flexed-arm PNG (`assets/images/icons/arms.png`).
+- **2026-10-04 — Cursor:** Plus/tick on add-exercise rows crossfade with a short rotate+scale instead of swapping.
+- **2026-10-04 — Cursor:** Add particles now measure the tapped plus and the “added” label in window space so they always fly from that button to the count.
+- **2026-10-04 — Cursor:** Slowed add particles (~500ms). Workout cards use body-part stamps + matching title color. Closing add-exercise focuses the first card (others collapsed); finishing all sets collapses that card and opens the next.
+- **2026-10-04 — Cursor:** Reverted accordion/focus-reset. Cards stay independently open; finishing all sets still collapses that card and expands the next.
+- **2026-10-04 — Cursor:** First workout card starts open; the rest start collapsed. Finishing all sets collapses that card and opens the next.
+- **2026-10-04 — Cursor:** Start-collapsed cards now open as header-only (collapse progress starts at 0, height 0) instead of flashing full then shrinking.
+- **2026-10-04 — Cursor:** Collapsed workout cards fade the body-part stamp out and slide the title left.
+- **2026-10-04 — Cursor:** Workout cards no longer show body-part stamps; title color still uses the muscle color.
+- **2026-10-04 — Cursor:** Workout card icons are back as flat muscle-colored marks (no stamp background); they still fade away when collapsed.
+- **2026-10-04 — Cursor:** Workout cards always show the flat PlatesIcon in the exercise color, expanded or collapsed.
+- **2026-10-04 — Cursor:** Completed workout-card icons fade to the same green as the done title.
+- **2026-10-04 — Cursor:** Today’s goals widget gets left-peek Cal (`cal_goals.png`); press scales him from a bit below middle-left.
+- **2026-10-04 — Cursor:** Cal on food log + today’s goals is empty-state only; he shrinks away from his corner when the first item appears.
+- **2026-10-04 — Cursor:** Double-tap today’s goals (header, empty, or list) opens add-todo; single tap still opens the overlay.
+- **2026-10-04 — Cursor:** Workout “in progress” stays `#F9C117`. Food/exercise keep the hard buttons; their stack (incl. shadows) fits the today’s-goals square.
+- **2026-10-04 — Cursor:** Small Cal-with-fork peek in the food log widget’s bottom-right (`assets/images/icons/cal_food.png`).
+- **2026-10-04 — Cursor:** Restored Cal’s #252525 outline, made him bigger, and left-aligned empty-state copy on two lines so it doesn’t cover him.
+- **2026-10-04 — Cursor:** Pressing the food log widget scales Cal up slightly from the bottom-right corner.
+- **2026-10-04 — Cursor:** Add-food sheet now slides/fades out before unmounting when you tap away or swipe down.
+- **2026-10-04 — Cursor:** Habit Chains is a separate home widget next to the timer (`ENABLE_HABIT_CHAINS`). Today’s goals is untouched. Data lives in AsyncStorage `plates.habit_chains.${userId}`.
+- **2026-10-04 — Cursor:** Habit Tree removed. Habit Trail (`ENABLE_HABIT_TRAIL`) is the visualization on the habit-chains card. Extra state in `plates.habit_trail.${userId}`.
 
 ## 10. What to do next (as of the top of §9)
 

@@ -26,6 +26,8 @@ import { SetTableHeader } from './SetTableHeader';
 import { SetRow } from './SetRow';
 import { COMPLETE_BG, COMPLETE_BORDER, COMPLETE_INK, FlatMinus, FlatPlus, FlatTick } from './FlatMark';
 import { Confetti, ConfettiParticle } from '../Confetti';
+import { getBodyPartStamp, PlatesIcon } from '../icons/PlatesIcon';
+import { mapBodyPartToMuscleGroup } from '../../workout/muscleGroups';
 
 const DUST_COLORS = ['#8A8A8A', '#B0B0B0', '#6E6E6E', '#C8C8C8', '#9A9A9A', '#D4D4D4'];
 
@@ -57,6 +59,9 @@ interface ExerciseCardProps {
     onRemoveExercise: () => void;
     onAddWarmupSets: () => void;
     onAddToSuperset: () => void;
+    startCollapsed?: boolean;
+    expandNonce?: number;
+    onCompletedAllSets?: () => void;
 }
 
 export const ExerciseCard: React.FC<ExerciseCardProps> = ({
@@ -74,9 +79,13 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
     onRemoveExercise,
     onAddWarmupSets,
     onAddToSuperset,
+    startCollapsed = false,
+    expandNonce = 0,
+    onCompletedAllSets,
 }) => {
     const [noteVisible, setNoteVisible] = useState(!!exercise.note);
-    const [collapsed, setCollapsed] = useState(false);
+    const [collapsed, setCollapsed] = useState(startCollapsed);
+    const stamp = getBodyPartStamp(exercise.bodyPart ?? mapBodyPartToMuscleGroup(undefined, exercise.name) ?? undefined);
     const railColor = exercise.supersetId
         ? SUPERSET_COLORS[supersetColorIndex % SUPERSET_COLORS.length]
         : undefined;
@@ -184,7 +193,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
 
     const [measuredReady, setMeasuredReady] = useState(false);
     const measuredHeight = useSharedValue(0);
-    const collapseProgress = useSharedValue(1); // 1 = expanded, 0 = collapsed
+    const collapseProgress = useSharedValue(startCollapsed ? 0 : 1);
 
     useEffect(() => {
         collapseProgress.value = withTiming(collapsed ? 0 : 1, {
@@ -198,14 +207,22 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
         setCollapsed((current) => !current);
     };
 
+    useEffect(() => {
+        if (expandNonce > 0) setCollapsed(false);
+    }, [expandNonce]);
+
     const bodyStyle = useAnimatedStyle(() => {
         const measured = measuredHeight.value;
+        const progress = collapseProgress.value;
         if (measured <= 0) {
-            return { opacity: collapseProgress.value };
+            if (progress < 0.5) {
+                return { height: 0, opacity: 0 };
+            }
+            return { opacity: progress };
         }
         return {
-            height: measured * collapseProgress.value,
-            opacity: collapseProgress.value,
+            height: measured * progress,
+            opacity: progress,
         };
     });
 
@@ -234,7 +251,8 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
         if (wasAllComplete.current) return;
         wasAllComplete.current = true;
         setCollapsed(true);
-    }, [allSetsComplete]);
+        onCompletedAllSets?.();
+    }, [allSetsComplete, onCompletedAllSets]);
 
     const cardCompleteStyle = useAnimatedStyle(() => ({
         backgroundColor: interpolateColor(
@@ -253,7 +271,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
         color: interpolateColor(
             completeProgress.value,
             [0, 1],
-            [WORKOUT_COLORS.accent, COMPLETE_INK]
+            [stamp.fill, COMPLETE_INK]
         ),
     }));
 
@@ -268,6 +286,14 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
     const doneLabelStyle = useAnimatedStyle(() => ({
         opacity: completeProgress.value,
         transform: [{ translateX: (1 - completeProgress.value) * 8 }],
+    }));
+
+    const iconLiveStyle = useAnimatedStyle(() => ({
+        opacity: 1 - completeProgress.value,
+    }));
+
+    const iconDoneStyle = useAnimatedStyle(() => ({
+        opacity: completeProgress.value,
     }));
 
     const exitSlotStyle = useAnimatedStyle(() => {
@@ -338,6 +364,26 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                     accessibilityRole="button"
                     accessibilityLabel={collapsed ? `Expand ${exercise.name}` : `Collapse ${exercise.name}`}
                 >
+                    <View style={styles.iconSlot}>
+                        <Reanimated.View style={[styles.iconLayer, iconLiveStyle]}>
+                            <PlatesIcon
+                                name={stamp.icon}
+                                size={24}
+                                color={stamp.fill}
+                                fill={stamp.fill}
+                                strokeWidth={1.2}
+                            />
+                        </Reanimated.View>
+                        <Reanimated.View style={[styles.iconLayer, iconDoneStyle]}>
+                            <PlatesIcon
+                                name={stamp.icon}
+                                size={24}
+                                color={COMPLETE_INK}
+                                fill={COMPLETE_INK}
+                                strokeWidth={1.2}
+                            />
+                        </Reanimated.View>
+                    </View>
                     <View style={styles.titleTextWrap}>
                         <Reanimated.Text style={[styles.title, titleCompleteStyle]}>
                             {exercise.name.toLowerCase()}
@@ -366,12 +412,12 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
             <Reanimated.View
                 style={[
                     styles.collapsibleInner,
-                    measuredReady && styles.collapsibleInnerLocked,
+                    (measuredReady || startCollapsed) && styles.collapsibleInnerLocked,
                     innerStyle,
                 ]}
                 onLayout={(event) => {
                     const measured = event.nativeEvent.layout.height;
-                    if (measured <= 0 || collapsed) return;
+                    if (measured <= 0) return;
                     if (measuredHeight.value <= 0) {
                         measuredHeight.value = measured;
                         setMeasuredReady(true);
@@ -516,6 +562,18 @@ const styles = StyleSheet.create({
         minWidth: 0,
         flexDirection: 'row',
         alignItems: 'center',
+    },
+    iconSlot: {
+        width: 24,
+        height: 24,
+        marginRight: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    iconLayer: {
+        position: 'absolute',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     titleTextWrap: {
         flex: 1,

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, Easing, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, Easing, TextInput, Alert, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../constants/fonts';
@@ -65,6 +65,63 @@ export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
         } else {
             setShowOverlay(true);
         }
+    };
+
+    const lastTapRef = useRef(0);
+    const tapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const DOUBLE_TAP_DELAY = 300;
+
+    const handleCardTap = (onSingle?: () => void) => {
+        const now = Date.now();
+        if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
+            if (tapTimeoutRef.current) {
+                clearTimeout(tapTimeoutRef.current);
+                tapTimeoutRef.current = null;
+            }
+            lastTapRef.current = 0;
+            handleAddTodo();
+            return;
+        }
+        lastTapRef.current = now;
+        if (tapTimeoutRef.current) {
+            clearTimeout(tapTimeoutRef.current);
+        }
+        tapTimeoutRef.current = setTimeout(() => {
+            tapTimeoutRef.current = null;
+            onSingle?.();
+        }, DOUBLE_TAP_DELAY);
+    };
+
+    const calPress = useRef(new Animated.Value(1)).current;
+    const isGoalsEmpty = goals.filter((goal) => !goal.completed).length === 0;
+    const calShow = useRef(new Animated.Value(isGoalsEmpty ? 1 : 0)).current;
+    const calScale = Animated.multiply(calShow, calPress);
+
+    React.useEffect(() => {
+        Animated.timing(calShow, {
+            toValue: isGoalsEmpty ? 1 : 0,
+            duration: isGoalsEmpty ? 280 : 220,
+            easing: isGoalsEmpty ? Easing.out(Easing.back(1.15)) : Easing.in(Easing.cubic),
+            useNativeDriver: true,
+        }).start();
+    }, [calShow, isGoalsEmpty]);
+
+    const growCal = () => {
+        if (!isGoalsEmpty) return;
+        Animated.spring(calPress, {
+            toValue: 1.16,
+            friction: 6,
+            tension: 240,
+            useNativeDriver: true,
+        }).start();
+    };
+    const resetCal = () => {
+        Animated.spring(calPress, {
+            toValue: 1,
+            friction: 7,
+            tension: 180,
+            useNativeDriver: true,
+        }).start();
     };
     const [confettiParticles, setConfettiParticles] = useState<Array<{ id: number; originX: number; originY: number; angle: number }>>([]);
     const [removingIndex, setRemovingIndex] = useState<number | null>(null);
@@ -210,10 +267,29 @@ export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
                 });
             }}
         >
+            <Animated.View
+                pointerEvents="none"
+                style={[
+                    styles.calPeek,
+                    {
+                        transformOrigin: ['0%', '62%', 0],
+                        opacity: calShow,
+                        transform: [{ scale: calScale }],
+                    },
+                ]}
+            >
+                <Image
+                    source={require('../../assets/images/icons/cal_goals.png')}
+                    style={styles.calImage}
+                    resizeMode="contain"
+                />
+            </Animated.View>
             {/* Header */}
             <TouchableOpacity
                 style={styles.header}
-                onPress={handleWidgetPress}
+                onPress={() => handleCardTap(handleWidgetPress)}
+                onPressIn={growCal}
+                onPressOut={resetCal}
                 activeOpacity={0.7}
             >
                 <Text style={styles.headerText}>today's goals</Text>
@@ -225,10 +301,15 @@ export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
 
             {/* Goals list */}
             {incompleteGoals.length === 0 ? (
-                <EmptyAreaWithDoubleTap onDoubleTap={handleAddTodo} />
+                <EmptyAreaWithDoubleTap
+                    onPress={() => handleCardTap(handleWidgetPress)}
+                    onPressIn={growCal}
+                    onPressOut={resetCal}
+                />
             ) : (
                 <TouchableOpacity
                     style={styles.goalsContainer}
+                    onPress={() => handleCardTap(handleWidgetPress)}
                     activeOpacity={1}
                 >
                     {visibleGoals.map((goal, displayIndex) => {
@@ -286,48 +367,25 @@ export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
 };
 
 interface EmptyAreaWithDoubleTapProps {
-    onDoubleTap: () => void;
+    onPress: () => void;
+    onPressIn?: () => void;
+    onPressOut?: () => void;
 }
 
-const EmptyAreaWithDoubleTap: React.FC<EmptyAreaWithDoubleTapProps> = ({ onDoubleTap }) => {
-    const lastTapTime = useRef<number>(0);
-    const doubleTapTimer = useRef<NodeJS.Timeout | null>(null);
-
-    React.useEffect(() => {
-        return () => {
-            if (doubleTapTimer.current) {
-                clearTimeout(doubleTapTimer.current);
-            }
-        };
-    }, []);
-
-    const handlePress = () => {
-        const now = Date.now();
-        const timeSinceLastTap = now - lastTapTime.current;
-
-        if (doubleTapTimer.current) {
-            clearTimeout(doubleTapTimer.current);
-            doubleTapTimer.current = null;
-        }
-
-        if (timeSinceLastTap < 300) {
-            onDoubleTap();
-            lastTapTime.current = 0;
-        } else {
-            lastTapTime.current = now;
-            doubleTapTimer.current = setTimeout(() => {
-                lastTapTime.current = 0;
-            }, 300);
-        }
-    };
-
+const EmptyAreaWithDoubleTap: React.FC<EmptyAreaWithDoubleTapProps> = ({
+    onPress,
+    onPressIn,
+    onPressOut,
+}) => {
     return (
         <TouchableOpacity
             style={styles.emptyContainer}
-            onPress={handlePress}
+            onPress={onPress}
+            onPressIn={onPressIn}
+            onPressOut={onPressOut}
             activeOpacity={0.7}
         >
-            <Text style={styles.emptyText}>hold to remove &  double tap to add!</Text>
+            <Text style={styles.emptyText}>hold to remove &{'\n'}double tap to add!</Text>
         </TouchableOpacity>
     );
 };
@@ -592,6 +650,18 @@ const styles = StyleSheet.create({
         paddingBottom: 15,
         overflow: 'hidden',
     },
+    calPeek: {
+        position: 'absolute',
+        left: -22,
+        top: '46%',
+        width: 96,
+        height: 86,
+        zIndex: 1,
+    },
+    calImage: {
+        width: '100%',
+        height: '100%',
+    },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -614,19 +684,23 @@ const styles = StyleSheet.create({
     goalsContainer: {
         flex: 1,
         justifyContent: 'flex-start',
+        paddingLeft: 6,
     },
     emptyContainer: {
         flex: 1,
         justifyContent: 'center',
-        alignItems: 'center',
-        paddingVertical: 20,
+        alignItems: 'flex-end',
+        paddingLeft: 72,
+        paddingRight: 4,
+        paddingVertical: 12,
     },
     emptyText: {
         fontSize: 14,
         fontFamily: fonts.regular,
         color: 'rgba(37, 37, 37, 0.5)',
         textTransform: 'lowercase',
-        textAlign: 'center',
+        textAlign: 'right',
+        lineHeight: 20,
     },
     emptySubtext: {
         fontSize: 14,

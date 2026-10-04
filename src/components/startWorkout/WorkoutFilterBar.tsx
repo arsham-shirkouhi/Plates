@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { fonts } from '../../constants/fonts';
 import { WORKOUT_COLORS } from '../../workout/constants';
 import { MUSCLE_GROUP_LABELS, MuscleGroup } from '../../workout/muscleGroups';
 import { StartWorkoutFilters } from '../../workout/startWorkoutTypes';
+import { HardSearchBar } from '../ui/HardSearchBar';
 
 interface WorkoutFilterBarProps {
     filters: StartWorkoutFilters;
@@ -90,14 +91,13 @@ export const WorkoutFilterBar: React.FC<WorkoutFilterBarProps> = ({ filters, onC
             </View>
 
             {searchOpen ? (
-                <TextInput
+                <HardSearchBar
                     value={filters.searchQuery}
                     onChangeText={(searchQuery) => onChange({ ...filters, searchQuery })}
                     placeholder="search routines"
-                    placeholderTextColor={WORKOUT_COLORS.placeholder}
-                    style={styles.searchInput}
                     autoFocus
                     accessibilityLabel="Search routines by name"
+                    containerStyle={styles.searchBar}
                 />
             ) : null}
         </View>
@@ -160,16 +160,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         marginLeft: 'auto',
     },
-    searchInput: {
+    searchBar: {
         marginTop: 10,
-        borderWidth: 2,
-        borderColor: '#CCCCCC',
-        borderRadius: 10,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        fontFamily: fonts.regular,
-        fontSize: 15,
-        color: WORKOUT_COLORS.text,
-        backgroundColor: WORKOUT_COLORS.background,
     },
 });

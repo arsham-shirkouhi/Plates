@@ -18,6 +18,9 @@ import {
     MuscleRecencyMap,
     formatDaysSinceLabel,
 } from '../../workout/muscleGroups';
+import { getBodyPartStamp } from '../icons/PlatesIcon';
+import { FlatTick } from '../activeWorkout/FlatMark';
+import { HardListCard, HardStamp } from '../ui/HardListCard';
 
 interface MuscleNamePickerProps {
     visible: boolean;
@@ -44,24 +47,23 @@ export const MuscleNamePicker: React.FC<MuscleNamePickerProps> = ({
                     <ScrollView style={styles.list}>
                         {MUSCLE_GROUPS.map((muscle) => {
                             const selected = selectedMuscles.includes(muscle);
+                            const stamp = getBodyPartStamp(muscle);
                             return (
-                                <TouchableOpacity
+                                <HardListCard
                                     key={muscle}
-                                    style={styles.row}
+                                    title={MUSCLE_GROUP_LABELS[muscle]}
+                                    meta={formatDaysSinceLabel(recency[muscle])}
+                                    stamp={<HardStamp icon={stamp.icon} fill={stamp.fill} />}
+                                    highlighted={selected}
+                                    trailing={
+                                        <View style={[styles.checkbox, selected && styles.checkboxChecked]}>
+                                            {selected ? <FlatTick size={12} color="#FFFFFF" /> : null}
+                                        </View>
+                                    }
                                     onPress={() => onToggleMuscle(muscle)}
                                     accessibilityRole="checkbox"
                                     accessibilityState={{ checked: selected }}
-                                >
-                                    <View style={[styles.checkbox, selected && styles.checkboxChecked]}>
-                                        {selected ? <Text style={styles.checkmark}>x</Text> : null}
-                                    </View>
-                                    <View style={styles.rowCopy}>
-                                        <Text style={styles.rowTitle}>{MUSCLE_GROUP_LABELS[muscle]}</Text>
-                                        <Text style={styles.rowMeta}>
-                                            {formatDaysSinceLabel(recency[muscle])}
-                                        </Text>
-                                    </View>
-                                </TouchableOpacity>
+                                />
                             );
                         })}
                     </ScrollView>
@@ -119,49 +121,20 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     list: {
-        maxHeight: 320,
-    },
-    row: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 10,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: '#E0E0E0',
-        gap: 12,
+        maxHeight: 360,
     },
     checkbox: {
-        width: 22,
-        height: 22,
-        borderWidth: 2,
+        width: 28,
+        height: 28,
+        borderWidth: 2.5,
         borderColor: WORKOUT_COLORS.border,
-        borderRadius: 4,
+        borderRadius: 8,
         alignItems: 'center',
         justifyContent: 'center',
+        backgroundColor: WORKOUT_COLORS.background,
     },
     checkboxChecked: {
         backgroundColor: WORKOUT_COLORS.accent,
-        borderColor: WORKOUT_COLORS.accent,
-    },
-    checkmark: {
-        fontFamily: fonts.bold,
-        fontSize: 12,
-        color: WORKOUT_COLORS.background,
-    },
-    rowCopy: {
-        flex: 1,
-    },
-    rowTitle: {
-        fontFamily: fonts.bold,
-        fontSize: 15,
-        color: WORKOUT_COLORS.text,
-        textTransform: 'lowercase',
-    },
-    rowMeta: {
-        fontFamily: fonts.regular,
-        fontSize: 12,
-        color: WORKOUT_COLORS.placeholder,
-        textTransform: 'lowercase',
-        marginTop: 2,
     },
     doneButton: {
         marginTop: 14,

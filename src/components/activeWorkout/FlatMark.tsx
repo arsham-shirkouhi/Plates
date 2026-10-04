@@ -8,15 +8,16 @@ export const COMPLETE_INK = '#1F6B38';
 interface MarkProps {
     color: string;
     size?: number;
+    strokeWidth?: number;
 }
 
-export const FlatTick: React.FC<MarkProps> = ({ color, size = 16 }) => (
+export const FlatTick: React.FC<MarkProps> = ({ color, size = 16, strokeWidth = 2.2 }) => (
     <Svg width={size} height={size} viewBox="0 0 16 16">
         <Polyline
             points="2.2,8.2 6.2,12.2 13.8,3.4"
             fill="none"
             stroke={color}
-            strokeWidth={2.2}
+            strokeWidth={strokeWidth}
             strokeLinecap="square"
             strokeLinejoin="miter"
         />
@@ -37,15 +38,15 @@ export const FlatBox: React.FC<MarkProps> = ({ color, size = 16 }) => (
     </Svg>
 );
 
-export const FlatPlus: React.FC<MarkProps> = ({ color, size = 16 }) => (
+export const FlatPlus: React.FC<MarkProps> = ({ color, size = 16, strokeWidth = 2.2 }) => (
     <Svg width={size} height={size} viewBox="0 0 16 16">
-        <Line x1={8} y1={2.4} x2={8} y2={13.6} stroke={color} strokeWidth={2.2} strokeLinecap="square" />
-        <Line x1={2.4} y1={8} x2={13.6} y2={8} stroke={color} strokeWidth={2.2} strokeLinecap="square" />
+        <Line x1={8} y1={2.4} x2={8} y2={13.6} stroke={color} strokeWidth={strokeWidth} strokeLinecap="square" />
+        <Line x1={2.4} y1={8} x2={13.6} y2={8} stroke={color} strokeWidth={strokeWidth} strokeLinecap="square" />
     </Svg>
 );
 
-export const FlatMinus: React.FC<MarkProps> = ({ color, size = 16 }) => (
+export const FlatMinus: React.FC<MarkProps> = ({ color, size = 16, strokeWidth = 2.2 }) => (
     <Svg width={size} height={size} viewBox="0 0 16 16">
-        <Line x1={2.4} y1={8} x2={13.6} y2={8} stroke={color} strokeWidth={2.2} strokeLinecap="square" />
+        <Line x1={2.4} y1={8} x2={13.6} y2={8} stroke={color} strokeWidth={strokeWidth} strokeLinecap="square" />
     </Svg>
 );

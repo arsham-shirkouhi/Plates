@@ -21,6 +21,7 @@ export interface WorkoutExercise {
     id: string;
     exerciseId: string;
     name: string;
+    bodyPart?: string;
     thumbnailUrl?: string;
     supersetId?: string;
     note: string;
@@ -91,6 +92,7 @@ export type ActiveWorkoutAction =
 export interface CatalogExercise {
     exerciseId: string;
     name: string;
+    bodyPart?: string;
     thumbnailUrl?: string;
     previousSets?: PreviousSetSnapshot[];
 }

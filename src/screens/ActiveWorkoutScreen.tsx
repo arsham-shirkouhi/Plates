@@ -170,14 +170,14 @@ export const ActiveWorkoutScreen: React.FC = () => {
         mergeParams({ startWorkoutPrompt: undefined });
     }, [startWorkoutPrompt, state.workout, mergeParams]);
 
-    const handleSelectExercise = (exercise: { id: string; name: string }) => {
+    const handleSelectExercise = (exercise: { id: string; name: string; bodyPart?: string }) => {
         const alreadyAdded = state.workout?.exercises.some(
             (item) =>
                 item.exerciseId === exercise.id ||
                 item.name.trim().toLowerCase() === exercise.name.trim().toLowerCase()
         );
         if (alreadyAdded) return;
-        addExercises([{ exerciseId: exercise.id, name: exercise.name }]);
+        addExercises([{ exerciseId: exercise.id, name: exercise.name, bodyPart: exercise.bodyPart }]);
     };
 
     const handleRemoveExercise = (exercise: { id: string; name: string }) => {

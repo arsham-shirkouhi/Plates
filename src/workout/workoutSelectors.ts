@@ -147,6 +147,7 @@ export function createDefaultSet(previousSet?: WorkoutSet): WorkoutSet {
 export function createWorkoutExercise(input: {
     exerciseId: string;
     name: string;
+    bodyPart?: string;
     thumbnailUrl?: string;
     previousSets?: Array<{ weight: number; reps: number }>;
 }): WorkoutExercise {
@@ -158,6 +159,7 @@ export function createWorkoutExercise(input: {
         id: createUniqueId('wx-'),
         exerciseId: input.exerciseId,
         name: input.name,
+        bodyPart: input.bodyPart,
         thumbnailUrl: input.thumbnailUrl,
         note: '',
         restSeconds: 60,

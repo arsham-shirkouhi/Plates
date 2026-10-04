@@ -128,6 +128,9 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
     const detailAddButtonTranslateY = useRef(new Animated.Value(0)).current;
     const detailAddButtonShadowHeight = useRef(new Animated.Value(4)).current;
     const searchRequestId = useRef(0);
+    const [sheetOpen, setSheetOpen] = useState(visible);
+    const closingRef = useRef(false);
+    const closeRef = useRef<() => void>(() => {});
 
     // Detail overlay state
     const [detailServingSize, setDetailServingSize] = useState('');
@@ -172,7 +175,7 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
             onPanResponderRelease: (_, gestureState) => {
                 if (gestureState.dy > 100 || gestureState.vy > 0.5) {
                     // Swipe down to dismiss
-                    handleClose();
+                    closeRef.current();
                 } else {
                     // Snap back
                     Animated.spring(slideAnim, {
@@ -188,6 +191,8 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
 
     useEffect(() => {
         if (visible) {
+            closingRef.current = false;
+            setSheetOpen(true);
             // Reset height to default
             sheetHeightAnim.setValue(SHEET_HEIGHT);
 
@@ -287,42 +292,8 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
             //         ])
             //     ).start();
             // }, 300);
-        } else {
-            // When closing, animate out first, then reset state
-            Animated.parallel([
-                Animated.timing(slideAnim, {
-                    toValue: SCREEN_HEIGHT + TOASTER_OFFSET,
-                    duration: 250,
-                    easing: Easing.in(Easing.ease),
-                    useNativeDriver: true,
-                }),
-                Animated.timing(backdropOpacity, {
-                    toValue: 0,
-                    duration: 200,
-                    easing: Easing.out(Easing.ease),
-                    useNativeDriver: true,
-                }),
-            ]).start(() => {
-                // Reset state after animation completes
-                setSearchQuery('');
-                setSearchResults([]);
-                setIsSearching(false);
-                setSearchMessage(null);
-                setAddedItems(new Set());
-                setSelectedMeal(null);
-                setSelectedFoodDetail(null);
-                setShowUnitSelector(false);
-                sheetHeightAnim.setValue(SHEET_HEIGHT);
-                keyboardHeightAnim.setValue(0);
-                aiSuggestionOpacity.setValue(0);
-                aiSuggestionTranslateY.setValue(20);
-                skeletonAnim.setValue(0);
-                calIconRotate.setValue(0);
-                calIconBounce.setValue(0);
-                detailAddButtonTranslateY.setValue(0);
-                detailAddButtonShadowHeight.setValue(4);
-                Keyboard.dismiss();
-            });
+        } else if (sheetOpen && !closingRef.current) {
+            closeRef.current();
         }
     }, [visible]);
 
@@ -378,14 +349,7 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
         };
     }, []);
 
-    const handleClose = () => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-        // CRITICAL: Call onClose FIRST to immediately set visible=false
-        // This removes Modal from render tree before any animations
-        onClose();
-
-        // Reset all state immediately
+    const resetSheetState = () => {
         setSearchQuery('');
         setSearchResults([]);
         setIsSearching(false);
@@ -405,6 +369,33 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
         detailAddButtonShadowHeight.setValue(4);
         Keyboard.dismiss();
     };
+
+    const handleClose = () => {
+        if (closingRef.current) return;
+        closingRef.current = true;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        Keyboard.dismiss();
+
+        Animated.parallel([
+            Animated.timing(slideAnim, {
+                toValue: SCREEN_HEIGHT + TOASTER_OFFSET,
+                duration: 280,
+                easing: Easing.in(Easing.cubic),
+                useNativeDriver: true,
+            }),
+            Animated.timing(backdropOpacity, {
+                toValue: 0,
+                duration: 240,
+                easing: Easing.out(Easing.ease),
+                useNativeDriver: true,
+            }),
+        ]).start(() => {
+            resetSheetState();
+            setSheetOpen(false);
+            onClose();
+        });
+    };
+    closeRef.current = handleClose;
 
     const handleAddFood = (food: FoodItem, mealOverride?: MealType | null) => {
         // Track that this item was added (for visual feedback)
@@ -426,9 +417,7 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
         // This ensures Modal is removed from render tree before any state updates
         // Use setTimeout to ensure close happens in next tick
         setTimeout(() => {
-            if (onClose) {
-                onClose();
-            }
+            handleClose();
         }, 0);
 
         onAddFood(food, mealOverride ?? selectedMeal);
@@ -633,16 +622,17 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
     // Show all quick add items (users can add multiple)
     const availableQuickAdd = quickAddItems;
 
-    // CRITICAL: Don't render Modal at all when not visible
-    // React Native Modal has a bug where it can block touches even after visible={false}
-    // The only reliable fix is to completely remove it from the render tree
-    // Use Modal to ensure it appears above all other content including navbar
+    // Keep the Modal mounted until the slide-out finishes so dismiss can animate.
+    if (!sheetOpen) {
+        return null;
+    }
+
     return (
         <Modal
-            visible={visible}
+            visible
             transparent={true}
             animationType="none"
-            onRequestClose={onClose}
+            onRequestClose={handleClose}
             statusBarTranslucent={true}
             presentationStyle="overFullScreen"
         >
@@ -784,7 +774,6 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
                                     {/* Handle bar */}
                                     <View style={styles.handleBar} />
 
-                                    {/* Search Bar */}
                                     <View style={styles.searchContainer}>
                                         <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
                                         <TextInput
@@ -980,10 +969,12 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
                                         }}
                                         activeOpacity={0.7}
                                     >
-                                        <Text style={[
-                                            styles.unitSelectorItemText,
-                                            detailServingSize === unit && styles.unitSelectorItemTextSelected,
-                                        ]}>
+                                        <Text
+                                            style={[
+                                                styles.unitSelectorItemText,
+                                                detailServingSize === unit && styles.unitSelectorItemTextSelected,
+                                            ]}
+                                        >
                                             {unit}
                                         </Text>
                                         {detailServingSize === unit && (
@@ -1028,10 +1019,9 @@ interface QuickAddItemProps {
 const QuickAddItem: React.FC<QuickAddItemProps> = ({ item, onAdd, onPress, isAdded }) => {
     const fadeAnim = useRef(new Animated.Value(1)).current;
     const scaleAnim = useRef(new Animated.Value(1)).current;
-    const iconColorAnim = useRef(new Animated.Value(0)).current; // 0 = not added, 1 = added
+    const iconColorAnim = useRef(new Animated.Value(0)).current;
 
     const handleAdd = () => {
-        // Animation
         Animated.parallel([
             Animated.sequence([
                 Animated.timing(scaleAnim, {
@@ -1054,14 +1044,13 @@ const QuickAddItem: React.FC<QuickAddItemProps> = ({ item, onAdd, onPress, isAdd
                 toValue: 1,
                 duration: 200,
                 easing: Easing.out(Easing.ease),
-                useNativeDriver: false, // Color animation doesn't support native driver
+                useNativeDriver: false,
             }),
         ]).start();
 
         onAdd();
     };
 
-    // Reset icon color and fade when isAdded becomes false
     useEffect(() => {
         if (!isAdded) {
             Animated.parallel([
@@ -1079,7 +1068,7 @@ const QuickAddItem: React.FC<QuickAddItemProps> = ({ item, onAdd, onPress, isAdd
                 }),
             ]).start();
         }
-    }, [isAdded]);
+    }, [fadeAnim, iconColorAnim, isAdded]);
 
     return (
         <Animated.View
@@ -1118,30 +1107,22 @@ const QuickAddItem: React.FC<QuickAddItemProps> = ({ item, onAdd, onPress, isAdd
                     style={{
                         opacity: iconColorAnim.interpolate({
                             inputRange: [0, 1],
-                            outputRange: [1, 0], // Fade out add icon
+                            outputRange: [1, 0],
                         }),
                     }}
                 >
-                    <Ionicons
-                        name="add"
-                        size={28}
-                        color="#ADADAD"
-                    />
+                    <Ionicons name="add" size={28} color="#ADADAD" />
                 </Animated.View>
                 <Animated.View
                     style={{
                         position: 'absolute',
                         opacity: iconColorAnim.interpolate({
                             inputRange: [0, 1],
-                            outputRange: [0, 1], // Fade in checkmark
+                            outputRange: [0, 1],
                         }),
                     }}
                 >
-                    <Ionicons
-                        name="checkmark"
-                        size={28}
-                        color="#252525"
-                    />
+                    <Ionicons name="checkmark" size={28} color="#252525" />
                 </Animated.View>
             </TouchableOpacity>
         </Animated.View>

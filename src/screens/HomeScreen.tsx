@@ -17,6 +17,9 @@ import { AIWidget } from '../components/AIWidget';
 import { TodaysGoalsWidget } from '../components/TodaysGoalsWidget';
 import { TimerWidget } from '../components/TimerWidget'; // ✅ ADD
 import { QuickActionsWidget } from '../components/QuickActionsWidget';
+// HABIT CHAINS
+import { ENABLE_HABIT_CHAINS } from '../habitChains/featureFlag';
+import { HabitChainsWidget } from '../components/habitChains/HabitChainsWidget';
 import { TestControls } from '../components/TestControls';
 import { GradientBackground } from '../components/GradientBackground';
 import { AuraOverlay } from '../components/AuraOverlay';
@@ -646,10 +649,11 @@ export const HomeScreen: React.FC = () => {
               initialSeconds={300}
               onInteractionChange={handleTimerInteractionChange}
             />
-            <View style={styles.widgetSpacer} />
+            {/* HABIT CHAINS */}
+            {ENABLE_HABIT_CHAINS ? <HabitChainsWidget /> : <View style={styles.widgetSpacer} />}
           </View>
 
-          {!loadingProfile && macros && (
+          {/* {!loadingProfile && macros && (
             <TestControls consumed={consumed} onUpdate={handleTestUpdate} onReset={handleTestReset} />
           )}
 
@@ -669,7 +673,7 @@ export const HomeScreen: React.FC = () => {
             loading={loggingOut}
             disabled={loggingOut}
             containerStyle={styles.logoutButton}
-          />
+          /> */}
         </ScrollView>
       </View>
 

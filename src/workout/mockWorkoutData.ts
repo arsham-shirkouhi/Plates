@@ -263,6 +263,9 @@ export function buildWorkoutExercisesFromExerciseTemplates(
         id: createUniqueId('wx-'),
         exerciseId: exerciseTemplate.exerciseId,
         name: exerciseTemplate.name,
+        bodyPart:
+            exerciseTemplate.bodyPart ??
+            MOCK_EXERCISES.find((item) => item.id === exerciseTemplate.exerciseId)?.bodyPart,
         note: '',
         restSeconds: exerciseTemplate.restSeconds ?? 60,
         sets: exerciseTemplate.sets.map((setTemplate): WorkoutSet => ({

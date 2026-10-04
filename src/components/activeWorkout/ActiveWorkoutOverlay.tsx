@@ -81,6 +81,7 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
     } = useActiveWorkout();
 
     const workout = state.workout;
+    const [expandTarget, setExpandTarget] = useState<{ id: string; nonce: number } | null>(null);
     const presentation = state.presentation;
     const isFullscreen = presentation === 'fullscreen';
     const screenHeight = SCREEN_HEIGHT;
@@ -96,8 +97,24 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
     const minimizedShellTop = screenHeight - MINI_BAR_HEIGHT - widgetBottomInset;
 
     const [bottomActionsHeight, setBottomActionsHeight] = useState(0);
+    const [scrollViewportH, setScrollViewportH] = useState(0);
+    const [scrollContentH, setScrollContentH] = useState(0);
     const [celebration, setCelebration] = useState<ConfettiParticle[]>([]);
     const expandProgress = useSharedValue(isFullscreen ? 1 : 0);
+
+    const handleCompletedAllSets = useCallback(
+        (exerciseId: string) => {
+            const list = workout?.exercises ?? [];
+            const index = list.findIndex((exercise) => exercise.id === exerciseId);
+            const next = list[index + 1];
+            if (!next) return;
+            setExpandTarget((current) => ({
+                id: next.id,
+                nonce: (current?.nonce ?? 0) + 1,
+            }));
+        },
+        [workout?.exercises]
+    );
 
     const celebrateAtPoint = useCallback((origin: { x: number; y: number }) => {
         const burst: ConfettiParticle[] = Array.from({ length: 18 }, (_, i) => ({
@@ -194,6 +211,9 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
         }
     });
 
+    const isEmptyList = workout.exercises.length === 0;
+    const canScroll = !isEmptyList && scrollContentH > scrollViewportH + 1;
+
     const handleFinish = () => {
         if (workout.exercises.length === 0) {
             void finishWorkout().then(() => {
@@ -232,57 +252,70 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
                         collapsePanHandlers={collapsePanResponder.panHandlers}
                     />
                     <ActiveWorkoutStatsStrip elapsedSeconds={elapsedSeconds} volume={volume} sets={sets} />
-                    <ScrollView
-                        ref={scrollRef}
-                        style={styles.scroll}
-                        contentContainerStyle={[
-                            styles.scrollContent,
-                            workout.exercises.length === 0 && styles.scrollContentEmpty,
-                        ]}
-                        keyboardShouldPersistTaps="handled"
-                        showsVerticalScrollIndicator={false}
-                    >
-                        {workout.exercises.length === 0 ? (
+                    {isEmptyList ? (
+                        <View style={[styles.scroll, styles.emptyList]}>
                             <EmptyExerciseState onAddPress={onAddExercises} />
-                        ) : null}
-                        {workout.exercises.map((exercise) => (
-                            <View
-                                key={exercise.id}
-                                onLayout={(event) => {
-                                    exerciseOffsetsRef.current[exercise.id] = event.nativeEvent.layout.y;
-                                }}
-                            >
-                                <ExerciseCard
-                                    exercise={exercise}
-                                    supersetColorIndex={
-                                        exercise.supersetId
-                                            ? supersetColorMap.get(exercise.supersetId)
-                                            : undefined
-                                    }
-                                    showRpe={state.settings.showRpeColumn}
-                                    onUpdateNote={(note) => updateExerciseNote(exercise.id, note)}
-                                    onUpdateRestSeconds={(restSeconds) =>
-                                        updateRestSeconds(exercise.id, restSeconds)
-                                    }
-                                    onAddSet={() => addSet(exercise.id)}
-                                    onUpdateSet={(setId, patch) => updateSet(exercise.id, setId, patch)}
-                                    onToggleSetComplete={(setId) => toggleSetComplete(exercise.id, setId)}
-                                    onApplyPreviousSet={(setId) => applyPreviousSet(exercise.id, setId)}
-                                    onChangeSetType={(setId, type) => changeSetType(exercise.id, setId, type)}
-                                    onRemoveSet={(setId) => removeSet(exercise.id, setId)}
-                                    onRemoveExercise={() => removeExercise(exercise.id)}
-                                    onAddWarmupSets={() => {
-                                        addSet(exercise.id);
-                                        const latest = exercise.sets[exercise.sets.length - 1];
-                                        if (latest) {
-                                            changeSetType(exercise.id, latest.id, 'warmup');
-                                        }
+                        </View>
+                    ) : (
+                        <ScrollView
+                            ref={scrollRef}
+                            style={styles.scroll}
+                            contentContainerStyle={styles.scrollContent}
+                            keyboardShouldPersistTaps="handled"
+                            showsVerticalScrollIndicator={false}
+                            scrollEnabled={canScroll}
+                            bounces={canScroll}
+                            alwaysBounceVertical={canScroll}
+                            overScrollMode={canScroll ? 'auto' : 'never'}
+                            onLayout={(event) => setScrollViewportH(event.nativeEvent.layout.height)}
+                            onContentSizeChange={(_, height) => setScrollContentH(height)}
+                        >
+                            {workout.exercises.map((exercise, index) => (
+                                <View
+                                    key={exercise.id}
+                                    onLayout={(event) => {
+                                        exerciseOffsetsRef.current[exercise.id] = event.nativeEvent.layout.y;
                                     }}
-                                    onAddToSuperset={() => addToSuperset([exercise.id])}
-                                />
-                            </View>
-                        ))}
-                    </ScrollView>
+                                >
+                                    <ExerciseCard
+                                        exercise={exercise}
+                                        startCollapsed={index > 0}
+                                        expandNonce={expandTarget?.id === exercise.id ? expandTarget.nonce : 0}
+                                        onCompletedAllSets={() => handleCompletedAllSets(exercise.id)}
+                                        supersetColorIndex={
+                                            exercise.supersetId
+                                                ? supersetColorMap.get(exercise.supersetId)
+                                                : undefined
+                                        }
+                                        showRpe={state.settings.showRpeColumn}
+                                        onUpdateNote={(note) => updateExerciseNote(exercise.id, note)}
+                                        onUpdateRestSeconds={(restSeconds) =>
+                                            updateRestSeconds(exercise.id, restSeconds)
+                                        }
+                                        onAddSet={() => addSet(exercise.id)}
+                                        onUpdateSet={(setId, patch) => updateSet(exercise.id, setId, patch)}
+                                        onToggleSetComplete={(setId) =>
+                                            toggleSetComplete(exercise.id, setId)
+                                        }
+                                        onApplyPreviousSet={(setId) => applyPreviousSet(exercise.id, setId)}
+                                        onChangeSetType={(setId, type) =>
+                                            changeSetType(exercise.id, setId, type)
+                                        }
+                                        onRemoveSet={(setId) => removeSet(exercise.id, setId)}
+                                        onRemoveExercise={() => removeExercise(exercise.id)}
+                                        onAddWarmupSets={() => {
+                                            addSet(exercise.id);
+                                            const latest = exercise.sets[exercise.sets.length - 1];
+                                            if (latest) {
+                                                changeSetType(exercise.id, latest.id, 'warmup');
+                                            }
+                                        }}
+                                        onAddToSuperset={() => addToSuperset([exercise.id])}
+                                    />
+                                </View>
+                            ))}
+                        </ScrollView>
+                    )}
 
                     <View
                         style={styles.bottomActionsLayer}
@@ -394,8 +427,7 @@ const styles = StyleSheet.create({
         paddingTop: 8,
         paddingBottom: 24,
     },
-    scrollContentEmpty: {
-        flexGrow: 1,
+    emptyList: {
         justifyContent: 'center',
     },
     miniLayer: {

@@ -49,11 +49,10 @@ export const RoutineList: React.FC<RoutineListProps> = ({
 
     return (
         <View style={styles.list}>
-            {routines.map((routine, index) => (
+            {routines.map((routine) => (
                 <RoutineListRow
                     key={`${routine.source}-${routine.id}`}
                     routine={routine}
-                    isLast={index === routines.length - 1}
                     onPress={() => onStartRoutine(routine)}
                     onPreview={() => onPreviewRoutine(routine)}
                     onEdit={() => onPreviewRoutine(routine)}
@@ -67,8 +66,7 @@ export const RoutineList: React.FC<RoutineListProps> = ({
 
 const styles = StyleSheet.create({
     list: {
-        borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: '#E0E0E0',
+        paddingTop: 4,
     },
     empty: {
         paddingVertical: 20,

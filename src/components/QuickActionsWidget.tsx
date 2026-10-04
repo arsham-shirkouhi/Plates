@@ -17,9 +17,9 @@ const widgetSpacing = 16;
 const availableWidth = screenWidth - containerPadding - widgetSpacing;
 const widgetSize = availableWidth / 2;
 const widgetGap = 15;
-const actionHeight = (widgetSize - widgetGap) / 2;
 const SHADOW_OFFSET = 4;
 const PRESS_ANIM_MS = 120;
+const actionHeight = (widgetSize - widgetGap - SHADOW_OFFSET) / 2;
 
 const formatCount = (count: number) => {
   if (count <= 0) return 'none logged';
@@ -48,18 +48,17 @@ export const QuickActionsWidget: React.FC<QuickActionsWidgetProps> = ({
 
       <QuickActionButton
         height={actionHeight}
-        backgroundColor={workoutInProgress ? '#526EFF' : '#F9C117'}
+        backgroundColor="#F9C117"
         title={workoutInProgress ? 'in progress' : 'log exercise!'}
         subtitle={workoutInProgress ? 'tap to resume' : formatCount(exerciseCount)}
-        titleColor={workoutInProgress ? '#FFFFFF' : '#252525'}
-        subtitleColor={workoutInProgress ? '#FFFFFF' : '#252525'}
-        pressedLook={workoutInProgress}
+        titleColor="#252525"
+        subtitleColor="#252525"
         topRight={workoutInProgress ? <LiveIndicator /> : null}
         icon={
           <Ionicons
             name={workoutInProgress ? 'barbell' : 'add'}
             size={workoutInProgress ? 20 : 24}
-            color={workoutInProgress ? '#FFFFFF' : '#252525'}
+            color="#252525"
             style={styles.icon}
           />
         }
@@ -94,8 +93,6 @@ const QuickActionButton: React.FC<QuickActionButtonProps> = ({
   pressedLook = false,
   topRight = null,
 }) => {
-  // When pressedLook is on, the button rests in its "pushed down" position
-  // so it reads as actively engaged while still animating on touch.
   const restY = pressedLook ? SHADOW_OFFSET : 0;
   const restShadow = pressedLook ? 0 : 1;
 
@@ -221,7 +218,8 @@ const LiveIndicator: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: 'transparent',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
+    gap: widgetGap,
   },
   actionWrap: {
     position: 'relative',
@@ -260,9 +258,6 @@ const styles = StyleSheet.create({
     textTransform: 'lowercase',
     marginTop: 'auto',
   },
-  lightText: {
-    color: '#FFFFFF',
-  },
   textBlock: {
     flex: 1,
     alignSelf: 'stretch',
@@ -289,12 +284,12 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#252525',
   },
   liveDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#252525',
   },
 });

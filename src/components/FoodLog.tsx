@@ -1,4 +1,4 @@
-import React, { forwardRef, useImperativeHandle, useRef } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Animated, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { fonts } from '../constants/fonts';
@@ -36,7 +36,10 @@ export const FoodLog = forwardRef<FoodLogHandle, FoodLogProps>(({
     const rootRef = useRef<View>(null);
     const lastRectRef = useRef<FoodLogTargetRect | null>(null);
     const pulseAnim = useRef(new Animated.Value(0)).current;
+    const calPress = useRef(new Animated.Value(1)).current;
     const isEmpty = !items || items.length === 0;
+    const calShow = useRef(new Animated.Value(isEmpty ? 1 : 0)).current;
+    const calScale = Animated.multiply(calShow, calPress);
     const lastTapRef = useRef<number>(0);
     const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const DOUBLE_TAP_DELAY = 300;
@@ -125,6 +128,34 @@ export const FoodLog = forwardRef<FoodLogHandle, FoodLogProps>(({
         outputRange: [1, 1.035],
     });
 
+    useEffect(() => {
+        Animated.timing(calShow, {
+            toValue: isEmpty ? 1 : 0,
+            duration: isEmpty ? 280 : 220,
+            easing: isEmpty ? Easing.out(Easing.back(1.15)) : Easing.in(Easing.cubic),
+            useNativeDriver: true,
+        }).start();
+    }, [calShow, isEmpty]);
+
+    const growCal = () => {
+        if (!isEmpty) return;
+        Animated.spring(calPress, {
+            toValue: 1.16,
+            friction: 6,
+            tension: 240,
+            useNativeDriver: true,
+        }).start();
+    };
+
+    const resetCal = () => {
+        Animated.spring(calPress, {
+            toValue: 1,
+            friction: 7,
+            tension: 180,
+            useNativeDriver: true,
+        }).start();
+    };
+
     return (
         <Animated.View
             ref={rootRef}
@@ -135,8 +166,27 @@ export const FoodLog = forwardRef<FoodLogHandle, FoodLogProps>(({
             <TouchableOpacity
                 style={styles.container}
                 onPress={handlePress}
+                onPressIn={growCal}
+                onPressOut={resetCal}
                 activeOpacity={0.7}
             >
+                <Animated.View
+                    pointerEvents="none"
+                    style={[
+                        styles.calCorner,
+                        {
+                            transformOrigin: ['100%', '100%', 0],
+                            opacity: calShow,
+                            transform: [{ scale: calScale }],
+                        },
+                    ]}
+                >
+                    <Image
+                        source={require('../../assets/images/icons/cal_food.png')}
+                        style={styles.calImage}
+                        resizeMode="contain"
+                    />
+                </Animated.View>
                 <View style={styles.header}>
                     <Text style={styles.headerText}>food log</Text>
                     <Ionicons name="chevron-forward" size={20} color="#252525" />
@@ -146,7 +196,9 @@ export const FoodLog = forwardRef<FoodLogHandle, FoodLogProps>(({
 
                 {isEmpty ? (
                     <View style={styles.emptyStateContainer}>
-                        <Text style={styles.emptyStateText}>tap to view, double tap to log meal!</Text>
+                        <Text style={styles.emptyStateText}>
+                            tap to view,{'\n'}double tap to log meal!
+                        </Text>
                     </View>
                 ) : (
                     <View style={styles.itemsContainer}>
@@ -192,6 +244,19 @@ const styles = StyleSheet.create({
         paddingHorizontal: 15,
         marginTop: 16,
         height: 140,
+        overflow: 'hidden',
+    },
+    calCorner: {
+        position: 'absolute',
+        right: -6,
+        bottom: -8,
+        width: 92,
+        height: 98,
+        zIndex: 1,
+    },
+    calImage: {
+        width: '100%',
+        height: '100%',
     },
     header: {
         flexDirection: 'row',
@@ -218,16 +283,19 @@ const styles = StyleSheet.create({
     emptyStateContainer: {
         flex: 1,
         justifyContent: 'center',
-        alignItems: 'center',
-        paddingVertical: 20,
+        alignItems: 'flex-start',
+        paddingLeft: 2,
+        paddingRight: 88,
+        paddingVertical: 8,
         minHeight: 60,
     },
     emptyStateText: {
-        fontSize: 16,
+        fontSize: 15,
         fontFamily: fonts.regular,
         color: 'rgba(37, 37, 37, 0.5)',
         textTransform: 'lowercase',
-        textAlign: 'center',
+        textAlign: 'left',
+        lineHeight: 21,
     },
     itemRow: {
         flexDirection: 'row',

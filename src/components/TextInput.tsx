@@ -1,8 +1,16 @@
 import React from 'react';
-import { TextInput as RNTextInput, TextInputProps as RNTextInputProps, StyleSheet, View, ViewStyle } from 'react-native';
-import { fonts } from '../constants/fonts';
+import {
+    TextInput as RNTextInput,
+    TextInputProps as RNTextInputProps,
+    StyleSheet,
+    View,
+    ViewStyle,
+    TouchableOpacity,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { TouchableOpacity } from 'react-native';
+import { fonts } from '../constants/fonts';
+import { WORKOUT_COLORS } from '../workout/constants';
+import { HARD_SHADOW } from './ui/HardSearchBar';
 
 export type TextInputVariant = 'default' | 'password';
 
@@ -23,75 +31,64 @@ export const TextInput: React.FC<TextInputProps> = ({
     style,
     ...props
 }) => {
-    const getInputStyle = () => {
-        return {
-            backgroundColor: '#F5F5F5',
-            borderWidth: 2,
-            borderColor: '#252525',
-            borderRadius: 10,
-            paddingHorizontal: 15,
-            paddingVertical: 15,
-            fontSize: 18,
-            fontFamily: fonts.regular,
-            color: '#252525',
-            width: 360,
-            height: 50,
-        };
-    };
+    const showToggle = variant === 'password' || showPasswordToggle;
 
-    if (variant === 'password' || showPasswordToggle) {
-        return (
-            <View style={[styles.passwordContainer, containerStyle]}>
+    return (
+        <View style={[styles.wrap, containerStyle]}>
+            <View style={styles.shadow} />
+            <View style={styles.field}>
                 <RNTextInput
-                    style={[getInputStyle(), styles.passwordInput, style]}
-                    placeholderTextColor="#999"
+                    style={[styles.input, style]}
+                    placeholderTextColor={WORKOUT_COLORS.placeholder}
                     secureTextEntry={false}
                     {...props}
                 />
-                {showPasswordToggle && (
-                    <TouchableOpacity
-                        onPress={onTogglePassword}
-                        style={styles.eyeIcon}
-                    >
+                {showToggle ? (
+                    <TouchableOpacity onPress={onTogglePassword} style={styles.eye} activeOpacity={0.7}>
                         <Ionicons
                             name={isPasswordVisible ? 'eye-off-outline' : 'eye-outline'}
                             size={20}
-                            color="#252525"
+                            color={WORKOUT_COLORS.text}
                         />
                     </TouchableOpacity>
-                )}
+                ) : null}
             </View>
-        );
-    }
-
-    return (
-        <RNTextInput
-            style={[getInputStyle(), style]}
-            placeholderTextColor="#999"
-            {...props}
-        />
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
-    passwordContainer: {
+    wrap: {
+        width: 360,
+        paddingBottom: HARD_SHADOW,
+        alignSelf: 'center',
+    },
+    shadow: {
+        ...StyleSheet.absoluteFill,
+        top: HARD_SHADOW,
+        borderRadius: 12,
+        backgroundColor: WORKOUT_COLORS.border,
+    },
+    field: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#F5F5F5',
-        borderWidth: 2,
-        borderColor: '#252525',
-        borderRadius: 10,
-        width: 360,
-        height: 50,
+        minHeight: 50,
+        paddingHorizontal: 14,
+        backgroundColor: WORKOUT_COLORS.background,
+        borderRadius: 12,
+        borderWidth: 2.5,
+        borderColor: WORKOUT_COLORS.border,
+        gap: 10,
     },
-    passwordInput: {
+    input: {
         flex: 1,
-        backgroundColor: 'transparent',
-        borderWidth: 0,
-        paddingRight: 0,
+        fontSize: 18,
+        fontFamily: fonts.regular,
+        color: WORKOUT_COLORS.text,
+        paddingVertical: 12,
+        paddingHorizontal: 0,
     },
-    eyeIcon: {
-        paddingRight: 15,
-        paddingLeft: 10,
+    eye: {
+        padding: 4,
     },
 });
