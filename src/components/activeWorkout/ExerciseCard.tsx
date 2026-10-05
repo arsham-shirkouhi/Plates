@@ -7,7 +7,6 @@ import {
     TextInput,
     Alert,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import Reanimated, {
     Easing,
     Extrapolation,
@@ -21,10 +20,9 @@ import Reanimated, {
 import { fonts } from '../../constants/fonts';
 import { EXERCISE_EXPAND_MS, SUPERSET_COLORS, WORKOUT_COLORS } from '../../workout/constants';
 import { WorkoutExercise } from '../../workout/types';
-import { formatRestDuration } from '../../workout/workoutSelectors';
 import { SetTableHeader } from './SetTableHeader';
 import { SetRow } from './SetRow';
-import { COMPLETE_BG, COMPLETE_BORDER, COMPLETE_INK, FlatMinus, FlatPlus, FlatTick } from './FlatMark';
+import { COMPLETE_BG, COMPLETE_BORDER, COMPLETE_INK, FlatDots, FlatMinus, FlatPlus, FlatTick } from './FlatMark';
 import { Confetti, ConfettiParticle } from '../Confetti';
 import { getBodyPartStamp, PlatesIcon } from '../icons/PlatesIcon';
 import { mapBodyPartToMuscleGroup } from '../../workout/muscleGroups';
@@ -46,7 +44,6 @@ interface ExerciseCardProps {
     supersetColorIndex?: number;
     showRpe?: boolean;
     onUpdateNote: (note: string) => void;
-    onUpdateRestSeconds: (restSeconds: number) => void;
     onAddSet: () => void;
     onUpdateSet: (
         setId: string,
@@ -69,7 +66,6 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
     supersetColorIndex = 0,
     showRpe = false,
     onUpdateNote,
-    onUpdateRestSeconds,
     onAddSet,
     onUpdateSet,
     onToggleSetComplete,
@@ -163,18 +159,6 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
             { text: 'Add Warm-up Sets', onPress: onAddWarmupSets },
             { text: 'Add to Superset', onPress: onAddToSuperset },
             { text: 'Remove Exercise', style: 'destructive', onPress: requestRemove },
-            { text: 'Cancel', style: 'cancel' },
-        ]);
-    };
-
-    const openRestPicker = () => {
-        Alert.alert('Rest timer', 'Choose rest duration', [
-            { text: 'Off', onPress: () => onUpdateRestSeconds(0) },
-            { text: '1:00', onPress: () => onUpdateRestSeconds(60) },
-            { text: '1:30', onPress: () => onUpdateRestSeconds(90) },
-            { text: '2:00', onPress: () => onUpdateRestSeconds(120) },
-            { text: '2:30', onPress: () => onUpdateRestSeconds(150) },
-            { text: '3:00', onPress: () => onUpdateRestSeconds(180) },
             { text: 'Cancel', style: 'cancel' },
         ]);
     };
@@ -401,7 +385,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                     </Reanimated.View>
                 ) : null}
                 <TouchableOpacity onPress={openMenu} style={styles.menuButton}>
-                    <Ionicons name="ellipsis-horizontal" size={20} color={WORKOUT_COLORS.text} />
+                    <FlatDots color={WORKOUT_COLORS.text} size={20} />
                 </TouchableOpacity>
             </View>
 
@@ -441,10 +425,6 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                     multiline
                 />
             ) : null}
-
-            <TouchableOpacity style={styles.restChip} onPress={openRestPicker}>
-                <Text style={styles.restChipText}>⏱ {formatRestDuration(exercise.restSeconds)}</Text>
-            </TouchableOpacity>
 
             <SetTableHeader showRpe={showRpe} />
             {exercise.sets.map((set, index) => (
@@ -611,20 +591,6 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: WORKOUT_COLORS.text,
         minHeight: 44,
-    },
-    restChip: {
-        alignSelf: 'flex-start',
-        marginHorizontal: 14,
-        marginBottom: 10,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 999,
-        backgroundColor: '#F3F4F6',
-    },
-    restChipText: {
-        fontFamily: fonts.bold,
-        fontSize: 12,
-        color: WORKOUT_COLORS.text,
     },
     setActionsRow: {
         flexDirection: 'row',

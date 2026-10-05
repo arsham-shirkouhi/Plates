@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../icons/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../../constants/fonts';
@@ -35,7 +35,7 @@ export const MuscleSelectTopBar: React.FC<MuscleSelectTopBarProps> = ({
                 accessibilityRole="button"
                 accessibilityLabel="Close muscle select"
             >
-                <Ionicons name="close" size={24} color={WORKOUT_COLORS.text} />
+                <Icon name="close" size={24} color={WORKOUT_COLORS.text} />
             </TouchableOpacity>
 
             <View style={styles.toggleRow} accessibilityRole="tablist">

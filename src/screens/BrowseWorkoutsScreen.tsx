@@ -8,7 +8,7 @@ import {
     Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../components/icons/Icon';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -76,7 +76,7 @@ export const BrowseWorkoutsScreen: React.FC = () => {
                             <>
                                 <Text style={styles.workoutCardStatSeparator}>•</Text>
                                 <View style={styles.likesContainer}>
-                                    <Ionicons name="heart" size={14} color="#9E9E9E" />
+                                    <Icon name="heart" size={14} color="#9E9E9E" />
                                     <Text style={styles.workoutCardStatText}>{workout.likes}</Text>
                                 </View>
                             </>
@@ -86,7 +86,7 @@ export const BrowseWorkoutsScreen: React.FC = () => {
                         <Text style={styles.workoutCardAuthor}>by {workout.author}</Text>
                     )}
                 </View>
-                <Ionicons name="chevron-forward" size={20} color="#252525" />
+                <Icon name="chevron-forward" size={20} color="#252525" />
             </View>
         </TouchableOpacity>
     );
@@ -103,7 +103,7 @@ export const BrowseWorkoutsScreen: React.FC = () => {
                                 onPress={() => navigation.goBack()}
                                 activeOpacity={0.7}
                             >
-                                <Ionicons name="chevron-back" size={24} color="#526EFF" />
+                                <Icon name="chevron-back" size={24} color="#526EFF" />
                             </TouchableOpacity>
                             <View style={styles.headerCenter}>
                                 <Text style={styles.headerTitle}>browse workouts</Text>

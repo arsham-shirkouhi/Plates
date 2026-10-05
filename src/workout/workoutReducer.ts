@@ -191,7 +191,11 @@ export function activeWorkoutReducer(
                 });
                 const toggled = sets.find((set) => set.id === action.payload.setId);
                 if (toggled?.completed) {
-                    nextRestTimer = shouldStartRestTimer({ ...exercise, sets }, action.payload.setId, exercise.restSeconds);
+                    nextRestTimer = shouldStartRestTimer(
+                        { ...exercise, sets },
+                        action.payload.setId,
+                        state.settings.defaultRestSeconds ?? exercise.restSeconds
+                    );
                     const nextSupersetExercise = getNextSupersetExercise(
                         { ...state.workout, exercises: state.workout.exercises },
                         exercise.id

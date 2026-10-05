@@ -1,7 +1,7 @@
 // HABIT TRAIL
 import React, { useEffect, useRef } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../icons/Icon';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../../constants/fonts';
 import { HabitChain } from '../../habitChains/types';
@@ -73,7 +73,7 @@ export const HabitTrailCompact: React.FC<HabitTrailCompactProps> = ({
         <Text style={styles.caption} numberOfLines={1}>
           {trailCaption(chains)}
         </Text>
-        <Ionicons name="expand-outline" size={15} color="#252525" />
+        <Icon name="expand-outline" size={15} color="#252525" />
       </TouchableOpacity>
     </View>
   );

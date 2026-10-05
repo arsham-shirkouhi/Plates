@@ -100,6 +100,20 @@ export function getExerciseSetProgress(exercise: WorkoutExercise): { completed: 
     return { completed, total: exercise.sets.length };
 }
 
+export function createManualRestTimer(
+    durationSeconds: number,
+    exerciseId = 'manual'
+): RestTimerState {
+    const now = Date.now();
+    return {
+        exerciseId,
+        setId: `manual-${now}`,
+        startedAt: now,
+        endsAt: now + durationSeconds * 1000,
+        durationSeconds,
+    };
+}
+
 export function getRestRemainingSeconds(restTimer: RestTimerState | null, now = Date.now()): number {
     if (!restTimer) return 0;
     return Math.max(0, Math.ceil((restTimer.endsAt - now) / 1000));
@@ -203,6 +217,7 @@ export function getInitialStoreState(): ActiveWorkoutStoreState {
             showRpeColumn: false,
             restTimerSoundEnabled: false,
             restTimerEnabled: true,
+            defaultRestSeconds: 60,
         },
         scrollTargetExerciseId: null,
         isHydrated: false,

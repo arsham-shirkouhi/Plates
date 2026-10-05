@@ -7,7 +7,7 @@ import {
     Animated,
     Easing,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from './icons/Icon';
 import Reanimated, {
     Easing as ReanimatedEasing,
     Extrapolation,
@@ -116,7 +116,7 @@ export const FoodLogMealCard: React.FC<FoodLogMealCardProps> = ({
                 <View style={styles.mealCardHeaderTop}>
                     <Text style={styles.mealCardLabel}>{label}</Text>
                     <Reanimated.View style={chevronStyle}>
-                        <Ionicons name="chevron-forward" size={20} color="#252525" />
+                        <Icon name="chevron-forward" size={20} color="#252525" />
                     </Reanimated.View>
                 </View>
                 {showMacros && (
@@ -232,7 +232,7 @@ export const FoodLogMealCard: React.FC<FoodLogMealCardProps> = ({
                                 onPress={onAddFood}
                                 style={styles.addFoodRow}
                             >
-                                <Ionicons name="add" size={18} color="#252525" />
+                                <Icon name="add" size={18} color="#252525" />
                                 <Text style={styles.addFoodRowText}>add food</Text>
                             </TouchableOpacity>
                         </View>
@@ -244,7 +244,7 @@ export const FoodLogMealCard: React.FC<FoodLogMealCardProps> = ({
                                 onPress={onAddFood}
                                 style={styles.addFoodRow}
                             >
-                                <Ionicons name="add" size={18} color="#252525" />
+                                <Icon name="add" size={18} color="#252525" />
                                 <Text style={styles.addFoodRowText}>add food</Text>
                             </TouchableOpacity>
                         </View>

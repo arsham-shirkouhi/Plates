@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { View, StyleSheet, TouchableOpacity, Animated, Dimensions } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from './icons/Icon';
 import * as Haptics from 'expo-haptics';
 
 interface NavButtonProps {
@@ -43,7 +43,7 @@ export const AddButton: React.FC<NavButtonProps> = ({ onPress }) => {
         // Haptic feedback when plus button is pressed
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         // Directly call onPress to open bottom sheet
-                onPress?.();
+        onPress?.();
     };
 
 
@@ -68,7 +68,7 @@ export const AddButton: React.FC<NavButtonProps> = ({ onPress }) => {
                             }
                         ]}
                     >
-                        <Ionicons name="add" size={28} color="#252525" />
+                        <Icon name="add" size={28} color="#252525" />
                     </Animated.View>
                     {/* Green shadow below */}
                     <View style={[styles.circle, styles.circleGreenShadowSingle]} />
@@ -221,7 +221,7 @@ export const NavIconButton: React.FC<NavIconButtonProps> = ({ onPress, icon, isA
                         transform: [{ translateY: topCircleTranslateY }],
                     }
                 ]}>
-                    <Ionicons
+                    <Icon
                         name={icon as any}
                         size={24}
                         color={isActive ? '#fff' : '#252525'}
@@ -233,9 +233,9 @@ export const NavIconButton: React.FC<NavIconButtonProps> = ({ onPress, icon, isA
 };
 
 // Container for the three nav buttons
-export const NavButtons: React.FC<{ 
-    onHomePress?: () => void; 
-    onFoodPress?: () => void; 
+export const NavButtons: React.FC<{
+    onHomePress?: () => void;
+    onFoodPress?: () => void;
     onFitnessPress?: () => void;
     activeScreen?: 'home' | 'food' | 'fitness';
 }> = ({
@@ -244,28 +244,28 @@ export const NavButtons: React.FC<{
     onFitnessPress,
     activeScreen = 'home',
 }) => {
-    return (
-        <View style={navButtonStyles.container}>
-            <NavIconButton
-                icon="home-outline"
-                isActive={activeScreen === 'home'}
-                onPress={onHomePress}
-            />
-            <View style={navButtonStyles.spacer} />
-            <NavIconButton
-                icon="restaurant-outline"
-                isActive={activeScreen === 'food'}
-                onPress={onFoodPress}
-            />
-            <View style={navButtonStyles.spacer} />
-            <NavIconButton
-                icon="fitness-outline"
-                isActive={activeScreen === 'fitness'}
-                onPress={onFitnessPress}
-            />
-        </View>
-    );
-};
+        return (
+            <View style={navButtonStyles.container}>
+                <NavIconButton
+                    icon="home-outline"
+                    isActive={activeScreen === 'home'}
+                    onPress={onHomePress}
+                />
+                <View style={navButtonStyles.spacer} />
+                <NavIconButton
+                    icon="restaurant-outline"
+                    isActive={activeScreen === 'food'}
+                    onPress={onFoodPress}
+                />
+                <View style={navButtonStyles.spacer} />
+                <NavIconButton
+                    icon="fitness-outline"
+                    isActive={activeScreen === 'fitness'}
+                    onPress={onFitnessPress}
+                />
+            </View>
+        );
+    };
 
 const navButtonStyles = StyleSheet.create({
     container: {

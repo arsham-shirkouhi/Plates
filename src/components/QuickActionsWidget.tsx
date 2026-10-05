@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, Easing } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from './icons/Icon';
 import { fonts } from '../constants/fonts';
 
 interface QuickActionsWidgetProps {
@@ -42,7 +42,7 @@ export const QuickActionsWidget: React.FC<QuickActionsWidgetProps> = ({
         subtitle={formatCount(foodCount)}
         titleColor="#FFFFFF"
         subtitleColor="#FFFFFF"
-        icon={<Ionicons name="leaf-outline" size={22} color="#FFFFFF" style={styles.icon} />}
+        icon={<Icon name="leaf-outline" size={22} color="#FFFFFF" style={styles.icon} />}
         onPress={onLogFoodPress}
       />
 
@@ -55,7 +55,7 @@ export const QuickActionsWidget: React.FC<QuickActionsWidgetProps> = ({
         subtitleColor="#252525"
         topRight={workoutInProgress ? <LiveIndicator /> : null}
         icon={
-          <Ionicons
+          <Icon
             name={workoutInProgress ? 'barbell' : 'add'}
             size={workoutInProgress ? 20 : 24}
             color="#252525"

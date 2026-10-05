@@ -1,8 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, PanResponder, Animated, TouchableOpacity, TextInput } from 'react-native';
 import { fonts } from '../constants/fonts';
-import { Ionicons } from '@expo/vector-icons';
-
+import { Icon } from './icons/Icon';
 interface SliderProps {
     value: number;
     onValueChange: (value: number) => void;
@@ -248,7 +247,7 @@ export const Slider: React.FC<SliderProps> = ({
                         selectTextOnFocus
                         maxLength={step < 1 ? 5 : 3} // Allow decimals for weight
                     />
-                    <Ionicons
+                    <Icon
                         name="create-outline"
                         size={20}
                         color={isEditing ? '#526EFF' : '#999'}

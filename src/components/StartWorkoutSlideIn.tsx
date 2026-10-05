@@ -9,7 +9,7 @@ import {
     Easing,
     PanResponder,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from './icons/Icon';
 import { fonts } from '../constants/fonts';
 import * as Haptics from 'expo-haptics';
 import { useRegisterOverlay } from '../contexts/OverlayContext';
@@ -136,7 +136,7 @@ export const StartWorkoutSlideIn: React.FC<StartWorkoutSlideInProps> = ({
                         onPress={onClose}
                         activeOpacity={0.7}
                     >
-                        <Ionicons name="arrow-back" size={24} color="#252525" />
+                        <Icon name="arrow-back" size={24} color="#252525" />
                     </TouchableOpacity>
                     <Text style={styles.title}>start workout</Text>
                     <View style={styles.backButtonPlaceholder} />
@@ -150,7 +150,7 @@ export const StartWorkoutSlideIn: React.FC<StartWorkoutSlideInProps> = ({
                         activeOpacity={0.7}
                     >
                         <Text style={styles.optionText}>pick as you go</Text>
-                        <Ionicons name="chevron-forward" size={20} color="#252525" />
+                        <Icon name="chevron-forward" size={20} color="#252525" />
                     </TouchableOpacity>
 
                     {/* Option 2: Previous workouts (only show if they exist) */}
@@ -161,7 +161,7 @@ export const StartWorkoutSlideIn: React.FC<StartWorkoutSlideInProps> = ({
                             activeOpacity={0.7}
                         >
                             <Text style={styles.optionText}>previous workouts</Text>
-                            <Ionicons name="chevron-forward" size={20} color="#252525" />
+                            <Icon name="chevron-forward" size={20} color="#252525" />
                         </TouchableOpacity>
                     )}
 
@@ -172,7 +172,7 @@ export const StartWorkoutSlideIn: React.FC<StartWorkoutSlideInProps> = ({
                         activeOpacity={0.7}
                     >
                         <Text style={styles.optionText}>create new workout</Text>
-                        <Ionicons name="chevron-forward" size={20} color="#252525" />
+                        <Icon name="chevron-forward" size={20} color="#252525" />
                     </TouchableOpacity>
 
                     {/* Option 4: Schedule workout */}
@@ -182,7 +182,7 @@ export const StartWorkoutSlideIn: React.FC<StartWorkoutSlideInProps> = ({
                         activeOpacity={0.7}
                     >
                         <Text style={styles.optionText}>schedule workout</Text>
-                        <Ionicons name="chevron-forward" size={20} color="#252525" />
+                        <Icon name="chevron-forward" size={20} color="#252525" />
                     </TouchableOpacity>
                 </View>
             </Animated.View>

@@ -16,7 +16,7 @@ import {
     KeyboardAvoidingView,
     Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from './icons/Icon';
 import { fonts } from '../constants/fonts';
 import * as Haptics from 'expo-haptics';
 import { FoodItem } from '../services/foodService';
@@ -369,7 +369,7 @@ export const EditFoodBottomSheet: React.FC<EditFoodBottomSheetProps> = ({
                                                         },
                                                     ]}
                                                 >
-                                                    <Ionicons name="trash-outline" size={24} color="#252525" />
+                                                    <Icon name="trash-outline" size={24} color="#252525" />
                                                 </Animated.View>
                                             </TouchableOpacity>
                                         </View>
@@ -401,7 +401,7 @@ export const EditFoodBottomSheet: React.FC<EditFoodBottomSheetProps> = ({
                                     style={styles.unitSelectorCloseButton}
                                     activeOpacity={0.7}
                                 >
-                                    <Ionicons name="close" size={24} color="#252525" />
+                                    <Icon name="close" size={24} color="#252525" />
                                 </TouchableOpacity>
                             </View>
 
@@ -430,7 +430,7 @@ export const EditFoodBottomSheet: React.FC<EditFoodBottomSheetProps> = ({
                                             {unit}
                                         </Text>
                                         {detailServingSize === unit && (
-                                            <Ionicons name="checkmark-circle" size={24} color="#4463F7" />
+                                            <Icon name="checkmark-circle" size={24} color="#4463F7" />
                                         )}
                                     </TouchableOpacity>
                                 ))}

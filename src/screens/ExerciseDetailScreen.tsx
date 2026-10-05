@@ -14,7 +14,7 @@ import {
     Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../components/icons/Icon';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -494,7 +494,7 @@ export const ExerciseDetailScreen: React.FC = () => {
                                     onPress={handleClose}
                                     activeOpacity={0.7}
                                 >
-                                    <Ionicons name="chevron-back" size={24} color="#526EFF" />
+                                    <Icon name="chevron-back" size={24} color="#526EFF" />
                                 </TouchableOpacity>
                                 <View style={styles.headerCenter}>
                                     <Text style={styles.headerTitle}>{ex.name.toLowerCase()}</Text>
@@ -507,7 +507,7 @@ export const ExerciseDetailScreen: React.FC = () => {
                                     onPress={handleDeleteExercise}
                                     activeOpacity={0.7}
                                 >
-                                    <Ionicons name="trash-outline" size={24} color="#FF5252" />
+                                    <Icon name="trash-outline" size={24} color="#FF5252" />
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -614,7 +614,7 @@ export const ExerciseDetailScreen: React.FC = () => {
                                                                         onPress={() => handleRemoveSet(set.id)}
                                                                         activeOpacity={0.7}
                                                                     >
-                                                                        <Ionicons name="close" size={20} color="#252525" />
+                                                                        <Icon name="close" size={20} color="#252525" />
                                                                     </TouchableOpacity>
                                                                 )}
                                                             </View>

@@ -8,7 +8,7 @@ import {
   Dimensions,
   PanResponder,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Icon } from './icons/Icon';
 import { fonts } from "../constants/fonts";
 import * as Haptics from "expo-haptics";
 
@@ -396,7 +396,7 @@ export const TimerWidget: React.FC<TimerWidgetProps> = ({
           onPress={handleAdd}
           activeOpacity={0.7}
         >
-          <Ionicons name="add" size={buttonSize * 0.8} color="#252525" />
+          <Icon name="add" size={buttonSize * 0.8} color="#252525" />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -404,7 +404,7 @@ export const TimerWidget: React.FC<TimerWidgetProps> = ({
           onPress={handleSubtract}
           activeOpacity={0.7}
         >
-          <Ionicons name="remove" size={buttonSize * 0.8} color="#252525" />
+          <Icon name="remove" size={buttonSize * 0.8} color="#252525" />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -412,7 +412,7 @@ export const TimerWidget: React.FC<TimerWidgetProps> = ({
           onPress={handlePlayPause}
           activeOpacity={0.7}
         >
-          <Ionicons name={isRunning ? "pause" : "play"} size={buttonSize * 0.5} color="#252525" />
+          <Icon name={isRunning ? "pause" : "play"} size={buttonSize * 0.5} color="#252525" />
         </TouchableOpacity>
       </View>
     </View>

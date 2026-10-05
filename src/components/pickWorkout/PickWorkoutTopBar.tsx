@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing, LayoutChangeEvent } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../icons/Icon';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../../constants/fonts';
 import { PICK_WORKOUT_LAYOUT, WORKOUT_COLORS } from '../../workout/constants';
@@ -76,7 +76,7 @@ export const PickWorkoutTopBar: React.FC<PickWorkoutTopBarProps> = ({
                     accessibilityRole="button"
                     accessibilityLabel="Close pick workout"
                 >
-                    <Ionicons name="close" size={22} color={WORKOUT_COLORS.text} />
+                    <Icon name="close" size={22} color={WORKOUT_COLORS.text} />
                 </TouchableOpacity>
             </View>
 

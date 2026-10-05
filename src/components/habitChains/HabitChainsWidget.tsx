@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../icons/Icon';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../../constants/fonts';
 import { useAuth } from '../../context/AuthContext';
@@ -127,7 +127,7 @@ export const HabitChainsWidget: React.FC = () => {
       <TouchableOpacity style={styles.header} onPress={handleCardTap} onLongPress={openCreate} activeOpacity={0.7}>
         <Text style={styles.headerText}>habit chains</Text>
         <TouchableOpacity onPress={openCreate} hitSlop={10}>
-          <Ionicons name="add" size={20} color="#252525" />
+          <Icon name="add" size={20} color="#252525" />
         </TouchableOpacity>
       </TouchableOpacity>
       <View style={styles.separator} />

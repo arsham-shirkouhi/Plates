@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, Easing, TextInput, Alert, Image } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from './icons/Icon';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../constants/fonts';
 import { TodaysGoalsOverlay } from './TodaysGoalsOverlay';
@@ -293,7 +293,7 @@ export const TodaysGoalsWidget: React.FC<TodaysGoalsWidgetProps> = ({
                 activeOpacity={0.7}
             >
                 <Text style={styles.headerText}>today's goals</Text>
-                <Ionicons name="chevron-forward" size={20} color="#252525" />
+                <Icon name="chevron-forward" size={20} color="#252525" />
             </TouchableOpacity>
 
             {/* Separator line */}

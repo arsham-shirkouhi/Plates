@@ -1,6 +1,6 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Animated, Easing } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from './icons/Icon';
 import { fonts } from '../constants/fonts';
 import { useAddFood } from '../context/AddFoodContext';
 
@@ -189,7 +189,7 @@ export const FoodLog = forwardRef<FoodLogHandle, FoodLogProps>(({
                 </Animated.View>
                 <View style={styles.header}>
                     <Text style={styles.headerText}>food log</Text>
-                    <Ionicons name="chevron-forward" size={20} color="#252525" />
+                    <Icon name="chevron-forward" size={20} color="#252525" />
                 </View>
 
                 <View style={styles.separator} />

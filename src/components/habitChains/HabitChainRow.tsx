@@ -1,7 +1,7 @@
 // HABIT CHAINS
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../icons/Icon';
 import { fonts } from '../../constants/fonts';
 import { HabitChain } from '../../habitChains/types';
 import {
@@ -49,7 +49,7 @@ export const HabitChainRow: React.FC<HabitChainRowProps> = ({
           )}
         </View>
         <Text style={styles.progress}>{doneToday ? `${chain.streak}d` : formatProgress(chain)}</Text>
-        <Ionicons
+        <Icon
           name={expanded ? 'chevron-down' : 'chevron-forward'}
           size={16}
           color="#252525"

@@ -11,7 +11,7 @@ import {
     Image,
     Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from './icons/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../constants/fonts';
@@ -232,7 +232,7 @@ export const ProfileOverlay: React.FC<ProfileOverlayProps> = ({
                             activeOpacity={0.7}
                             accessibilityLabel="Close profile"
                         >
-                            <Ionicons name="close" size={26} color="#252525" />
+                            <Icon name="close" size={26} color="#252525" />
                         </TouchableOpacity>
                     </View>
 

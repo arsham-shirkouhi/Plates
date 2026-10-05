@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { Ionicons } from '@expo/vector-icons';
-
+import { Icon } from './icons/Icon';
 interface BarcodeScannerModalProps {
     visible: boolean;
     onClose: () => void;
@@ -29,7 +28,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({ visibl
                 <View style={styles.header}>
                     <Text style={styles.title}>scan barcode</Text>
                     <TouchableOpacity accessibilityLabel="Close barcode scanner" onPress={onClose} style={styles.closeButton}>
-                        <Ionicons name="close" size={26} color="#fff" />
+                        <Icon name="close" size={26} color="#fff" />
                     </TouchableOpacity>
                 </View>
 

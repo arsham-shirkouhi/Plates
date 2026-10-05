@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../components/icons/Icon';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -21,7 +21,7 @@ export const ExerciseLogScreen: React.FC = () => {
           activeOpacity={0.7}
           style={styles.backButton}
         >
-          <Ionicons name="chevron-back" size={22} color="#252525" />
+          <Icon name="chevron-back" size={22} color="#252525" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>exercise log</Text>
         <View style={styles.headerSpacer} />

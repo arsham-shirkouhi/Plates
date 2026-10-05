@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from './icons/Icon';
 import { fonts } from '../constants/fonts';
 import * as Haptics from 'expo-haptics';
 import { Easing } from 'react-native';
@@ -221,7 +221,7 @@ export const FoodLogHeaderSection: React.FC<FoodLogHeaderSectionProps> = ({
                     activeOpacity={0.7}
                     disabled={!onClosePress}
                 >
-                    <Ionicons name="close" size={26} color="#252525" />
+                    <Icon name="close" size={26} color="#252525" />
                 </TouchableOpacity>
             </View>
         </View>

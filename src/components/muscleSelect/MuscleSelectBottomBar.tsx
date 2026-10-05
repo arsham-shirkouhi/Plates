@@ -6,7 +6,7 @@ import {
     TouchableOpacity,
     ActivityIndicator,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../icons/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fonts } from '../../constants/fonts';
 import { WORKOUT_COLORS } from '../../workout/constants';
@@ -61,7 +61,7 @@ export const MuscleSelectBottomBar: React.FC<MuscleSelectBottomBarProps> = ({
                                         accessibilityLabel={`Remove ${MUSCLE_GROUP_LABELS[muscle]}`}
                                     >
                                         <Text style={styles.chipText}>{MUSCLE_GROUP_LABELS[muscle]}</Text>
-                                        <Ionicons name="close" size={12} color={WORKOUT_COLORS.text} />
+                                        <Icon name="close" size={12} color={WORKOUT_COLORS.text} />
                                     </TouchableOpacity>
                                 ))}
                             </View>

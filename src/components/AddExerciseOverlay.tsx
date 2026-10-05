@@ -19,7 +19,7 @@ import { useRegisterOverlay } from '../contexts/OverlayContext';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from './icons/Icon';
 import { WORKOUT_COLORS } from '../workout/constants';
 import { FlatPlus } from './activeWorkout/FlatMark';
 import { getBodyPartStamp, PlatesIcon, type PlatesIconName } from './icons/PlatesIcon';
@@ -27,6 +27,7 @@ import { HardSearchBar } from './ui/HardSearchBar';
 import { HardStamp } from './ui/HardListCard';
 import Reanimated, {
     Easing as ReanimatedEasing,
+    interpolate,
     runOnJS,
     useAnimatedStyle,
     useSharedValue,
@@ -87,7 +88,7 @@ const AddFlyParticle: React.FC<FlyParticle & { onDone: (id: number) => void }> =
         const finish = () => onDone(id);
         progress.value = withTiming(
             1,
-            { duration, easing: ReanimatedEasing.bezier(0.12, 0.82, 0.28, 1) },
+            { duration, easing: ReanimatedEasing.bezier(0.42, 0.0, 0.18, 1) },
             (finished) => {
                 if (finished) runOnJS(finish)();
             }
@@ -97,8 +98,8 @@ const AddFlyParticle: React.FC<FlyParticle & { onDone: (id: number) => void }> =
     const style = useAnimatedStyle(() => {
         const x = quadBezier(progress.value, x0, x1, x2);
         const y = quadBezier(progress.value, y0, y1, y2);
-        const scale = 1.18 - progress.value * 0.92;
-        const opacity = progress.value > 0.88 ? 1 - (progress.value - 0.88) / 0.12 : 1;
+        const scale = interpolate(progress.value, [0, 0.14, 1], [1.05, 1.28, 0.28]);
+        const opacity = progress.value > 0.9 ? 1 - (progress.value - 0.9) / 0.1 : 1;
         return {
             opacity,
             transform: [
@@ -204,10 +205,10 @@ const AddTickToggle: React.FC<{ added: boolean }> = ({ added }) => {
     return (
         <View style={styles.addTickHit}>
             <Reanimated.View style={[styles.addTickLayer, plusStyle]}>
-                <Ionicons name="add" size={28} color="#ADADAD" />
+                <Icon name="add" size={28} color="#ADADAD" />
             </Reanimated.View>
             <Reanimated.View style={[styles.addTickLayer, tickStyle]}>
-                <Ionicons name="checkmark" size={28} color={WORKOUT_COLORS.accent} />
+                <Icon name="checkmark" size={28} color={WORKOUT_COLORS.accent} />
             </Reanimated.View>
         </View>
     );
@@ -647,13 +648,13 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
                 y2: end.y,
                 size: i === 0 ? 16 : 7 + Math.random() * 5,
                 color,
-                duration: 500 + Math.round(Math.random() * 80),
+                duration: 980 + Math.round(Math.random() * 160),
             };
         });
         setFlyParticles((prev) => [...prev, ...next]);
         addedPulse.setValue(1);
         Animated.sequence([
-            Animated.delay(460),
+            Animated.delay(880),
             Animated.spring(addedPulse, {
                 toValue: 1.2,
                 friction: 5,

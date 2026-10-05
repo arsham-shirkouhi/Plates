@@ -17,7 +17,7 @@ import {
     Image,
     Modal,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from './icons/Icon';
 import { fonts } from '../constants/fonts';
 import * as Haptics from 'expo-haptics';
 import { FoodItem, searchFoods } from '../services/foodService';
@@ -130,7 +130,7 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
     const searchRequestId = useRef(0);
     const [sheetOpen, setSheetOpen] = useState(visible);
     const closingRef = useRef(false);
-    const closeRef = useRef<() => void>(() => {});
+    const closeRef = useRef<() => void>(() => { });
 
     // Detail overlay state
     const [detailServingSize, setDetailServingSize] = useState('');
@@ -775,7 +775,7 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
                                     <View style={styles.handleBar} />
 
                                     <View style={styles.searchContainer}>
-                                        <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+                                        <Icon name="search" size={20} color="#666" style={styles.searchIcon} />
                                         <TextInput
                                             ref={searchInputRef}
                                             style={styles.searchInput}
@@ -820,7 +820,7 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
                                                     onPressOut={handleScanBarcodePressOut}
                                                     activeOpacity={1}
                                                 >
-                                                    <Ionicons name="barcode-outline" size={20} color="#252525" style={{ marginRight: 8 }} />
+                                                    <Icon name="barcode-outline" size={20} color="#252525" style={{ marginRight: 8 }} />
                                                     <Text style={styles.secondaryButtonText}>scan barcode</Text>
                                                 </TouchableOpacity>
                                             </Animated.View>
@@ -852,7 +852,7 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
                                                     onPressOut={handleTakePhotoPressOut}
                                                     activeOpacity={1}
                                                 >
-                                                    <Ionicons name="camera-outline" size={20} color="#252525" style={{ marginRight: 8 }} />
+                                                    <Icon name="camera-outline" size={20} color="#252525" style={{ marginRight: 8 }} />
                                                     <Text style={styles.secondaryButtonText}>take photo</Text>
                                                 </TouchableOpacity>
                                             </Animated.View>
@@ -946,7 +946,7 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
                                     style={styles.unitSelectorCloseButton}
                                     activeOpacity={0.7}
                                 >
-                                    <Ionicons name="close" size={24} color="#252525" />
+                                    <Icon name="close" size={24} color="#252525" />
                                 </TouchableOpacity>
                             </View>
 
@@ -978,7 +978,7 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
                                             {unit}
                                         </Text>
                                         {detailServingSize === unit && (
-                                            <Ionicons name="checkmark-circle" size={24} color="#4463F7" />
+                                            <Icon name="checkmark-circle" size={24} color="#4463F7" />
                                         )}
                                     </TouchableOpacity>
                                 ))}
@@ -1111,7 +1111,7 @@ const QuickAddItem: React.FC<QuickAddItemProps> = ({ item, onAdd, onPress, isAdd
                         }),
                     }}
                 >
-                    <Ionicons name="add" size={28} color="#ADADAD" />
+                    <Icon name="add" size={28} color="#ADADAD" />
                 </Animated.View>
                 <Animated.View
                     style={{
@@ -1122,7 +1122,7 @@ const QuickAddItem: React.FC<QuickAddItemProps> = ({ item, onAdd, onPress, isAdd
                         }),
                     }}
                 >
-                    <Ionicons name="checkmark" size={28} color="#252525" />
+                    <Icon name="checkmark" size={28} color="#252525" />
                 </Animated.View>
             </TouchableOpacity>
         </Animated.View>

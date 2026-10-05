@@ -9,7 +9,7 @@ import {
     Easing as RNEasing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../icons/Icon';
 import * as Haptics from 'expo-haptics';
 import Reanimated, {
     Easing,
@@ -444,7 +444,7 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
                                         <Text style={styles.rowTitle}>{item.name.toLowerCase()}</Text>
                                         <Text style={styles.rowMeta}>{formatExerciseMeta(item)}</Text>
                                     </View>
-                                    <Ionicons name="add" size={28} color="#ADADAD" />
+                                    <Icon name="add" size={28} color="#ADADAD" />
                                 </TouchableOpacity>
                             </Reanimated.View>
                         ))}
@@ -479,7 +479,7 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
                                                     </Text>
                                                 ) : null}
                                             </View>
-                                            <Ionicons name="add" size={28} color="#ADADAD" />
+                                            <Icon name="add" size={28} color="#ADADAD" />
                                         </TouchableOpacity>
                                     ))
                                 ) : (
@@ -547,7 +547,7 @@ function AddedCard({
                     style={styles.iconButton}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                    <Ionicons
+                    <Icon
                         name={isEditing ? 'checkmark' : 'pencil-outline'}
                         size={20}
                         color={isEditing ? WORKOUT_COLORS.accent : WORKOUT_COLORS.text}
@@ -590,7 +590,7 @@ function AddedCard({
                             style={[styles.reorderButton, !canMoveUp && styles.reorderButtonDisabled]}
                             activeOpacity={0.7}
                         >
-                            <Ionicons
+                            <Icon
                                 name="chevron-up"
                                 size={16}
                                 color={canMoveUp ? WORKOUT_COLORS.text : WORKOUT_COLORS.placeholder}
@@ -615,7 +615,7 @@ function AddedCard({
                             ]}
                             activeOpacity={0.7}
                         >
-                            <Ionicons
+                            <Icon
                                 name="chevron-down"
                                 size={16}
                                 color={canMoveDown ? WORKOUT_COLORS.text : WORKOUT_COLORS.placeholder}
@@ -694,7 +694,7 @@ function RotatingAddRemoveButton({ onRemove, label }: { onRemove: () => void; la
             activeOpacity={0.6}
         >
             <RNAnimated.View style={{ transform: [{ rotate }] }}>
-                <Ionicons name="add" size={28} color={WORKOUT_COLORS.accent} />
+                <Icon name="add" size={28} color={WORKOUT_COLORS.accent} />
             </RNAnimated.View>
         </TouchableOpacity>
     );
@@ -756,7 +756,7 @@ function Stepper({
                     accessibilityRole="button"
                     accessibilityLabel={`Decrease ${label}`}
                 >
-                    <Ionicons name="remove" size={16} color={WORKOUT_COLORS.text} />
+                    <Icon name="remove" size={16} color={WORKOUT_COLORS.text} />
                 </TouchableOpacity>
                 <Text style={styles.stepperValue}>{value}</Text>
                 <TouchableOpacity
@@ -765,7 +765,7 @@ function Stepper({
                     accessibilityRole="button"
                     accessibilityLabel={`Increase ${label}`}
                 >
-                    <Ionicons name="add" size={16} color={WORKOUT_COLORS.text} />
+                    <Icon name="add" size={16} color={WORKOUT_COLORS.text} />
                 </TouchableOpacity>
             </View>
         </View>
@@ -781,7 +781,7 @@ function ReviewHeader({ onBack }: { onBack: () => void }) {
                 accessibilityRole="button"
                 accessibilityLabel="Back to pick workout"
             >
-                <Ionicons name="arrow-back" size={22} color={WORKOUT_COLORS.text} />
+                <Icon name="arrow-back" size={22} color={WORKOUT_COLORS.text} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>pick exercises</Text>
             <View style={styles.headerSide} />

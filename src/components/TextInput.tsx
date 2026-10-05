@@ -7,7 +7,7 @@ import {
     ViewStyle,
     TouchableOpacity,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from './icons/Icon';
 import { fonts } from '../constants/fonts';
 import { WORKOUT_COLORS } from '../workout/constants';
 import { HARD_SHADOW } from './ui/HardSearchBar';
@@ -45,7 +45,7 @@ export const TextInput: React.FC<TextInputProps> = ({
                 />
                 {showToggle ? (
                     <TouchableOpacity onPress={onTogglePassword} style={styles.eye} activeOpacity={0.7}>
-                        <Ionicons
+                        <Icon
                             name={isPasswordVisible ? 'eye-off-outline' : 'eye-outline'}
                             size={20}
                             color={WORKOUT_COLORS.text}

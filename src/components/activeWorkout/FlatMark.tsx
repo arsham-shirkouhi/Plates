@@ -1,9 +1,9 @@
 import React from 'react';
-import Svg, { Line, Polyline, Rect } from 'react-native-svg';
+import Svg, { Circle, Line, Polyline, Rect } from 'react-native-svg';
 
-export const COMPLETE_BG = '#E8F6EC';
-export const COMPLETE_BORDER = '#2A8F4A';
-export const COMPLETE_INK = '#1F6B38';
+export const COMPLETE_BG = '#EAEEFF';
+export const COMPLETE_BORDER = '#526EFF';
+export const COMPLETE_INK = '#526EFF';
 
 interface MarkProps {
     color: string;
@@ -48,5 +48,13 @@ export const FlatPlus: React.FC<MarkProps> = ({ color, size = 16, strokeWidth = 
 export const FlatMinus: React.FC<MarkProps> = ({ color, size = 16, strokeWidth = 2.2 }) => (
     <Svg width={size} height={size} viewBox="0 0 16 16">
         <Line x1={2.4} y1={8} x2={13.6} y2={8} stroke={color} strokeWidth={strokeWidth} strokeLinecap="square" />
+    </Svg>
+);
+
+export const FlatDots: React.FC<MarkProps> = ({ color, size = 16 }) => (
+    <Svg width={size} height={size} viewBox="0 0 16 16">
+        <Circle cx={3.2} cy={8} r={1.5} fill={color} />
+        <Circle cx={8} cy={8} r={1.5} fill={color} />
+        <Circle cx={12.8} cy={8} r={1.5} fill={color} />
     </Svg>
 );

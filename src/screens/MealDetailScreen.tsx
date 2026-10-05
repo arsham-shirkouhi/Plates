@@ -7,7 +7,7 @@ import {
     TouchableOpacity,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../components/icons/Icon';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -96,7 +96,7 @@ export const MealDetailScreen: React.FC = () => {
                     style={styles.backButton}
                     accessibilityLabel="Back to food log"
                 >
-                    <Ionicons name="chevron-back" size={24} color="#252525" />
+                    <Icon name="chevron-back" size={24} color="#252525" />
                 </TouchableOpacity>
                 <View style={styles.headerCenter}>
                     <Text style={styles.headerTitle}>{mealInfo.label}</Text>
@@ -141,7 +141,7 @@ export const MealDetailScreen: React.FC = () => {
                         ))
                     ) : (
                         <View style={styles.emptyState}>
-                            <Ionicons name={mealInfo.icon} size={28} color={mealInfo.color} />
+                            <Icon name={mealInfo.icon} size={28} color={mealInfo.color} />
                             <Text style={styles.emptyTitle}>nothing logged</Text>
                             <Text style={styles.emptySub}>add food to start this meal</Text>
                         </View>

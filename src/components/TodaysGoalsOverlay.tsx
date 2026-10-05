@@ -14,7 +14,7 @@ import {
     PanResponder,
     Pressable,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from './icons/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../constants/fonts';
@@ -391,7 +391,7 @@ export const TodaysGoalsOverlay: React.FC<TodaysGoalsOverlayProps> = ({
                                     onPress={handleClose}
                                     activeOpacity={0.7}
                                 >
-                                    <Ionicons name="chevron-back" size={24} color="#526EFF" />
+                                    <Icon name="chevron-back" size={24} color="#526EFF" />
                                 </TouchableOpacity>
                                 <View style={styles.headerCenter}>
                                     <Text style={styles.headerTitle}>today's goals</Text>
@@ -406,7 +406,7 @@ export const TodaysGoalsOverlay: React.FC<TodaysGoalsOverlayProps> = ({
                                     onPress={handleShowAddChoice}
                                     activeOpacity={0.7}
                                 >
-                                    <Ionicons name="add" size={32} color="#526EFF" />
+                                    <Icon name="add" size={32} color="#526EFF" />
                                 </TouchableOpacity>
                             </View>
                         </View>

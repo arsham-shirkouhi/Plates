@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../icons/Icon';
 import { fonts } from '../../constants/fonts';
 import { WORKOUT_COLORS } from '../../workout/constants';
 import { MUSCLE_GROUP_LABELS, MuscleGroup } from '../../workout/muscleGroups';
@@ -40,7 +40,7 @@ export const WorkoutFilterBar: React.FC<WorkoutFilterBarProps> = ({ filters, onC
                         <Text style={styles.chipFilledText}>
                             {MUSCLE_GROUP_LABELS[filters.muscleGroup]}
                         </Text>
-                        <Ionicons name="close" size={14} color={WORKOUT_COLORS.background} />
+                        <Icon name="close" size={14} color={WORKOUT_COLORS.background} />
                     </TouchableOpacity>
                 ) : null}
 
@@ -82,7 +82,7 @@ export const WorkoutFilterBar: React.FC<WorkoutFilterBarProps> = ({ filters, onC
                     accessibilityRole="button"
                     accessibilityLabel={searchOpen ? 'Close search' : 'Search routines'}
                 >
-                    <Ionicons
+                    <Icon
                         name={searchOpen ? 'close' : 'search'}
                         size={18}
                         color={WORKOUT_COLORS.text}

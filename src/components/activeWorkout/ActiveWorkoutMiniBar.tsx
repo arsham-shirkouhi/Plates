@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../icons/Icon';
 import { fonts } from '../../constants/fonts';
 import { WORKOUT_COLORS } from '../../workout/constants';
 import { formatRestDuration, formatWorkoutDurationShort } from '../../workout/workoutSelectors';
@@ -63,7 +63,7 @@ export const ActiveWorkoutMiniBar: React.FC<ActiveWorkoutMiniBarProps> = ({
         return (
             <TouchableOpacity style={styles.container} activeOpacity={0.92} onPress={onExpand}>
                 <View style={styles.row}>
-                    <Ionicons name="expand-outline" size={20} color={WORKOUT_COLORS.text} />
+                    <Icon name="expand-outline" size={20} color={WORKOUT_COLORS.text} />
                     <View style={styles.center}>
                         <Text style={styles.duration}>
                             {formatRestDuration(restRemainingSeconds)}
@@ -90,7 +90,7 @@ export const ActiveWorkoutMiniBar: React.FC<ActiveWorkoutMiniBarProps> = ({
                             accessibilityRole="button"
                             accessibilityLabel="Finish rest"
                         >
-                            <Ionicons name="checkmark" size={20} color="#fff" />
+                            <Icon name="checkmark" size={20} color="#fff" />
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -101,7 +101,7 @@ export const ActiveWorkoutMiniBar: React.FC<ActiveWorkoutMiniBarProps> = ({
     return (
         <TouchableOpacity style={styles.container} activeOpacity={0.92} onPress={onExpand}>
             <View style={styles.row}>
-                <Ionicons name="expand-outline" size={20} color={WORKOUT_COLORS.text} />
+                <Icon name="expand-outline" size={20} color={WORKOUT_COLORS.text} />
                 <View style={styles.center}>
                     <Text style={styles.duration}>{formatWorkoutDurationShort(elapsedSeconds)}</Text>
                     <Text style={styles.meta} numberOfLines={1}>

@@ -71,9 +71,10 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
         changeSetType,
         applyPreviousSet,
         updateExerciseNote,
-        updateRestSeconds,
         removeExercise,
         addToSuperset,
+        startRestTimer,
+        setDefaultRestSeconds,
         adjustRestTimer,
         skipRestTimer,
         clearScrollTarget,
@@ -231,6 +232,30 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
         ]);
     };
 
+    const handleStartRest = () => {
+        const started = startRestTimer();
+        if (!started) {
+            handlePickRestDuration();
+        }
+    };
+
+    const handlePickRestDuration = () => {
+        Alert.alert('Rest timer', 'Choose rest duration for this workout', [
+            { text: 'Off', onPress: () => setDefaultRestSeconds(0) },
+            { text: '1:00', onPress: () => applyRestDuration(60) },
+            { text: '1:30', onPress: () => applyRestDuration(90) },
+            { text: '2:00', onPress: () => applyRestDuration(120) },
+            { text: '2:30', onPress: () => applyRestDuration(150) },
+            { text: '3:00', onPress: () => applyRestDuration(180) },
+            { text: 'Cancel', style: 'cancel' },
+        ]);
+    };
+
+    const applyRestDuration = (restSeconds: number) => {
+        setDefaultRestSeconds(restSeconds);
+        startRestTimer(restSeconds);
+    };
+
     return (
         <View style={styles.host} pointerEvents="box-none" collapsable={false}>
             <Reanimated.View
@@ -247,6 +272,7 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
                     style={[styles.expandedLayer, expandedStyle]}
                 >
                     <ActiveWorkoutHeader
+                        title={workout.title}
                         onCollapse={minimize}
                         onFinish={handleFinish}
                         collapsePanHandlers={collapsePanResponder.panHandlers}
@@ -289,9 +315,6 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
                                         }
                                         showRpe={state.settings.showRpeColumn}
                                         onUpdateNote={(note) => updateExerciseNote(exercise.id, note)}
-                                        onUpdateRestSeconds={(restSeconds) =>
-                                            updateRestSeconds(exercise.id, restSeconds)
-                                        }
                                         onAddSet={() => addSet(exercise.id)}
                                         onUpdateSet={(setId, patch) => updateSet(exercise.id, setId, patch)}
                                         onToggleSetComplete={(setId) =>
@@ -321,7 +344,13 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
                         style={styles.bottomActionsLayer}
                         onLayout={(event) => setBottomActionsHeight(event.nativeEvent.layout.height)}
                     >
-                        <ActiveWorkoutBottomActions onAddExercises={onAddExercises} />
+                        <ActiveWorkoutBottomActions
+                            onAddExercises={onAddExercises}
+                            showRest={!isEmptyList}
+                            restActive={isRunning}
+                            onRest={handleStartRest}
+                            onPickRestDuration={handlePickRestDuration}
+                        />
                     </View>
                 </Reanimated.View>
 

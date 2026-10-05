@@ -11,7 +11,7 @@ import {
     Easing,
     ScrollView,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from './icons/Icon';
 import { fonts } from '../constants/fonts';
 import * as Haptics from 'expo-haptics';
 import { useOverlay } from '../contexts/OverlayContext';
@@ -182,7 +182,7 @@ export const StartWorkoutBottomSheet: React.FC<StartWorkoutBottomSheetProps> = (
                                             >
                                                 <View style={styles.savedCardHeader}>
                                                     <Text style={styles.savedCardTitle}>{workout.name}</Text>
-                                                    <Ionicons name="chevron-forward" size={18} color="#252525" />
+                                                    <Icon name="chevron-forward" size={18} color="#252525" />
                                                 </View>
                                                 <Text style={styles.savedCardMeta}>
                                                     {workout.exerciseCount} exercises · {workout.duration}

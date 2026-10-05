@@ -9,7 +9,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from './icons/Icon';
 import { FoodItem } from '../services/foodService';
 import { searchUsdaFoods } from '../services/usdaFoodService';
 
@@ -130,7 +130,7 @@ export const PhotoMealReviewModal: React.FC<PhotoMealReviewModalProps> = ({
                             <Text style={styles.subtitle}>Edit amounts or add anything the photo missed.</Text>
                         </View>
                         <TouchableOpacity onPress={onClose} hitSlop={12}>
-                            <Ionicons name="close" size={26} color="#252525" />
+                            <Icon name="close" size={26} color="#252525" />
                         </TouchableOpacity>
                     </View>
 
@@ -142,7 +142,7 @@ export const PhotoMealReviewModal: React.FC<PhotoMealReviewModalProps> = ({
                         </View>
                     ) : error ? (
                         <View style={styles.centerState}>
-                            <Ionicons name="alert-circle-outline" size={34} color="#BE123C" />
+                            <Icon name="alert-circle-outline" size={34} color="#BE123C" />
                             <Text style={styles.stateTitle}>couldn’t analyze that photo</Text>
                             <Text style={styles.stateText}>{error}</Text>
                         </View>
@@ -160,7 +160,7 @@ export const PhotoMealReviewModal: React.FC<PhotoMealReviewModalProps> = ({
                                             style={styles.itemNameInput}
                                         />
                                         <TouchableOpacity onPress={() => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index))} hitSlop={10}>
-                                            <Ionicons name="trash-outline" size={20} color="#666" />
+                                            <Icon name="trash-outline" size={20} color="#666" />
                                         </TouchableOpacity>
                                     </View>
                                     {item.photoQuestion && <Text style={styles.question}>{item.photoQuestion}</Text>}
@@ -197,7 +197,7 @@ export const PhotoMealReviewModal: React.FC<PhotoMealReviewModalProps> = ({
                             <View style={styles.manualSection}>
                                 <Text style={styles.manualTitle}>add a missing ingredient</Text>
                                 <TouchableOpacity style={styles.customButton} onPress={addCustomFood}>
-                                    <Ionicons name="create-outline" size={18} color="#252525" />
+                                    <Icon name="create-outline" size={18} color="#252525" />
                                     <Text style={styles.customButtonText}>enter a custom food or nutrition label</Text>
                                 </TouchableOpacity>
                                 <TextInput
@@ -211,7 +211,7 @@ export const PhotoMealReviewModal: React.FC<PhotoMealReviewModalProps> = ({
                                 {manualResults.slice(0, 4).map((food) => (
                                     <TouchableOpacity key={food.id} style={styles.manualResult} onPress={() => addManualFood(food)}>
                                         <Text style={styles.manualResultName}>{food.name}</Text>
-                                        <Ionicons name="add-circle-outline" size={21} color="#252525" />
+                                        <Icon name="add-circle-outline" size={21} color="#252525" />
                                     </TouchableOpacity>
                                 ))}
                             </View>

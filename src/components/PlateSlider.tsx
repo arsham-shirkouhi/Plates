@@ -10,7 +10,7 @@ import {
     TextInput,
     TouchableOpacity,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from './icons/Icon';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../constants/fonts';
 
@@ -712,7 +712,7 @@ export const PlateSlider: React.FC<PlateSliderProps> = ({
                                 }}
                                 activeOpacity={0.7}
                             >
-                                <Ionicons name="remove" size={18} color="#526EFF" />
+                                <Icon name="remove" size={18} color="#526EFF" />
                             </TouchableOpacity>
                             <TextInput
                                 style={styles.repsInputSmall}
@@ -732,7 +732,7 @@ export const PlateSlider: React.FC<PlateSliderProps> = ({
                                 }}
                                 activeOpacity={0.7}
                             >
-                                <Ionicons name="add" size={18} color="#526EFF" />
+                                <Icon name="add" size={18} color="#526EFF" />
                             </TouchableOpacity>
                         </View>
                     </View>

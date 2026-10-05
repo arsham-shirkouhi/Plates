@@ -17,6 +17,7 @@ export type PlatesIconName =
     | 'search'
     | 'close'
     | 'chevronLeft'
+    | 'chevronDown'
     | 'food'
     | 'play';
 
@@ -195,6 +196,15 @@ export const PlatesIcon: React.FC<PlatesIconProps> = ({
             {name === 'chevronLeft' ? (
                 <Path
                     d="M14.8 5.2L8.2 12L14.8 18.8"
+                    stroke={color}
+                    strokeWidth={2.2}
+                    strokeLinecap="square"
+                    strokeLinejoin="miter"
+                />
+            ) : null}
+            {name === 'chevronDown' ? (
+                <Path
+                    d="M5.2 9.2L12 15.8L18.8 9.2"
                     stroke={color}
                     strokeWidth={2.2}
                     strokeLinecap="square"

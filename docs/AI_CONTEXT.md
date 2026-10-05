@@ -239,6 +239,11 @@ simulator (needs Xcode), `a` = Android emulator.
 - **2026-10-04 — Cursor:** Add-food sheet now slides/fades out before unmounting when you tap away or swipe down.
 - **2026-10-04 — Cursor:** Habit Chains is a separate home widget next to the timer (`ENABLE_HABIT_CHAINS`). Today’s goals is untouched. Data lives in AsyncStorage `plates.habit_chains.${userId}`.
 - **2026-10-04 — Cursor:** Habit Tree removed. Habit Trail (`ENABLE_HABIT_TRAIL`) is the visualization on the habit-chains card. Extra state in `plates.habit_trail.${userId}`.
+- **2026-10-04 — Cursor:** Rest is a 50px square ⏱ button next to add exercise, shown only when the workout has at least one exercise. Header is back to minimize / title / finish.
+- **2026-10-04 — Cursor:** Icons are back to Expo Ionicons via `<Icon>`. Removed Streamline Plump glyphs. Installed `@expo/vector-icons`.
+- **2026-10-04 — Cursor:** Rest square next to add exercise uses a timer icon, not the ⏱ emoji.
+- **2026-10-04 — Cursor:** Rest button + rest progress bar are back to app blue (`#526EFF`). Completed exercise cards stay blue.
+- **2026-10-04 — Cursor:** Slowed add-exercise fly particles (~1s, ease-in start) so you can see them leave the plus toward “N added”.
 
 ## 10. What to do next (as of the top of §9)
 

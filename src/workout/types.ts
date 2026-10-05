@@ -51,6 +51,7 @@ export interface WorkoutSettings {
     showRpeColumn: boolean;
     restTimerSoundEnabled: boolean;
     restTimerEnabled: boolean;
+    defaultRestSeconds: number;
 }
 
 export interface ActiveWorkoutStoreState {

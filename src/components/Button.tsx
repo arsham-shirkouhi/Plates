@@ -335,10 +335,14 @@ export const Button: React.FC<ButtonProps> = ({
                 />
                 <TouchableOpacity
                     onPress={props.onPress}
+                    onLongPress={props.onLongPress}
+                    delayLongPress={props.delayLongPress}
                     onPressIn={handlePressIn}
                     onPressOut={handlePressOut}
                     disabled={isDisabled}
                     activeOpacity={1}
+                    accessibilityLabel={props.accessibilityLabel}
+                    accessibilityHint={props.accessibilityHint}
                     style={{ zIndex: 1, width: '100%', alignItems: 'center' }}
                 >
                     <Animated.View

@@ -16,7 +16,7 @@ import {
     Modal,
     TouchableWithoutFeedback,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from './icons/Icon';
 import { fonts } from '../constants/fonts';
 import * as Haptics from 'expo-haptics';
 import { useRegisterOverlay } from '../contexts/OverlayContext';
@@ -254,7 +254,7 @@ export const ExerciseDetailBottomSheet: React.FC<ExerciseDetailBottomSheetProps>
                                         onPress={handleClose}
                                         activeOpacity={0.7}
                                     >
-                                        <Ionicons name="close" size={24} color="#252525" />
+                                        <Icon name="close" size={24} color="#252525" />
                                     </TouchableOpacity>
                                 </View>
 
@@ -274,10 +274,10 @@ export const ExerciseDetailBottomSheet: React.FC<ExerciseDetailBottomSheetProps>
                                                         onPress={() => handleUpdateSet(set.id, 'completed', !set.completed)}
                                                         activeOpacity={0.7}
                                                     >
-                                                        <Ionicons 
-                                                            name={set.completed ? "checkmark-circle" : "ellipse-outline"} 
-                                                            size={24} 
-                                                            color={set.completed ? "#26F170" : "#9E9E9E"} 
+                                                        <Icon
+                                                            name={set.completed ? "checkmark-circle" : "ellipse-outline"}
+                                                            size={24}
+                                                            color={set.completed ? "#26F170" : "#9E9E9E"}
                                                         />
                                                     </TouchableOpacity>
                                                     <Text style={styles.setNumber}>set {index + 1}</Text>
@@ -288,7 +288,7 @@ export const ExerciseDetailBottomSheet: React.FC<ExerciseDetailBottomSheetProps>
                                                         onPress={() => handleRemoveSet(set.id)}
                                                         activeOpacity={0.7}
                                                     >
-                                                        <Ionicons name="close-circle" size={20} color="#9E9E9E" />
+                                                        <Icon name="close-circle" size={20} color="#9E9E9E" />
                                                     </TouchableOpacity>
                                                 )}
                                             </View>
@@ -326,7 +326,7 @@ export const ExerciseDetailBottomSheet: React.FC<ExerciseDetailBottomSheetProps>
                                     onPress={handleAddSet}
                                     activeOpacity={0.7}
                                 >
-                                    <Ionicons name="add-circle-outline" size={24} color="#4463F7" />
+                                    <Icon name="add-circle-outline" size={24} color="#4463F7" />
                                     <Text style={styles.addSetText}>add set</Text>
                                 </TouchableOpacity>
                             </View>

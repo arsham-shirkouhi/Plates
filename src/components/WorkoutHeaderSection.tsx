@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Modal, Pressable } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from './icons/Icon';
 import { fonts } from '../constants/fonts';
 import { Easing } from 'react-native';
 import { Button } from './Button';
@@ -277,7 +277,7 @@ export const WorkoutHeaderSection: React.FC<WorkoutHeaderSectionProps> = ({
                                                     },
                                                 ]}
                                             >
-                                                <Ionicons
+                                                <Icon
                                                     name={sheetExpanded ? 'contract-outline' : 'expand-outline'}
                                                     size={24}
                                                     color="#252525"
@@ -291,7 +291,7 @@ export const WorkoutHeaderSection: React.FC<WorkoutHeaderSectionProps> = ({
                                                     },
                                                 ]}
                                             >
-                                                <Ionicons name="chevron-back" size={24} color="#252525" />
+                                                <Icon name="chevron-back" size={24} color="#252525" />
                                             </Animated.View>
                                         </TouchableOpacity>
                                     ) : (
@@ -348,7 +348,7 @@ export const WorkoutHeaderSection: React.FC<WorkoutHeaderSectionProps> = ({
                                     accessibilityLabel="Body area"
                                     accessibilityHint="Choose which part of the body you are working on"
                                 >
-                                    <Ionicons name="body-outline" size={20} color="#252525" />
+                                    <Icon name="body-outline" size={20} color="#252525" />
                                 </TouchableOpacity>
                             </View>
 
@@ -405,7 +405,7 @@ export const WorkoutHeaderSection: React.FC<WorkoutHeaderSectionProps> = ({
                         activeOpacity={0.7}
                         disabled={!onClosePress}
                     >
-                        <Ionicons name="close" size={26} color="#252525" />
+                        <Icon name="close" size={26} color="#252525" />
                     </TouchableOpacity>
                 ) : null}
             </View>

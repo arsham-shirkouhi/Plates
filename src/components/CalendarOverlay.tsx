@@ -11,7 +11,7 @@ import {
     BackHandler,
 } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from './icons/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../constants/fonts';
@@ -653,7 +653,7 @@ export const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
                                 onPress={() => handleShiftMonth(-1)}
                                 activeOpacity={0.7}
                             >
-                                <Ionicons name="chevron-back" size={20} color="#252525" />
+                                <Icon name="chevron-back" size={20} color="#252525" />
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[styles.monthButton, viewingCurrentMonth && styles.monthButtonDisabled]}
@@ -661,7 +661,7 @@ export const CalendarOverlay: React.FC<CalendarOverlayProps> = ({
                                 activeOpacity={0.7}
                                 disabled={viewingCurrentMonth}
                             >
-                                <Ionicons
+                                <Icon
                                     name="chevron-forward"
                                     size={20}
                                     color={viewingCurrentMonth ? '#C8C8C8' : '#252525'}

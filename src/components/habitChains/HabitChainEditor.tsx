@@ -13,7 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../icons/Icon';
 import { fonts } from '../../constants/fonts';
 import { useRegisterOverlay } from '../../contexts/OverlayContext';
 import { createHabitChain } from '../../habitChains/habitChainService';
@@ -199,16 +199,16 @@ export const HabitChainEditor: React.FC<HabitChainEditorProps> = ({
                   placeholderTextColor="rgba(37, 37, 37, 0.35)"
                 />
                 <TouchableOpacity onPress={() => moveStep(index, -1)} hitSlop={8}>
-                  <Ionicons name="chevron-up" size={16} color="#252525" />
+                  <Icon name="chevron-up" size={16} color="#252525" />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => moveStep(index, 1)} hitSlop={8}>
-                  <Ionicons name="chevron-down" size={16} color="#252525" />
+                  <Icon name="chevron-down" size={16} color="#252525" />
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => setSteps(steps.filter((item) => item.id !== step.id))}
                   hitSlop={8}
                 >
-                  <Ionicons name="close" size={16} color="#252525" />
+                  <Icon name="close" size={16} color="#252525" />
                 </TouchableOpacity>
               </View>
             ))}

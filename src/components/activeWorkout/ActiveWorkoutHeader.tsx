@@ -1,21 +1,25 @@
 import React from 'react';
 import {
     View,
+    Text,
     StyleSheet,
     TouchableOpacity,
     type GestureResponderHandlers,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../Button';
+import { fonts } from '../../constants/fonts';
 import { WORKOUT_COLORS } from '../../workout/constants';
+import { PlatesIcon } from '../icons/PlatesIcon';
 
 interface ActiveWorkoutHeaderProps {
+    title?: string;
     onCollapse: () => void;
     onFinish: () => void;
     collapsePanHandlers?: GestureResponderHandlers;
 }
 
 export const ActiveWorkoutHeader: React.FC<ActiveWorkoutHeaderProps> = ({
+    title = 'workout',
     onCollapse,
     onFinish,
     collapsePanHandlers,
@@ -28,9 +32,11 @@ export const ActiveWorkoutHeader: React.FC<ActiveWorkoutHeaderProps> = ({
                     style={styles.iconButton}
                     accessibilityLabel="Minimize workout"
                 >
-                    <Ionicons name="chevron-down" size={24} color={WORKOUT_COLORS.text} />
+                    <PlatesIcon name="chevronDown" size={24} color={WORKOUT_COLORS.text} />
                 </TouchableOpacity>
-                <View style={styles.spacer} />
+                <Text style={styles.title} numberOfLines={1}>
+                    {title.toLowerCase()}
+                </Text>
                 <Button
                     title="finish"
                     onPress={onFinish}
@@ -45,9 +51,9 @@ export const ActiveWorkoutHeader: React.FC<ActiveWorkoutHeaderProps> = ({
 
 const styles = StyleSheet.create({
     container: {
-        paddingHorizontal: 16,
-        paddingTop: 8,
-        paddingBottom: 10,
+        paddingHorizontal: 12,
+        paddingTop: 6,
+        paddingBottom: 8,
         borderBottomWidth: 1,
         borderBottomColor: '#ECECEC',
         backgroundColor: WORKOUT_COLORS.background,
@@ -55,7 +61,7 @@ const styles = StyleSheet.create({
     topRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: 6,
     },
     iconButton: {
         width: 36,
@@ -63,11 +69,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    spacer: {
+    title: {
         flex: 1,
+        minWidth: 0,
+        fontFamily: fonts.bold,
+        fontSize: 18,
+        color: WORKOUT_COLORS.text,
+        textTransform: 'lowercase',
     },
     finishButtonWrap: {
-        width: 88,
+        width: 84,
     },
     finishButtonBody: {
         minHeight: 36,

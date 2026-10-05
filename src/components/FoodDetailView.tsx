@@ -8,7 +8,7 @@ import {
     TouchableWithoutFeedback,
     Keyboard,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from './icons/Icon';
 import { fonts } from '../constants/fonts';
 import * as Haptics from 'expo-haptics';
 import { Button } from './Button';
@@ -91,7 +91,7 @@ export const FoodDetailView: React.FC<FoodDetailViewProps> = ({
                             style={styles.backButton}
                             activeOpacity={0.7}
                         >
-                            <Ionicons name="arrow-back" size={24} color="#252525" />
+                            <Icon name="arrow-back" size={24} color="#252525" />
                         </TouchableOpacity>
                         <Text style={styles.headerTitle}>{headerTitle}</Text>
                         <View style={styles.backButton} />
@@ -158,7 +158,7 @@ export const FoodDetailView: React.FC<FoodDetailViewProps> = ({
                                     ]}>
                                         {selectedServingSize || 'Select unit'}
                                     </Text>
-                                    <Ionicons name="chevron-down" size={20} color="#666" />
+                                    <Icon name="chevron-down" size={20} color="#666" />
                                 </TouchableOpacity>
                             )}
                         </View>

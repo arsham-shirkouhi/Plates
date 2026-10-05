@@ -13,7 +13,7 @@ import {
     Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../icons/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../../constants/fonts';
@@ -299,7 +299,7 @@ function RecapCard({
             <View style={styles.recapAccent} />
             <Animated.View style={[styles.recapTimeBlock, { transform: [{ scale: clockBounce }] }]}>
                 <View style={styles.recapTimeLabelRow}>
-                    <Ionicons name="stopwatch-outline" size={13} color={WORKOUT_COLORS.accent} />
+                    <Icon name="stopwatch-outline" size={13} color={WORKOUT_COLORS.accent} />
                     <Text style={styles.recapTimeLabel}>elapsed</Text>
                 </View>
                 <AnimatedClock value={durationAnim} target={seconds} style={styles.recapTime} />
@@ -686,7 +686,7 @@ export const WorkoutWrapUpOverlay: React.FC<WorkoutWrapUpOverlayProps> = ({
                                         <View key={`${item.eyebrow}-${item.name}`} style={styles.standout}>
                                             <View style={styles.standoutAccent} />
                                             <View style={styles.standoutIcon}>
-                                                <Ionicons
+                                                <Icon
                                                     name={item.icon}
                                                     size={18}
                                                     color={WORKOUT_COLORS.accent}
@@ -719,7 +719,7 @@ export const WorkoutWrapUpOverlay: React.FC<WorkoutWrapUpOverlayProps> = ({
                                     )[0];
                                     const beat =
                                         topSet?.previous &&
-                                        weightOf(topSet) > topSet.previous.weight
+                                            weightOf(topSet) > topSet.previous.weight
                                             ? Math.round(weightOf(topSet) - topSet.previous.weight)
                                             : 0;
                                     return (
@@ -728,7 +728,7 @@ export const WorkoutWrapUpOverlay: React.FC<WorkoutWrapUpOverlayProps> = ({
                                             style={[
                                                 styles.liftRow,
                                                 index === summary.workout.exercises.length - 1 &&
-                                                    styles.liftRowLast,
+                                                styles.liftRowLast,
                                             ]}
                                         >
                                             <Text style={styles.liftIndex}>
@@ -771,12 +771,12 @@ export const WorkoutWrapUpOverlay: React.FC<WorkoutWrapUpOverlayProps> = ({
                                     onPress={handleSavePresetPress}
                                     activeOpacity={0.7}
                                 >
-                                    <Ionicons name="bookmark-outline" size={18} color={WORKOUT_COLORS.muted} />
+                                    <Icon name="bookmark-outline" size={18} color={WORKOUT_COLORS.muted} />
                                     <Text style={styles.presetLinkText}>save as preset for next time</Text>
                                 </TouchableOpacity>
                             ) : (
                                 <View style={styles.presetLink}>
-                                    <Ionicons name="bookmark" size={18} color={WORKOUT_COLORS.accent} />
+                                    <Icon name="bookmark" size={18} color={WORKOUT_COLORS.accent} />
                                     <Text style={[styles.presetLinkText, styles.presetLinkTextSaved]}>
                                         saved as preset
                                     </Text>

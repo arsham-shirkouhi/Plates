@@ -9,7 +9,7 @@ import {
     Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../components/icons/Icon';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -121,7 +121,7 @@ export const StartWorkoutScreen: React.FC = () => {
                                 onPress={() => navigation.goBack()}
                                 activeOpacity={0.7}
                             >
-                                <Ionicons name="chevron-back" size={24} color="#526EFF" />
+                                <Icon name="chevron-back" size={24} color="#526EFF" />
                             </TouchableOpacity>
                             <View style={styles.headerCenter}>
                                 <Text style={styles.headerTitle}>start workout</Text>
@@ -170,7 +170,7 @@ export const StartWorkoutScreen: React.FC = () => {
                                                                 <Text style={styles.savedWorkoutCardStatText}>last completed: {workout.lastCompleted}</Text>
                                                             </View>
                                                         </View>
-                                                        <Ionicons name="chevron-forward" size={20} color="#252525" />
+                                                        <Icon name="chevron-forward" size={20} color="#252525" />
                                                     </View>
                                                 </TouchableOpacity>
                                             ))}
@@ -250,13 +250,13 @@ export const StartWorkoutScreen: React.FC = () => {
                                             >
                                                 <View style={styles.optionButtonContent}>
                                                     <View style={styles.optionButtonLeft}>
-                                                        <Ionicons name="flash" size={24} color="#252525" />
+                                                        <Icon name="flash" size={24} color="#252525" />
                                                         <View style={styles.optionButtonTextContainer}>
                                                             <Text style={styles.optionButtonTitle}>pick as you go</Text>
                                                             <Text style={styles.optionButtonSubtitle}>start a workout and add exercises as you go</Text>
                                                         </View>
                                                     </View>
-                                                    <Ionicons name="chevron-forward" size={20} color="#252525" />
+                                                    <Icon name="chevron-forward" size={20} color="#252525" />
                                                 </View>
                                             </Animated.View>
                                         </TouchableOpacity>
@@ -320,13 +320,13 @@ export const StartWorkoutScreen: React.FC = () => {
                                             >
                                                 <View style={styles.optionButtonContent}>
                                                     <View style={styles.optionButtonLeft}>
-                                                        <Ionicons name="add-circle" size={24} color="#252525" />
+                                                        <Icon name="add-circle" size={24} color="#252525" />
                                                         <View style={styles.optionButtonTextContainer}>
                                                             <Text style={styles.optionButtonTitle}>create new workout</Text>
                                                             <Text style={styles.optionButtonSubtitle}>build a custom workout from scratch</Text>
                                                         </View>
                                                     </View>
-                                                    <Ionicons name="chevron-forward" size={20} color="#252525" />
+                                                    <Icon name="chevron-forward" size={20} color="#252525" />
                                                 </View>
                                             </Animated.View>
                                         </TouchableOpacity>
@@ -390,13 +390,13 @@ export const StartWorkoutScreen: React.FC = () => {
                                             >
                                                 <View style={styles.optionButtonContent}>
                                                     <View style={styles.optionButtonLeft}>
-                                                        <Ionicons name="calendar" size={24} color="#252525" />
+                                                        <Icon name="calendar" size={24} color="#252525" />
                                                         <View style={styles.optionButtonTextContainer}>
                                                             <Text style={styles.optionButtonTitle}>schedule workout</Text>
                                                             <Text style={styles.optionButtonSubtitle}>plan your workout for later</Text>
                                                         </View>
                                                     </View>
-                                                    <Ionicons name="chevron-forward" size={20} color="#252525" />
+                                                    <Icon name="chevron-forward" size={20} color="#252525" />
                                                 </View>
                                             </Animated.View>
                                         </TouchableOpacity>

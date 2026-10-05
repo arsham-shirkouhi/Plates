@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Image } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from './icons/Icon';
 import { fonts } from '../constants/fonts';
 import type { ProfileIconOrigin } from './ProfileOverlay';
 
@@ -100,7 +100,7 @@ export const HeaderSection: React.FC<HeaderSectionProps> = ({
                     >
                         <Text style={styles.dateText}>today</Text>
                         <Animated.View style={[styles.chevron, { transform: [{ rotate: chevronSpin }] }]}>
-                            <Ionicons name="chevron-down" size={20} color="#fff" />
+                            <Icon name="chevron-down" size={20} color="#fff" />
                         </Animated.View>
                     </TouchableOpacity>
                 </View>

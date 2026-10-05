@@ -18,7 +18,7 @@ import {
 } from '../workout/types';
 import { WorkoutWrapUpSummary } from '../workout/workoutHistoryTypes';
 import { activeWorkoutReducer, getInitialStoreState } from '../workout/workoutReducer';
-import { buildWrapUpSummary } from '../workout/workoutSelectors';
+import { buildWrapUpSummary, createManualRestTimer, getCurrentExercise } from '../workout/workoutSelectors';
 import {
     clearPersistedWorkoutState,
     loadPersistedWorkoutState,
@@ -51,6 +51,8 @@ interface ActiveWorkoutContextValue {
     changeSetType: (exerciseId: string, setId: string, setType: WorkoutSetType) => void;
     applyPreviousSet: (exerciseId: string, setId: string) => void;
     addToSuperset: (exerciseIds: string[]) => void;
+    startRestTimer: (durationSeconds?: number) => boolean;
+    setDefaultRestSeconds: (restSeconds: number) => void;
     adjustRestTimer: (deltaSeconds: number) => void;
     skipRestTimer: () => void;
     clearScrollTarget: () => void;
@@ -215,6 +217,25 @@ export const ActiveWorkoutProvider: React.FC<{ children: React.ReactNode }> = ({
         dispatch({ type: 'ADD_TO_SUPERSET', payload: { exerciseIds } });
     }, []);
 
+    const setDefaultRestSeconds = useCallback((restSeconds: number) => {
+        dispatch({ type: 'UPDATE_SETTINGS', payload: { defaultRestSeconds: restSeconds } });
+        if (restSeconds <= 0) {
+            dispatch({ type: 'CLEAR_REST_TIMER' });
+        }
+    }, []);
+
+    const startRestTimer = useCallback((durationSeconds?: number) => {
+        if (!state.settings.restTimerEnabled) return false;
+        const seconds = durationSeconds ?? state.settings.defaultRestSeconds ?? 60;
+        if (seconds <= 0) return false;
+        const current = state.workout ? getCurrentExercise(state.workout) : null;
+        dispatch({
+            type: 'START_REST_TIMER',
+            payload: createManualRestTimer(seconds, current?.id ?? 'manual'),
+        });
+        return true;
+    }, [state.settings.defaultRestSeconds, state.settings.restTimerEnabled, state.workout]);
+
     const adjustRestTimer = useCallback((deltaSeconds: number) => {
         dispatch({ type: 'ADJUST_REST_TIMER', payload: { deltaSeconds, now: Date.now() } });
     }, []);
@@ -309,6 +330,8 @@ export const ActiveWorkoutProvider: React.FC<{ children: React.ReactNode }> = ({
             changeSetType,
             applyPreviousSet,
             addToSuperset,
+            startRestTimer,
+            setDefaultRestSeconds,
             adjustRestTimer,
             skipRestTimer,
             clearScrollTarget,
@@ -338,6 +361,8 @@ export const ActiveWorkoutProvider: React.FC<{ children: React.ReactNode }> = ({
             changeSetType,
             applyPreviousSet,
             addToSuperset,
+            startRestTimer,
+            setDefaultRestSeconds,
             adjustRestTimer,
             skipRestTimer,
             clearScrollTarget,

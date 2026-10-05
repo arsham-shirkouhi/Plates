@@ -17,6 +17,7 @@ export const DEFAULT_WORKOUT_SETTINGS: WorkoutSettings = {
     showRpeColumn: false,
     restTimerSoundEnabled: false,
     restTimerEnabled: true,
+    defaultRestSeconds: 60,
 };
 
 export const SUPERSET_COLORS = ['#526EFF', '#E53935', '#7B1FA2', '#00897B', '#F57C00', '#455A64'];
