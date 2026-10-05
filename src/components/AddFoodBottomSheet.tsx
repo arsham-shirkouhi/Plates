@@ -26,7 +26,8 @@ import { FoodDetailView } from './FoodDetailView';
 import { BarcodeScannerModal } from './BarcodeScannerModal';
 import { PhotoMealReviewModal } from './PhotoMealReviewModal';
 import { useOverlay } from '../contexts/OverlayContext';
-import { MealType } from '../food/types';
+import { HardSearchBar } from './ui/HardSearchBar';
+import { MealType, MEAL_TAG_COLORS } from '../food/types';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 
@@ -774,22 +775,15 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
                                     {/* Handle bar */}
                                     <View style={styles.handleBar} />
 
-                                    <View style={styles.searchContainer}>
-                                        <Icon name="search" size={20} color="#666" style={styles.searchIcon} />
-                                        <TextInput
-                                            ref={searchInputRef}
-                                            style={styles.searchInput}
-                                            placeholder="What's on your plate?"
-                                            placeholderTextColor="#999"
-                                            value={searchQuery}
-                                            onChangeText={handleSearch}
-                                            returnKeyType="search"
-                                            autoCorrect={false}
-                                            autoComplete="off"
-                                            spellCheck={false}
-                                            keyboardAppearance="light"
-                                        />
-                                    </View>
+                                    <HardSearchBar
+                                        inputRef={searchInputRef}
+                                        value={searchQuery}
+                                        onChangeText={handleSearch}
+                                        placeholder="What's on your plate?"
+                                        autoCorrect={false}
+                                        autoCapitalize="none"
+                                        containerStyle={styles.searchBar}
+                                    />
 
                                     {/* Secondary Buttons */}
                                     <View style={styles.secondaryButtonsContainer}>
@@ -863,24 +857,29 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
                                     <View style={styles.mealButtonsContainer}>
                                         {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map((meal) => {
                                             const isSelected = selectedMeal === meal;
-                                            const isBreakfast = meal === 'breakfast';
+                                            const colors = MEAL_TAG_COLORS[meal];
 
                                             return (
                                                 <TouchableOpacity
                                                     key={meal}
                                                     style={[
                                                         styles.mealButton,
-                                                        isBreakfast && styles.mealButtonBreakfast,
-                                                        isSelected && styles.mealButtonSelected,
+                                                        meal === 'breakfast' && styles.mealButtonBreakfast,
+                                                        {
+                                                            backgroundColor: isSelected ? colors.fill : colors.wash,
+                                                            borderColor: colors.fill,
+                                                        },
                                                     ]}
                                                     onPress={() => handleMealPress(meal)}
                                                     activeOpacity={0.7}
                                                 >
-                                                    <Text style={[
-                                                        styles.mealButtonText,
-                                                        isSelected && styles.mealButtonTextSelected,
-                                                    ]}>
-                                                        {meal}
+                                                    <Text
+                                                        style={[
+                                                            styles.mealButtonText,
+                                                            { color: isSelected ? colors.ink : colors.fill },
+                                                        ]}
+                                                    >
+                                                        {meal === 'snack' ? 'snacks' : meal}
                                                     </Text>
                                                 </TouchableOpacity>
                                             );
@@ -1169,26 +1168,8 @@ const styles = StyleSheet.create({
         alignSelf: 'center',
         marginBottom: 16,
     },
-    searchContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#FFFFFF',
-        borderRadius: 12,
-        borderWidth: 2,
-        borderColor: '#CCCCCC',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        marginBottom: 12,
-    },
-    searchIcon: {
-        marginRight: 12,
-    },
-    searchInput: {
-        flex: 1,
-        fontSize: 18,
-        fontFamily: fonts.regular,
-        color: '#252525',
-        padding: 0,
+    searchBar: {
+        marginBottom: 8,
     },
     secondaryButtonsContainer: {
         flexDirection: 'row',
@@ -1244,25 +1225,17 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         borderRadius: 10,
         borderWidth: 2,
-        borderColor: '#252525',
         paddingVertical: 10,
-        paddingHorizontal: 12,
+        paddingHorizontal: 8,
         minHeight: 38,
     },
     mealButtonBreakfast: {
-        flex: 1.2,
-    },
-    mealButtonSelected: {
-        backgroundColor: '#4463F7',
+        flex: 1.25,
     },
     mealButtonText: {
-        fontSize: 14,
+        fontSize: 13,
         fontFamily: fonts.bold,
-        color: '#252525',
         textTransform: 'lowercase',
-    },
-    mealButtonTextSelected: {
-        color: '#fff',
     },
     aiSuggestionContainer: {
         position: 'absolute',

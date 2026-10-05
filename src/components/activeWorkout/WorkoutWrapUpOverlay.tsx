@@ -10,25 +10,29 @@ import {
     Animated,
     Easing,
     TouchableOpacity,
-    Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Icon } from '../icons/Icon';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { fonts } from '../../constants/fonts';
 import { WORKOUT_COLORS } from '../../workout/constants';
 import { Workout, WorkoutExercise, WorkoutSet } from '../../workout/types';
 import { WorkoutWrapUpSummary } from '../../workout/workoutHistoryTypes';
-import { formatWorkoutClock } from '../../workout/workoutSelectors';
+import { formatWorkoutDurationShort } from '../../workout/workoutSelectors';
 import { Button } from '../Button';
+import { Icon } from '../icons/Icon';
 import { Confetti, ConfettiParticle } from '../Confetti';
 import { useRegisterOverlay } from '../../contexts/OverlayContext';
+import { useAuth } from '../../context/AuthContext';
+import { getCompletedWorkouts } from '../../services/workoutHistoryService';
+import { ScrollingGridBackground } from '../ScrollingGridBackground';
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const SCREEN_HEIGHT = Dimensions.get('window').height;
-const CONTENT_WIDTH = 360;
-const CONFETTI_COLORS = ['#526EFF', '#252525', '#34A853', '#FFD600', '#E53935', '#FF5151', '#8E24AA'];
+const LABEL_WIDTH = 360;
+const INK = '#000';
+const BLUE = '#526EFF';
+const BLUE_WASH = '#F5F7FF';
+const GREEN = '#34A853';
+const BTN_SIZE = 50;
+const BTN_SHADOW = 4;
 
 function weightOf(set: WorkoutSet): number {
     return parseFloat(set.weight) || 0;
@@ -54,94 +58,54 @@ function sessionHeadline(seconds: number, sets: number): string {
     return 'session complete';
 }
 
-interface Standout {
-    eyebrow: string;
-    name: string;
-    detail: string;
-    icon: React.ComponentProps<typeof Ionicons>['name'];
+function formatVolume(value: number): string {
+    const safe = Math.max(0, Math.round(value));
+    if (safe >= 1000) {
+        return `${(safe / 1000).toFixed(1).replace(/\.0$/, '')}k`;
+    }
+    return safe.toLocaleString();
 }
 
-function buildStandouts(workout: Workout): Standout[] {
-    const lifts: Array<{
-        exercise: WorkoutExercise;
-        set: WorkoutSet;
-        weight: number;
-        reps: number;
-        volume: number;
-    }> = [];
-
+function countPersonalRecords(workout: Workout): number {
+    let count = 0;
     workout.exercises.forEach((exercise) => {
         completedSetsOf(exercise).forEach((set) => {
-            lifts.push({
-                exercise,
-                set,
-                weight: weightOf(set),
-                reps: repsOf(set),
-                volume: setVolume(set),
-            });
+            if (!set.previous) return;
+            const weight = weightOf(set);
+            const reps = repsOf(set);
+            const beatWeight = weight > 0 && weight > set.previous.weight;
+            const beatReps =
+                weight === (set.previous.weight || 0) && reps > (set.previous.reps || 0);
+            if (beatWeight || beatReps) count += 1;
         });
     });
+    return count;
+}
 
-    const standouts: Standout[] = [];
-    const used = new Set<string>();
+function dayKey(iso: string): string {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return '';
+    return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
 
-    const heaviest = [...lifts].sort((a, b) => b.weight - a.weight || b.reps - a.reps)[0];
-    if (heaviest && heaviest.weight > 0) {
-        used.add(heaviest.exercise.id);
-        standouts.push({
-            eyebrow: 'the heavy one',
-            name: heaviest.exercise.name,
-            detail: `${heaviest.weight} kg × ${heaviest.reps}`,
-            icon: 'barbell-outline',
-        });
+function computeStreak(completedAtList: string[], nowIso: string): number {
+    const keys = new Set(completedAtList.map(dayKey).filter(Boolean));
+    const today = dayKey(nowIso);
+    if (today) keys.add(today);
+
+    let streak = 0;
+    const cursor = new Date(nowIso);
+    if (Number.isNaN(cursor.getTime())) return 1;
+    cursor.setHours(12, 0, 0, 0);
+
+    while (true) {
+        const key = `${cursor.getFullYear()}-${cursor.getMonth()}-${cursor.getDate()}`;
+        if (!keys.has(key)) break;
+        streak += 1;
+        cursor.setDate(cursor.getDate() - 1);
+        if (streak > 365) break;
     }
-
-    const biggest = [...lifts].sort((a, b) => b.volume - a.volume)[0];
-    if (biggest && biggest.volume > 0 && !used.has(biggest.exercise.id)) {
-        used.add(biggest.exercise.id);
-        standouts.push({
-            eyebrow: 'the big set',
-            name: biggest.exercise.name,
-            detail: `${biggest.weight} kg × ${biggest.reps} · ${Math.round(biggest.volume)} kg moved`,
-            icon: 'flash-outline',
-        });
-    }
-
-    const pr = lifts
-        .filter(
-            (lift) =>
-                lift.set.previous &&
-                lift.weight > 0 &&
-                lift.weight > lift.set.previous.weight
-        )
-        .sort(
-            (a, b) =>
-                b.weight - (b.set.previous?.weight ?? 0) - (a.weight - (a.set.previous?.weight ?? 0))
-        )[0];
-    if (pr && !used.has(pr.exercise.id)) {
-        const jump = Math.round(pr.weight - (pr.set.previous?.weight ?? 0));
-        used.add(pr.exercise.id);
-        standouts.push({
-            eyebrow: 'beat last time',
-            name: pr.exercise.name,
-            detail: `+${jump} kg · ${pr.weight} kg × ${pr.reps}`,
-            icon: 'trending-up-outline',
-        });
-    }
-
-    const grinder = [...workout.exercises]
-        .map((exercise) => ({ exercise, count: completedSetsOf(exercise).length }))
-        .sort((a, b) => b.count - a.count)[0];
-    if (grinder && grinder.count >= 4 && standouts.length < 3 && !used.has(grinder.exercise.id)) {
-        standouts.push({
-            eyebrow: 'the grinder',
-            name: grinder.exercise.name,
-            detail: `${grinder.count} sets completed`,
-            icon: 'repeat-outline',
-        });
-    }
-
-    return standouts.slice(0, 3);
+    return Math.max(1, streak);
 }
 
 const AnimatedNumber: React.FC<{
@@ -163,36 +127,18 @@ const AnimatedNumber: React.FC<{
     }, [value]);
 
     useEffect(() => {
-        const timer = setTimeout(() => setDisplayValue(safeTarget), 1200);
+        const timer = setTimeout(() => setDisplayValue(safeTarget), 1100);
         return () => clearTimeout(timer);
     }, [safeTarget]);
 
     return <Text style={style}>{format ? format(displayValue) : `${displayValue}`}</Text>;
 };
 
-function ClockFace({ seconds, style }: { seconds: number; style: object }) {
-    const parts = formatWorkoutClock(Math.max(0, Math.round(seconds))).split(':');
-    return (
-        <Text style={style} numberOfLines={1} adjustsFontSizeToFit>
-            {parts.map((part, index) => (
-                <React.Fragment key={`${part}-${index}`}>
-                    {index > 0 ? <Text style={styles.recapColon}>:</Text> : null}
-                    {part}
-                </React.Fragment>
-            ))}
-        </Text>
-    );
-}
-
-function AnimatedClock({
-    value,
-    target,
-    style,
-}: {
+const AnimatedDuration: React.FC<{
     value: Animated.Value;
     target: number;
     style: object;
-}) {
+}> = ({ value, target, style }) => {
     const safeTarget = Number.isFinite(target) ? Math.max(0, Math.round(target)) : 0;
     const [displayValue, setDisplayValue] = useState(0);
 
@@ -210,240 +156,32 @@ function AnimatedClock({
         return () => clearTimeout(timer);
     }, [safeTarget]);
 
-    return <ClockFace seconds={displayValue} style={style} />;
-}
+    return (
+        <Text style={style} numberOfLines={1} adjustsFontSizeToFit>
+            {formatWorkoutDurationShort(displayValue)}
+        </Text>
+    );
+};
 
-function RecapStat({
+function FactRow({
     label,
+    bold,
+    indent,
+    last,
     children,
-    emphasize,
 }: {
     label: string;
+    bold?: boolean;
+    indent?: boolean;
+    last?: boolean;
     children: React.ReactNode;
-    emphasize?: boolean;
 }) {
     return (
-        <View style={styles.recapStat}>
+        <View style={[styles.factRow, indent && styles.factRowIndent, last && styles.factRowLast]}>
+            <Text style={[styles.factLabel, bold && styles.factLabelBold]}>{label}</Text>
             {children}
-            <Text style={[styles.recapStatLabel, emphasize && styles.recapStatLabelEmph]}>{label}</Text>
         </View>
     );
-}
-
-function RecapCard({
-    seconds,
-    volume,
-    sets,
-    exercises,
-    durationAnim,
-    volumeAnim,
-    setsAnim,
-    exercisesAnim,
-}: {
-    seconds: number;
-    volume: number;
-    sets: number;
-    exercises: number;
-    durationAnim: Animated.Value;
-    volumeAnim: Animated.Value;
-    setsAnim: Animated.Value;
-    exercisesAnim: Animated.Value;
-}) {
-    const cardScale = useRef(new Animated.Value(0.94)).current;
-    const cardOpacity = useRef(new Animated.Value(0)).current;
-    const clockBounce = useRef(new Animated.Value(1)).current;
-
-    useEffect(() => {
-        Animated.parallel([
-            Animated.spring(cardScale, {
-                toValue: 1,
-                tension: 140,
-                friction: 12,
-                useNativeDriver: true,
-            }),
-            Animated.timing(cardOpacity, {
-                toValue: 1,
-                duration: 240,
-                useNativeDriver: true,
-            }),
-        ]).start();
-
-        const bounce = setTimeout(() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            Animated.sequence([
-                Animated.timing(clockBounce, {
-                    toValue: 1.05,
-                    duration: 140,
-                    easing: Easing.out(Easing.quad),
-                    useNativeDriver: true,
-                }),
-                Animated.spring(clockBounce, {
-                    toValue: 1,
-                    tension: 220,
-                    friction: 8,
-                    useNativeDriver: true,
-                }),
-            ]).start();
-        }, 920);
-
-        return () => clearTimeout(bounce);
-    }, [cardOpacity, cardScale, clockBounce]);
-
-    return (
-        <Animated.View
-            style={[
-                styles.recapCard,
-                { opacity: cardOpacity, transform: [{ scale: cardScale }] },
-            ]}
-        >
-            <View style={styles.recapAccent} />
-            <Animated.View style={[styles.recapTimeBlock, { transform: [{ scale: clockBounce }] }]}>
-                <View style={styles.recapTimeLabelRow}>
-                    <Icon name="stopwatch-outline" size={13} color={WORKOUT_COLORS.accent} />
-                    <Text style={styles.recapTimeLabel}>elapsed</Text>
-                </View>
-                <AnimatedClock value={durationAnim} target={seconds} style={styles.recapTime} />
-            </Animated.View>
-
-            <View style={styles.recapDivider} />
-
-            <View style={styles.recapStats}>
-                <RecapStat label="kg moved" emphasize>
-                    <AnimatedNumber
-                        value={volumeAnim}
-                        target={Math.round(volume)}
-                        style={[styles.recapStatValue, styles.recapStatValueEmph]}
-                        format={(value) =>
-                            value >= 10000
-                                ? `${(value / 1000).toFixed(1)}k`
-                                : value.toLocaleString()
-                        }
-                    />
-                </RecapStat>
-                <View style={styles.recapStatRule} />
-                <RecapStat label="sets">
-                    <AnimatedNumber
-                        value={setsAnim}
-                        target={sets}
-                        style={styles.recapStatValue}
-                    />
-                </RecapStat>
-                <View style={styles.recapStatRule} />
-                <RecapStat label="lifts">
-                    <AnimatedNumber
-                        value={exercisesAnim}
-                        target={exercises}
-                        style={styles.recapStatValue}
-                    />
-                </RecapStat>
-            </View>
-        </Animated.View>
-    );
-}
-
-interface ConfettiBit {
-    id: number;
-    x: number;
-    delay: number;
-    color: string;
-    width: number;
-    height: number;
-    radius: number;
-    drift: number;
-    spin: string;
-    duration: number;
-    distance: number;
-}
-
-function FallingBit({ bit }: { bit: ConfettiBit }) {
-    const translateY = useRef(new Animated.Value(-28)).current;
-    const translateX = useRef(new Animated.Value(0)).current;
-    const rotate = useRef(new Animated.Value(0)).current;
-    const opacity = useRef(new Animated.Value(0)).current;
-
-    useEffect(() => {
-        const fadeHold = Math.max(200, bit.duration - 480);
-        const animation = Animated.sequence([
-            Animated.delay(bit.delay),
-            Animated.parallel([
-                Animated.timing(translateY, {
-                    toValue: bit.distance,
-                    duration: bit.duration,
-                    easing: Easing.in(Easing.quad),
-                    useNativeDriver: true,
-                }),
-                Animated.timing(translateX, {
-                    toValue: bit.drift,
-                    duration: bit.duration,
-                    easing: Easing.inOut(Easing.sin),
-                    useNativeDriver: true,
-                }),
-                Animated.timing(rotate, {
-                    toValue: 1,
-                    duration: bit.duration,
-                    easing: Easing.linear,
-                    useNativeDriver: true,
-                }),
-                Animated.sequence([
-                    Animated.timing(opacity, {
-                        toValue: 1,
-                        duration: 120,
-                        useNativeDriver: true,
-                    }),
-                    Animated.delay(fadeHold),
-                    Animated.timing(opacity, {
-                        toValue: 0,
-                        duration: 360,
-                        useNativeDriver: true,
-                    }),
-                ]),
-            ]),
-        ]);
-        animation.start();
-        return () => animation.stop();
-    }, [bit, opacity, rotate, translateX, translateY]);
-
-    const spin = rotate.interpolate({
-        inputRange: [0, 1],
-        outputRange: ['0deg', bit.spin],
-    });
-
-    return (
-        <Animated.View
-            pointerEvents="none"
-            style={{
-                position: 'absolute',
-                left: bit.x,
-                top: 0,
-                width: bit.width,
-                height: bit.height,
-                borderRadius: bit.radius,
-                backgroundColor: bit.color,
-                opacity,
-                transform: [{ translateY }, { translateX }, { rotate: spin }],
-            }}
-        />
-    );
-}
-
-function makeFallingBits(): ConfettiBit[] {
-    return Array.from({ length: 56 }, (_, index) => {
-        const round = index % 4 === 0;
-        const size = round ? 6 + Math.random() * 5 : 5 + Math.random() * 6;
-        return {
-            id: index,
-            x: Math.random() * SCREEN_WIDTH,
-            delay: Math.random() * 560,
-            color: CONFETTI_COLORS[index % CONFETTI_COLORS.length],
-            width: size,
-            height: round ? size : 9 + Math.random() * 10,
-            radius: round ? size / 2 : 2,
-            drift: (Math.random() - 0.5) * 110,
-            spin: `${Math.random() > 0.5 ? '' : '-'}${200 + Math.random() * 280}deg`,
-            duration: 1500 + Math.random() * 900,
-            distance: SCREEN_HEIGHT * (0.48 + Math.random() * 0.4),
-        };
-    });
 }
 
 interface WorkoutWrapUpOverlayProps {
@@ -460,79 +198,123 @@ export const WorkoutWrapUpOverlay: React.FC<WorkoutWrapUpOverlayProps> = ({
     onSavePreset,
 }) => {
     useRegisterOverlay('WorkoutWrapUpOverlay', visible);
+    const { user } = useAuth();
     const [savedPreset, setSavedPreset] = useState(false);
-    const [confettiParticles, setConfettiParticles] = useState<ConfettiParticle[]>([]);
-    const [fallingBits, setFallingBits] = useState<ConfettiBit[]>([]);
+    const [streak, setStreak] = useState(1);
+    const [saveBurst, setSaveBurst] = useState<ConfettiParticle[]>([]);
+    const rootRef = useRef<View>(null);
+    const saveRef = useRef<View>(null);
 
-    const fadeAnim = useRef(new Animated.Value(0)).current;
-    const slideAnim = useRef(new Animated.Value(40)).current;
-    const rotateTopRight = useRef(new Animated.Value(0)).current;
-    const rotateBottomLeft = useRef(new Animated.Value(0)).current;
+    const labelOpacity = useRef(new Animated.Value(0)).current;
+    const labelScale = useRef(new Animated.Value(0.74)).current;
+    const labelRotate = useRef(new Animated.Value(-3.6)).current;
+    const labelY = useRef(new Animated.Value(46)).current;
+    const footerOpacity = useRef(new Animated.Value(0)).current;
+    const footerY = useRef(new Animated.Value(18)).current;
+    const saveScale = useRef(new Animated.Value(1)).current;
+    const saveRotate = useRef(new Animated.Value(0)).current;
+    const saveFlash = useRef(new Animated.Value(0)).current;
     const statAnims = useRef({
         duration: new Animated.Value(0),
-        sets: new Animated.Value(0),
         volume: new Animated.Value(0),
         exercises: new Animated.Value(0),
+        sets: new Animated.Value(0),
+        prs: new Animated.Value(0),
+        streak: new Animated.Value(0),
     }).current;
 
     const recap = useMemo(() => {
         if (!summary) return null;
-        const standouts = buildStandouts(summary.workout);
+        const prs = countPersonalRecords(summary.workout);
         return {
             headline: sessionHeadline(summary.elapsedSeconds, summary.sets),
-            standouts,
+            prs,
         };
     }, [summary]);
+
+    useEffect(() => {
+        if (!visible || !summary) return;
+        let cancelled = false;
+        (async () => {
+            const completed = await getCompletedWorkouts(user?.id);
+            if (cancelled) return;
+            setStreak(computeStreak(completed.map((item) => item.completedAt), summary.completedAt));
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [visible, summary?.completedAt, user?.id]);
 
     useEffect(() => {
         if (!visible || !summary || !recap) return;
 
         setSavedPreset(false);
-
-        fadeAnim.setValue(0);
-        slideAnim.setValue(40);
+        setSaveBurst([]);
+        labelOpacity.setValue(0);
+        labelScale.setValue(0.74);
+        labelRotate.setValue(-3.6);
+        labelY.setValue(46);
+        footerOpacity.setValue(0);
+        footerY.setValue(18);
+        saveScale.setValue(1);
+        saveRotate.setValue(0);
+        saveFlash.setValue(0);
         Object.values(statAnims).forEach((anim) => anim.setValue(0));
-
-        const burstOrigins = [
-            { x: SCREEN_WIDTH / 2, y: 150 },
-            { x: SCREEN_WIDTH * 0.28, y: 210 },
-            { x: SCREEN_WIDTH * 0.72, y: 210 },
-        ];
-        const particles: ConfettiParticle[] = Array.from({ length: 54 }, (_, index) => {
-            const origin = burstOrigins[index % burstOrigins.length];
-            return {
-                id: Date.now() + index,
-                originX: origin.x + (Math.random() - 0.5) * 36,
-                originY: origin.y + (Math.random() - 0.5) * 24,
-                angle: (360 / 18) * (index % 18) + Math.random() * 16,
-                color: CONFETTI_COLORS[index % CONFETTI_COLORS.length],
-            };
-        });
-        setConfettiParticles(particles);
-        setFallingBits(makeFallingBits());
-        const confettiClear = setTimeout(() => {
-            setConfettiParticles([]);
-            setFallingBits([]);
-        }, 3200);
 
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
         Animated.parallel([
-            Animated.timing(fadeAnim, {
+            Animated.spring(labelScale, {
                 toValue: 1,
-                duration: 450,
-                easing: Easing.out(Easing.ease),
+                tension: 58,
+                friction: 6.4,
                 useNativeDriver: true,
             }),
-            Animated.timing(slideAnim, {
+            Animated.spring(labelRotate, {
                 toValue: 0,
-                duration: 550,
+                tension: 72,
+                friction: 7.5,
+                useNativeDriver: true,
+            }),
+            Animated.spring(labelY, {
+                toValue: 0,
+                tension: 64,
+                friction: 8,
+                useNativeDriver: true,
+            }),
+            Animated.timing(labelOpacity, {
+                toValue: 1,
+                duration: 200,
                 easing: Easing.out(Easing.cubic),
                 useNativeDriver: true,
             }),
         ]).start();
 
+        Animated.sequence([
+            Animated.delay(260),
+            Animated.parallel([
+                Animated.timing(footerOpacity, {
+                    toValue: 1,
+                    duration: 280,
+                    easing: Easing.out(Easing.cubic),
+                    useNativeDriver: true,
+                }),
+                Animated.spring(footerY, {
+                    toValue: 0,
+                    tension: 90,
+                    friction: 10,
+                    useNativeDriver: true,
+                }),
+            ]),
+        ]).start();
+
         Animated.stagger(70, [
+            Animated.timing(statAnims.exercises, {
+                toValue: Number.isFinite(summary.exerciseCount) ? summary.exerciseCount : 0,
+                duration: 700,
+                easing: Easing.out(Easing.cubic),
+                useNativeDriver: false,
+            }),
             Animated.timing(statAnims.duration, {
                 toValue: Number.isFinite(summary.elapsedSeconds) ? summary.elapsedSeconds : 0,
                 duration: 900,
@@ -551,46 +333,106 @@ export const WorkoutWrapUpOverlay: React.FC<WorkoutWrapUpOverlayProps> = ({
                 easing: Easing.out(Easing.cubic),
                 useNativeDriver: false,
             }),
-            Animated.timing(statAnims.exercises, {
-                toValue: Number.isFinite(summary.exerciseCount) ? summary.exerciseCount : 0,
+            Animated.timing(statAnims.prs, {
+                toValue: recap.prs,
+                duration: 650,
+                easing: Easing.out(Easing.cubic),
+                useNativeDriver: false,
+            }),
+            Animated.timing(statAnims.streak, {
+                toValue: streak,
                 duration: 650,
                 easing: Easing.out(Easing.cubic),
                 useNativeDriver: false,
             }),
         ]).start();
-
-        Animated.loop(
-            Animated.timing(rotateTopRight, {
-                toValue: 1,
-                duration: 32000,
-                easing: Easing.linear,
-                useNativeDriver: true,
-            })
-        ).start();
-
-        Animated.loop(
-            Animated.timing(rotateBottomLeft, {
-                toValue: 1,
-                duration: 32000,
-                easing: Easing.linear,
-                useNativeDriver: true,
-            })
-        ).start();
-
-        return () => clearTimeout(confettiClear);
     }, [visible, summary?.completedAt]);
+
+    useEffect(() => {
+        if (!visible) return;
+        Animated.timing(statAnims.streak, {
+            toValue: streak,
+            duration: 480,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: false,
+        }).start();
+    }, [streak, visible]);
 
     if (!visible || !summary || !recap) return null;
 
-    const topRightRotation = rotateTopRight.interpolate({
-        inputRange: [0, 1],
-        outputRange: ['0deg', '360deg'],
-    });
+    const playSavedAnimation = () => {
+        setSavedPreset(true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        saveScale.setValue(1);
+        saveRotate.setValue(0);
+        saveFlash.setValue(0);
 
-    const bottomLeftRotation = rotateBottomLeft.interpolate({
-        inputRange: [0, 1],
-        outputRange: ['0deg', '-360deg'],
-    });
+        Animated.parallel([
+            Animated.sequence([
+                Animated.timing(saveScale, {
+                    toValue: 1.24,
+                    duration: 120,
+                    easing: Easing.out(Easing.cubic),
+                    useNativeDriver: true,
+                }),
+                Animated.spring(saveScale, {
+                    toValue: 1,
+                    tension: 160,
+                    friction: 5.5,
+                    useNativeDriver: true,
+                }),
+            ]),
+            Animated.sequence([
+                Animated.timing(saveRotate, {
+                    toValue: -14,
+                    duration: 80,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(saveRotate, {
+                    toValue: 11,
+                    duration: 90,
+                    useNativeDriver: true,
+                }),
+                Animated.spring(saveRotate, {
+                    toValue: 0,
+                    tension: 170,
+                    friction: 7,
+                    useNativeDriver: true,
+                }),
+            ]),
+            Animated.sequence([
+                Animated.timing(saveFlash, {
+                    toValue: 0.35,
+                    duration: 110,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(saveFlash, {
+                    toValue: 0,
+                    duration: 420,
+                    useNativeDriver: true,
+                }),
+            ]),
+        ]).start();
+
+        saveRef.current?.measureInWindow((x, y, w, h) => {
+            rootRef.current?.measureInWindow((rx, ry) => {
+                const originX = x - rx + w / 2;
+                const originY = y - ry + h / 2;
+                const colors = [BLUE, GREEN, '#E2A800', BLUE];
+                const particles = Array.from({ length: 8 }, (_, i) => ({
+                    id: Date.now() + i,
+                    originX,
+                    originY,
+                    angle: (i / 8) * 360,
+                    color: colors[i % colors.length],
+                    sizeScale: 0.85 + (i % 3) * 0.35,
+                    travel: 32 + (i % 4) * 10,
+                }));
+                setSaveBurst(particles);
+                setTimeout(() => setSaveBurst([]), 480);
+            });
+        });
+    };
 
     const handleSavePresetPress = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -606,7 +448,7 @@ export const WorkoutWrapUpOverlay: React.FC<WorkoutWrapUpOverlayProps> = ({
                         text: 'save',
                         onPress: (text?: string) => {
                             onSavePreset((text ?? '').trim() || defaultTitle);
-                            setSavedPreset(true);
+                            playSavedAnimation();
                         },
                     },
                 ],
@@ -617,181 +459,221 @@ export const WorkoutWrapUpOverlay: React.FC<WorkoutWrapUpOverlayProps> = ({
         }
 
         onSavePreset(defaultTitle);
-        setSavedPreset(true);
+        playSavedAnimation();
     };
+
+    const dateLine = new Date(summary.completedAt).toLocaleDateString(undefined, {
+        weekday: 'long',
+        month: 'short',
+        day: 'numeric',
+    });
+    const sessionLine = summary.workout.title?.trim()
+        ? `1 session ${summary.workout.title.trim()}`
+        : '1 session';
 
     return (
         <Modal visible transparent animationType="fade" statusBarTranslucent>
-            <View style={styles.root}>
-                <Animated.Image
-                    source={require('../../../assets/images/aura_ball.png')}
-                    style={[styles.auraBallTopRight, { transform: [{ rotate: topRightRotation }] }]}
-                    resizeMode="contain"
-                />
-                <Animated.Image
-                    source={require('../../../assets/images/aura_ball.png')}
-                    style={[styles.auraBallBottomLeft, { transform: [{ rotate: bottomLeftRotation }] }]}
-                    resizeMode="contain"
-                />
-
-                <View style={styles.confettiLayer} pointerEvents="none">
-                    <Confetti particles={confettiParticles} />
-                    {fallingBits.map((bit) => (
-                        <FallingBit key={bit.id} bit={bit} />
-                    ))}
-                </View>
-
+            <View ref={rootRef} style={styles.root} collapsable={false}>
+                <ScrollingGridBackground />
                 <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-                    <Animated.View
-                        style={[
-                            styles.content,
-                            {
-                                opacity: fadeAnim,
-                                transform: [{ translateY: slideAnim }],
-                            },
-                        ]}
-                    >
-                        <ScrollView
-                            style={styles.topScroll}
-                            contentContainerStyle={styles.topScrollContent}
-                            showsVerticalScrollIndicator={false}
+                    <View style={styles.content}>
+                        <Animated.View
+                            style={[
+                                styles.labelOuter,
+                                {
+                                    opacity: labelOpacity,
+                                    transform: [
+                                        { translateY: labelY },
+                                        { scale: labelScale },
+                                        {
+                                            rotate: labelRotate.interpolate({
+                                                inputRange: [-8, 8],
+                                                outputRange: ['-8deg', '8deg'],
+                                            }),
+                                        },
+                                    ],
+                                },
+                            ]}
                         >
-                            <Text style={styles.kicker}>
-                                {new Date(summary.completedAt).toLocaleDateString(undefined, {
-                                    weekday: 'long',
-                                    month: 'short',
-                                    day: 'numeric',
-                                })}
-                            </Text>
-                            <Text style={styles.title}>{recap.headline}</Text>
-                            <Text style={styles.subtitle}>{summary.workout.title}</Text>
+                            <View style={styles.labelInner}>
+                                <Text style={styles.factsTitle} numberOfLines={1} adjustsFontSizeToFit>
+                                    Workout Facts
+                                </Text>
+                                <Text style={styles.productLine}>{recap.headline}</Text>
+                                <View style={styles.hairline} />
+                                <Text style={styles.sessionLine} numberOfLines={1}>
+                                    {sessionLine}
+                                </Text>
+                                <Text style={styles.dateLine}>{dateLine}</Text>
 
-                            <RecapCard
-                                seconds={summary.elapsedSeconds}
-                                volume={summary.volume}
-                                sets={summary.sets}
-                                exercises={summary.exerciseCount}
-                                durationAnim={statAnims.duration}
-                                volumeAnim={statAnims.volume}
-                                setsAnim={statAnims.sets}
-                                exercisesAnim={statAnims.exercises}
-                            />
-                        </ScrollView>
-
-                        {recap.standouts.length > 0 ? (
-                            <>
-                                <Text style={styles.sectionTitle}>standouts</Text>
-                                <View style={styles.standoutList}>
-                                    {recap.standouts.map((item) => (
-                                        <View key={`${item.eyebrow}-${item.name}`} style={styles.standout}>
-                                            <View style={styles.standoutAccent} />
-                                            <View style={styles.standoutIcon}>
-                                                <Icon
-                                                    name={item.icon}
-                                                    size={18}
-                                                    color={WORKOUT_COLORS.accent}
-                                                />
-                                            </View>
-                                            <View style={styles.standoutCopy}>
-                                                <Text style={styles.standoutEyebrow}>{item.eyebrow}</Text>
-                                                <Text style={styles.standoutName}>{item.name}</Text>
-                                                <Text style={styles.standoutDetail}>{item.detail}</Text>
-                                            </View>
-                                        </View>
-                                    ))}
+                                <View style={styles.barThick} />
+                                <Text style={styles.amountLabel}>Amount per session</Text>
+                                <View style={styles.caloriesRow}>
+                                    <Text style={styles.caloriesLabel}>Volume</Text>
+                                    <AnimatedNumber
+                                        value={statAnims.volume}
+                                        target={Math.round(summary.volume)}
+                                        style={styles.caloriesValue}
+                                        format={(value) => `${formatVolume(value)}kg`}
+                                    />
                                 </View>
-                            </>
-                        ) : null}
+                                <View style={styles.barMedium} />
 
-                        <Text style={styles.sectionTitle}>your lifts</Text>
+                                <FactRow label="Duration" bold>
+                                    <AnimatedDuration
+                                        value={statAnims.duration}
+                                        target={summary.elapsedSeconds}
+                                        style={styles.factValue}
+                                    />
+                                </FactRow>
+                                <FactRow label="Exercises" bold>
+                                    <AnimatedNumber
+                                        value={statAnims.exercises}
+                                        target={summary.exerciseCount}
+                                        style={styles.factValue}
+                                    />
+                                </FactRow>
+                                <FactRow label="Sets" indent>
+                                    <AnimatedNumber
+                                        value={statAnims.sets}
+                                        target={summary.sets}
+                                        style={styles.factValue}
+                                    />
+                                </FactRow>
+                                <FactRow label="PRs" bold>
+                                    <AnimatedNumber
+                                        value={statAnims.prs}
+                                        target={recap.prs}
+                                        style={styles.factValue}
+                                        format={(value) => (value > 0 ? `+${value}` : `${value}`)}
+                                    />
+                                </FactRow>
+                                <FactRow label="Streak" bold last>
+                                    <AnimatedNumber
+                                        value={statAnims.streak}
+                                        target={streak}
+                                        style={styles.factValue}
+                                        format={(value) => `${value}d`}
+                                    />
+                                </FactRow>
 
-                        <View style={styles.exercisesWrap}>
-                            <ScrollView
-                                style={styles.exercisesScroll}
-                                contentContainerStyle={styles.exercisesContent}
-                                showsVerticalScrollIndicator={false}
-                                nestedScrollEnabled
-                            >
-                                {summary.workout.exercises.map((exercise, index) => {
-                                    const done = completedSetsOf(exercise);
-                                    const topSet = [...done].sort(
-                                        (a, b) => setVolume(b) - setVolume(a) || weightOf(b) - weightOf(a)
-                                    )[0];
-                                    const beat =
-                                        topSet?.previous &&
-                                            weightOf(topSet) > topSet.previous.weight
-                                            ? Math.round(weightOf(topSet) - topSet.previous.weight)
-                                            : 0;
-                                    return (
-                                        <View
-                                            key={exercise.id}
-                                            style={[
-                                                styles.liftRow,
-                                                index === summary.workout.exercises.length - 1 &&
-                                                styles.liftRowLast,
-                                            ]}
-                                        >
-                                            <Text style={styles.liftIndex}>
-                                                {String(index + 1).padStart(2, '0')}
-                                            </Text>
-                                            <View style={styles.liftCopy}>
-                                                <Text style={styles.liftName} numberOfLines={1}>
-                                                    {exercise.name}
-                                                </Text>
-                                                <Text style={styles.liftMeta}>
-                                                    {done.length}/{exercise.sets.length} sets
-                                                    {topSet
-                                                        ? ` · ${weightOf(topSet) || 0} × ${repsOf(topSet) || 0}`
-                                                        : ''}
-                                                </Text>
-                                            </View>
-                                            {beat > 0 ? (
-                                                <Text style={styles.liftDelta}>+{beat} kg</Text>
-                                            ) : null}
-                                        </View>
-                                    );
-                                })}
-                            </ScrollView>
-                            <LinearGradient
-                                colors={['#ffffff', 'rgba(255,255,255,0)']}
-                                style={styles.exercisesFadeTop}
-                                pointerEvents="none"
-                            />
-                            <LinearGradient
-                                colors={['rgba(255,255,255,0)', '#ffffff']}
-                                style={styles.exercisesFadeBottom}
-                                pointerEvents="none"
-                            />
-                        </View>
-
-                        <View style={styles.footer}>
-                            {!savedPreset ? (
-                                <TouchableOpacity
-                                    style={styles.presetLink}
-                                    onPress={handleSavePresetPress}
-                                    activeOpacity={0.7}
-                                >
-                                    <Icon name="bookmark-outline" size={18} color={WORKOUT_COLORS.muted} />
-                                    <Text style={styles.presetLinkText}>save as preset for next time</Text>
-                                </TouchableOpacity>
-                            ) : (
-                                <View style={styles.presetLink}>
-                                    <Icon name="bookmark" size={18} color={WORKOUT_COLORS.accent} />
-                                    <Text style={[styles.presetLinkText, styles.presetLinkTextSaved]}>
-                                        saved as preset
+                                <View style={styles.barMedium} />
+                                <View style={styles.liftsHeader}>
+                                    <Text style={styles.liftsTitle}>Your lifts</Text>
+                                    <Text style={styles.liftsCount}>
+                                        {summary.workout.exercises.length}
                                     </Text>
                                 </View>
-                            )}
 
+                                <ScrollView
+                                    style={styles.liftsScroll}
+                                    contentContainerStyle={styles.liftsContent}
+                                    showsVerticalScrollIndicator={false}
+                                    nestedScrollEnabled
+                                >
+                                    {summary.workout.exercises.map((exercise, index) => {
+                                        const done = completedSetsOf(exercise);
+                                        const topSet = [...done].sort(
+                                            (a, b) =>
+                                                setVolume(b) - setVolume(a) ||
+                                                weightOf(b) - weightOf(a)
+                                        )[0];
+                                        const beat =
+                                            topSet?.previous &&
+                                            weightOf(topSet) > topSet.previous.weight
+                                                ? Math.round(weightOf(topSet) - topSet.previous.weight)
+                                                : 0;
+                                        const last = index === summary.workout.exercises.length - 1;
+                                        return (
+                                            <View
+                                                key={exercise.id}
+                                                style={[styles.liftBlock, last && styles.liftBlockLast]}
+                                            >
+                                                <View style={styles.factRow}>
+                                                    <Text style={styles.liftName} numberOfLines={1}>
+                                                        {exercise.name}
+                                                    </Text>
+                                                    <Text style={styles.factValue}>
+                                                        {done.length}/{exercise.sets.length}
+                                                    </Text>
+                                                </View>
+                                                <View style={[styles.factRow, styles.factRowIndent, styles.factRowLast]}>
+                                                    <Text style={styles.liftMeta}>
+                                                        {topSet
+                                                            ? `${weightOf(topSet) || 0} × ${repsOf(topSet) || 0}`
+                                                            : 'no sets'}
+                                                    </Text>
+                                                    {beat > 0 ? (
+                                                        <Text style={styles.factValueGreen}>+{beat}kg</Text>
+                                                    ) : null}
+                                                </View>
+                                            </View>
+                                        );
+                                    })}
+                                </ScrollView>
+                            </View>
+                        </Animated.View>
+
+                        <Animated.View
+                            style={[
+                                styles.footer,
+                                {
+                                    opacity: footerOpacity,
+                                    transform: [{ translateY: footerY }],
+                                },
+                            ]}
+                        >
+                            <Animated.View
+                                style={{
+                                    transform: [
+                                        { scale: saveScale },
+                                        {
+                                            rotate: saveRotate.interpolate({
+                                                inputRange: [-20, 20],
+                                                outputRange: ['-20deg', '20deg'],
+                                            }),
+                                        },
+                                    ],
+                                }}
+                            >
+                                <View ref={saveRef} collapsable={false}>
+                                    <TouchableOpacity
+                                        style={styles.saveHit}
+                                        onPress={handleSavePresetPress}
+                                        disabled={savedPreset}
+                                        activeOpacity={0.85}
+                                        accessibilityRole="button"
+                                        accessibilityLabel={savedPreset ? 'saved as preset' : 'save as preset'}
+                                    >
+                                        <View style={styles.saveShadow} />
+                                        <View style={styles.saveFace}>
+                                            <Animated.View
+                                                pointerEvents="none"
+                                                style={[
+                                                    styles.saveFlash,
+                                                    { opacity: saveFlash },
+                                                ]}
+                                            />
+                                            <Icon
+                                                name={savedPreset ? 'bookmark' : 'bookmark-outline'}
+                                                size={22}
+                                                color={savedPreset ? WORKOUT_COLORS.accent : INK}
+                                            />
+                                        </View>
+                                    </TouchableOpacity>
+                                </View>
+                            </Animated.View>
                             <Button
                                 variant="primary"
-                                title="done"
+                                title="done!"
                                 onPress={onDone}
                                 containerStyle={styles.doneButton}
+                                buttonBodyStyle={styles.doneBody}
                             />
-                        </View>
-                    </Animated.View>
+                        </Animated.View>
+                    </View>
                 </SafeAreaView>
+                <Confetti particles={saveBurst} />
             </View>
         </Modal>
     );
@@ -803,315 +685,238 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         overflow: 'hidden',
     },
-    auraBallTopRight: {
-        position: 'absolute',
-        top: -220,
-        right: -220,
-        width: 440,
-        height: 440,
-        zIndex: 0,
-    },
-    auraBallBottomLeft: {
-        position: 'absolute',
-        bottom: -220,
-        left: -220,
-        width: 440,
-        height: 440,
-        zIndex: 0,
-    },
-    confettiLayer: {
-        ...StyleSheet.absoluteFill,
-        zIndex: 2,
-    },
     safeArea: {
         flex: 1,
-        zIndex: 1,
     },
     content: {
         flex: 1,
         width: '100%',
-        maxWidth: CONTENT_WIDTH,
+        maxWidth: LABEL_WIDTH,
         alignSelf: 'center',
+        paddingTop: 10,
+        paddingBottom: 0,
+        zIndex: 1,
+    },
+    labelOuter: {
+        flex: 1,
+        backgroundColor: BLUE_WASH,
+        borderWidth: 2,
+        borderColor: INK,
+        padding: 3,
+        minHeight: 0,
+    },
+    labelInner: {
+        flex: 1,
+        backgroundColor: BLUE_WASH,
+        borderWidth: 8,
+        borderColor: INK,
         paddingHorizontal: 16,
-        paddingTop: 8,
-        paddingBottom: 8,
-    },
-    topScroll: {
-        flexGrow: 0,
-        flexShrink: 1,
-        width: '100%',
-    },
-    topScrollContent: {
-        alignItems: 'center',
-        paddingBottom: 12,
-    },
-    kicker: {
-        fontFamily: fonts.regular,
-        fontSize: 13,
-        color: WORKOUT_COLORS.muted,
-        textTransform: 'lowercase',
-        marginBottom: 6,
-    },
-    title: {
-        fontFamily: fonts.bold,
-        fontSize: 32,
-        color: WORKOUT_COLORS.text,
-        textAlign: 'center',
-        textTransform: 'lowercase',
-    },
-    subtitle: {
-        fontFamily: fonts.regular,
-        fontSize: 16,
-        color: WORKOUT_COLORS.placeholder,
-        textAlign: 'center',
-        marginTop: 4,
-        marginBottom: 16,
-        textTransform: 'lowercase',
-    },
-    recapCard: {
-        width: '100%',
-        backgroundColor: '#F5F7FF',
-        borderWidth: 2.5,
-        borderColor: WORKOUT_COLORS.border,
-        borderRadius: 18,
-        overflow: 'hidden',
-        marginTop: 4,
-    },
-    recapAccent: {
-        height: 5,
-        backgroundColor: WORKOUT_COLORS.accent,
-    },
-    recapTimeBlock: {
-        alignItems: 'center',
         paddingTop: 16,
         paddingBottom: 14,
-        paddingHorizontal: 16,
+        minHeight: 0,
     },
-    recapTimeLabelRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 5,
-        marginBottom: 4,
-    },
-    recapTimeLabel: {
+    factsTitle: {
         fontFamily: fonts.bold,
-        fontSize: 11,
-        color: WORKOUT_COLORS.accent,
-        textTransform: 'lowercase',
-        letterSpacing: 1.1,
+        fontSize: 34,
+        color: BLUE,
+        letterSpacing: -1.2,
+        lineHeight: 38,
     },
-    recapTime: {
-        fontFamily: fonts.bold,
-        fontSize: 52,
-        color: WORKOUT_COLORS.text,
-        letterSpacing: -1.8,
-        lineHeight: 56,
-        textAlign: 'center',
-    },
-    recapColon: {
-        fontFamily: fonts.bold,
-        fontSize: 52,
-        color: WORKOUT_COLORS.accent,
-        letterSpacing: -1.8,
-        lineHeight: 56,
-    },
-    recapDivider: {
-        height: StyleSheet.hairlineWidth,
-        backgroundColor: WORKOUT_COLORS.completedBorder,
-        marginHorizontal: 16,
-    },
-    recapStats: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 14,
-        paddingHorizontal: 8,
-    },
-    recapStat: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 2,
-    },
-    recapStatRule: {
-        width: StyleSheet.hairlineWidth,
-        height: 32,
-        backgroundColor: WORKOUT_COLORS.completedBorder,
-    },
-    recapStatValue: {
-        fontFamily: fonts.bold,
-        fontSize: 22,
-        color: WORKOUT_COLORS.text,
-        letterSpacing: -0.4,
-    },
-    recapStatValueEmph: {
-        color: WORKOUT_COLORS.accent,
-    },
-    recapStatLabel: {
+    productLine: {
         fontFamily: fonts.regular,
-        fontSize: 11,
-        color: WORKOUT_COLORS.muted,
+        fontSize: 15,
+        color: INK,
+        marginTop: 2,
+        marginBottom: 4,
         textTransform: 'lowercase',
-        letterSpacing: 0.2,
     },
-    recapStatLabelEmph: {
-        color: WORKOUT_COLORS.accent,
+    hairline: {
+        height: StyleSheet.hairlineWidth,
+        backgroundColor: INK,
     },
-    sectionTitle: {
-        width: '100%',
-        fontFamily: fonts.bold,
-        fontSize: 13,
-        color: WORKOUT_COLORS.muted,
-        marginTop: 16,
-        marginBottom: 8,
-        textTransform: 'lowercase',
-        letterSpacing: 0.5,
-    },
-    standoutList: {
-        width: '100%',
-        gap: 8,
-    },
-    standout: {
-        width: '100%',
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#F5F7FF',
-        borderRadius: 12,
-        overflow: 'hidden',
-        paddingVertical: 10,
-        paddingRight: 12,
-    },
-    standoutAccent: {
-        width: 4,
-        alignSelf: 'stretch',
-        backgroundColor: WORKOUT_COLORS.accent,
-        marginRight: 10,
-    },
-    standoutIcon: {
-        width: 32,
-        height: 32,
-        borderRadius: 10,
-        backgroundColor: '#EAEEFF',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 10,
-    },
-    standoutCopy: {
-        flex: 1,
-        minWidth: 0,
-    },
-    standoutEyebrow: {
-        fontFamily: fonts.bold,
-        fontSize: 11,
-        color: WORKOUT_COLORS.accent,
-        textTransform: 'lowercase',
-        letterSpacing: 0.4,
-    },
-    standoutName: {
+    sessionLine: {
         fontFamily: fonts.bold,
         fontSize: 16,
-        color: WORKOUT_COLORS.text,
+        color: INK,
         textTransform: 'lowercase',
+        paddingTop: 6,
+        paddingBottom: 2,
     },
-    standoutDetail: {
+    dateLine: {
         fontFamily: fonts.regular,
-        fontSize: 13,
+        fontSize: 14,
         color: WORKOUT_COLORS.muted,
         textTransform: 'lowercase',
-        marginTop: 1,
+        paddingBottom: 6,
     },
-    exercisesWrap: {
-        flexGrow: 1,
-        flexShrink: 1,
-        width: '100%',
-        position: 'relative',
+    barThick: {
+        height: 14,
+        backgroundColor: INK,
     },
-    exercisesScroll: {
-        flex: 1,
-        width: '100%',
+    barMedium: {
+        height: 8,
+        backgroundColor: INK,
     },
-    exercisesContent: {
-        paddingTop: 2,
-        paddingBottom: 48,
+    amountLabel: {
+        fontFamily: fonts.regular,
+        fontSize: 13,
+        color: INK,
+        paddingTop: 4,
     },
-    exercisesFadeTop: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        top: 0,
-        height: 12,
+    caloriesRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        justifyContent: 'space-between',
+        paddingBottom: 4,
+        gap: 8,
     },
-    exercisesFadeBottom: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        bottom: 0,
-        height: 56,
+    caloriesLabel: {
+        fontFamily: fonts.bold,
+        fontSize: 30,
+        color: INK,
+        letterSpacing: -0.6,
+        lineHeight: 34,
     },
-    liftRow: {
-        width: '100%',
+    caloriesValue: {
+        fontFamily: fonts.bold,
+        fontSize: 36,
+        color: BLUE,
+        letterSpacing: -0.8,
+        lineHeight: 40,
+    },
+    factRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 10,
+        justifyContent: 'space-between',
+        gap: 8,
+        paddingVertical: 6,
         borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: WORKOUT_COLORS.divider,
+        borderBottomColor: INK,
     },
-    liftRowLast: {
+    factRowIndent: {
+        paddingLeft: 16,
+    },
+    factRowLast: {
         borderBottomWidth: 0,
     },
-    liftIndex: {
-        width: 28,
-        fontFamily: fonts.bold,
-        fontSize: 13,
-        color: WORKOUT_COLORS.placeholder,
-    },
-    liftCopy: {
+    factLabel: {
         flex: 1,
-        minWidth: 0,
-        marginRight: 8,
+        fontFamily: fonts.regular,
+        fontSize: 16,
+        color: INK,
+    },
+    factLabelBold: {
+        fontFamily: fonts.bold,
+        fontSize: 16,
+        color: INK,
+    },
+    factValue: {
+        fontFamily: fonts.bold,
+        fontSize: 16,
+        color: BLUE,
+    },
+    factValueGreen: {
+        fontFamily: fonts.bold,
+        fontSize: 16,
+        color: GREEN,
+    },
+    liftsHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingTop: 6,
+        paddingBottom: 2,
+    },
+    liftsTitle: {
+        fontFamily: fonts.bold,
+        fontSize: 16,
+        color: BLUE,
+    },
+    liftsCount: {
+        fontFamily: fonts.bold,
+        fontSize: 16,
+        color: BLUE,
+    },
+    liftsScroll: {
+        flex: 1,
+        minHeight: 0,
+        marginTop: 2,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: INK,
+    },
+    liftsContent: {
+        paddingBottom: 8,
+    },
+    liftBlock: {
+        paddingTop: 4,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: INK,
+    },
+    liftBlockLast: {
+        borderBottomWidth: 0,
     },
     liftName: {
+        flex: 1,
         fontFamily: fonts.bold,
-        fontSize: 15,
-        color: WORKOUT_COLORS.text,
+        fontSize: 16,
+        color: INK,
         textTransform: 'lowercase',
     },
     liftMeta: {
-        fontFamily: fonts.regular,
-        fontSize: 12,
-        color: WORKOUT_COLORS.muted,
-        textTransform: 'lowercase',
-        marginTop: 1,
-    },
-    liftDelta: {
-        fontFamily: fonts.bold,
-        fontSize: 12,
-        color: WORKOUT_COLORS.accent,
-        textTransform: 'lowercase',
-    },
-    footer: {
-        width: '100%',
-        paddingTop: 8,
-    },
-    presetLink: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        paddingVertical: 10,
-        marginBottom: 8,
-    },
-    presetLinkText: {
+        flex: 1,
         fontFamily: fonts.regular,
         fontSize: 14,
         color: WORKOUT_COLORS.muted,
         textTransform: 'lowercase',
     },
-    presetLinkTextSaved: {
-        color: WORKOUT_COLORS.accent,
+    footer: {
+        width: '100%',
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 10,
+        paddingTop: 14,
+        paddingBottom: 0,
+        zIndex: 5,
+    },
+    saveHit: {
+        width: BTN_SIZE,
+        height: BTN_SIZE + BTN_SHADOW,
+    },
+    saveShadow: {
+        position: 'absolute',
+        top: BTN_SHADOW,
+        left: 0,
+        width: BTN_SIZE,
+        height: BTN_SIZE,
+        borderRadius: 12,
+        backgroundColor: '#252525',
+    },
+    saveFace: {
+        width: BTN_SIZE,
+        height: BTN_SIZE,
+        borderRadius: 12,
+        borderWidth: 2,
+        borderColor: '#252525',
+        backgroundColor: '#fff',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+    },
+    saveFlash: {
+        ...StyleSheet.absoluteFill,
+        backgroundColor: BLUE,
+        opacity: 0,
     },
     doneButton: {
-        marginTop: 8,
-        marginBottom: 16,
+        flex: 1,
         width: '100%',
+        marginTop: 0,
+        marginBottom: 0,
+    },
+    doneBody: {
+        width: '100%',
+        marginTop: 0,
+        marginBottom: 0,
+        alignSelf: 'stretch',
     },
 });

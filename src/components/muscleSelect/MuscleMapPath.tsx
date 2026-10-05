@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing } from 'react-native';
 import { Path } from 'react-native-svg';
 import { WORKOUT_COLORS } from '../../workout/constants';
-import { MUSCLE_NEUTRAL_FILL, MUSCLE_SELECTED_FILL } from '../../workout/muscleGroups';
+import { MUSCLE_NEUTRAL_FILL } from '../../workout/muscleGroups';
 
 /** Visible but not heavy — sits between the old 3px black and faint 1.25px red */
 const SELECT_STROKE_WIDTH = 1.75;
@@ -11,6 +11,7 @@ const SELECT_STROKE_OPACITY = 0.55;
 interface MuscleMapPathProps {
     d: string;
     isSelected: boolean;
+    selectedFill: string;
     onPress: () => void;
     accessibilityLabel: string;
 }
@@ -18,6 +19,7 @@ interface MuscleMapPathProps {
 export const MuscleMapPath: React.FC<MuscleMapPathProps> = ({
     d,
     isSelected,
+    selectedFill,
     onPress,
     accessibilityLabel,
 }) => {
@@ -79,7 +81,7 @@ export const MuscleMapPath: React.FC<MuscleMapPathProps> = ({
             />
             <Path
                 d={d}
-                fill={MUSCLE_SELECTED_FILL}
+                fill={selectedFill}
                 stroke={WORKOUT_COLORS.text}
                 strokeWidth={SELECT_STROKE_WIDTH}
                 strokeOpacity={SELECT_STROKE_OPACITY}

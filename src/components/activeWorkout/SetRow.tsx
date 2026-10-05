@@ -14,7 +14,7 @@ import { SET_TYPE_META, WORKOUT_COLORS } from '../../workout/constants';
 import { WorkoutSet, WorkoutSetType } from '../../workout/types';
 import { formatPreviousSet } from '../../workout/workoutSelectors';
 import { Confetti, ConfettiParticle } from '../Confetti';
-import { COMPLETE_BG, COMPLETE_INK, FlatBox, FlatTick } from './FlatMark';
+import { COMPLETE_BG, COMPLETE_INK, COMPLETE_LINE, FlatBox, FlatTick } from './FlatMark';
 
 const CONFETTI_COLORS = ['#526EFF', '#F9C117', '#FF5151', '#2ED573', '#B06BFF', '#FF8A3D'];
 
@@ -108,6 +108,7 @@ export const SetRow: React.FC<SetRowProps> = ({
         <View
             style={[
                 styles.row,
+                exerciseComplete && styles.rowComplete,
                 set.completed && (exerciseComplete ? styles.completedRowGreen : styles.completedRow),
             ]}
         >
@@ -204,6 +205,9 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
         borderBottomWidth: 1,
         borderBottomColor: '#F0F0F0',
+    },
+    rowComplete: {
+        borderBottomColor: COMPLETE_LINE,
     },
     completedRow: {
         backgroundColor: WORKOUT_COLORS.completedRow,

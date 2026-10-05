@@ -243,16 +243,21 @@ export interface BodyPartStamp {
 
 const BODY_PART_STAMPS: { keys: string[]; stamp: BodyPartStamp }[] = [
     { keys: ['chest', 'pec'], stamp: { icon: 'chest', fill: '#526EFF', wash: '#EAEEFF' } },
-    { keys: ['back', 'lat', 'trap'], stamp: { icon: 'back', fill: '#1FA37A', wash: '#E0F5EE' } },
-    { keys: ['shoulder', 'delt'], stamp: { icon: 'shoulders', fill: '#F57C00', wash: '#FFF1E0' } },
-    { keys: ['bicep', 'tricep', 'arm', 'forearm'], stamp: { icon: 'arms', fill: '#7B4DFF', wash: '#F0EAFF' } },
-    { keys: ['leg', 'quad', 'hamstring', 'glute', 'calf', 'thigh'], stamp: { icon: 'legs', fill: '#3D4DB7', wash: '#E8EAF8' } },
-    { keys: ['core', 'ab', 'waist', 'oblique'], stamp: { icon: 'core', fill: '#FF8A00', wash: '#FFF3E0' } },
-    { keys: ['cardio', 'heart'], stamp: { icon: 'cardio', fill: '#E53935', wash: '#FFEBEE' } },
+    { keys: ['back', 'lat', 'trap'], stamp: { icon: 'back', fill: '#2ED573', wash: '#D8FCE6' } },
+    { keys: ['shoulder', 'delt'], stamp: { icon: 'shoulders', fill: '#F9C117', wash: '#FFF6C8' } },
+    { keys: ['bicep', 'tricep', 'arm', 'forearm'], stamp: { icon: 'arms', fill: '#FF5151', wash: '#FFE4E4' } },
+    { keys: ['leg', 'quad', 'hamstring', 'glute', 'calf', 'thigh'], stamp: { icon: 'legs', fill: '#B06BFF', wash: '#F3E8FF' } },
+    { keys: ['core', 'ab', 'waist', 'oblique'], stamp: { icon: 'core', fill: '#FF8A3D', wash: '#FFE6D4' } },
+    { keys: ['cardio', 'heart'], stamp: { icon: 'cardio', fill: '#FF5151', wash: '#FFE4E4' } },
     { keys: ['neck'], stamp: { icon: 'neck', fill: '#5C6670', wash: '#ECEDEF' } },
 ];
 
 const DEFAULT_STAMP: BodyPartStamp = { icon: 'dumbbell', fill: '#526EFF', wash: '#EAEEFF' };
+
+/** Yellow needs dark ink so chip/title text stays readable. */
+export function getStampInk(fill: string): string {
+    return fill.toUpperCase() === '#F9C117' ? '#252525' : fill;
+}
 
 export function getBodyPartStamp(bodyPart?: string): BodyPartStamp {
     if (!bodyPart) return DEFAULT_STAMP;

@@ -105,8 +105,8 @@ export function workoutxBodyPartsForMuscle(group: MuscleGroup): string[] {
     }
 }
 
-/** Selected muscle highlight on body map */
-export const MUSCLE_SELECTED_FILL = '#FF5151';
+/** Fallback selected fill; body maps use per-muscle stamp colors instead. */
+export const MUSCLE_SELECTED_FILL = '#526EFF';
 
 /** Neutral fill for untracked muscles — matches divider gray used elsewhere */
 export const MUSCLE_NEUTRAL_FILL = '#E0E0E0';
@@ -125,7 +125,7 @@ export function getMuscleFillColor(daysSince: number | null): string {
     return MUSCLE_ACCENT_RAMP[2];
 }
 
-/** Selected = red; unselected = flat gray on the body map. */
+/** Unselected = gray; selected fallback is accent blue (maps use stamp fills). */
 export function getMuscleDisplayFill(_daysSince: number | null, isSelected: boolean): string {
     if (isSelected) return MUSCLE_SELECTED_FILL;
     return MUSCLE_NEUTRAL_FILL;

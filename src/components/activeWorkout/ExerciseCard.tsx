@@ -22,7 +22,7 @@ import { EXERCISE_EXPAND_MS, SUPERSET_COLORS, WORKOUT_COLORS } from '../../worko
 import { WorkoutExercise } from '../../workout/types';
 import { SetTableHeader } from './SetTableHeader';
 import { SetRow } from './SetRow';
-import { COMPLETE_BG, COMPLETE_BORDER, COMPLETE_INK, FlatDots, FlatMinus, FlatPlus, FlatTick } from './FlatMark';
+import { COMPLETE_BG, COMPLETE_BORDER, COMPLETE_INK, COMPLETE_LINE, FlatDots, FlatMinus, FlatPlus, FlatTick } from './FlatMark';
 import { Confetti, ConfettiParticle } from '../Confetti';
 import { getBodyPartStamp, PlatesIcon } from '../icons/PlatesIcon';
 import { mapBodyPartToMuscleGroup } from '../../workout/muscleGroups';
@@ -37,6 +37,7 @@ const REMOVE_EASING = Easing.bezier(0.7, 0.0, 0.9, 0.15);
 // natively in real time, so they move in lockstep with no competing animation.
 const COLLAPSE_MS = EXERCISE_EXPAND_MS;
 const SIZE_MS = 140;
+const TITLE_SLIDE = 8;
 const collapseEasing = Easing.inOut(Easing.cubic);
 
 interface ExerciseCardProps {
@@ -81,6 +82,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
 }) => {
     const [noteVisible, setNoteVisible] = useState(!!exercise.note);
     const [collapsed, setCollapsed] = useState(startCollapsed);
+    const noteRef = useRef<TextInput>(null);
     const stamp = getBodyPartStamp(exercise.bodyPart ?? mapBodyPartToMuscleGroup(undefined, exercise.name) ?? undefined);
     const railColor = exercise.supersetId
         ? SUPERSET_COLORS[supersetColorIndex % SUPERSET_COLORS.length]
@@ -153,10 +155,14 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
         if (exitingRef.current) return;
         Alert.alert(exercise.name, undefined, [
             {
-                text: 'Add Note',
-                onPress: () => setNoteVisible(true),
+                text: exercise.note ? 'Edit Note' : 'Add Note',
+                onPress: () => {
+                    setCollapsed(false);
+                    setNoteVisible(true);
+                    setTimeout(() => noteRef.current?.focus(), 80);
+                },
             },
-            { text: 'Add Warm-up Sets', onPress: onAddWarmupSets },
+            { text: 'Add Warm-up Set', onPress: onAddWarmupSets },
             { text: 'Add to Superset', onPress: onAddToSuperset },
             { text: 'Remove Exercise', style: 'destructive', onPress: requestRemove },
             { text: 'Cancel', style: 'cancel' },
@@ -251,6 +257,18 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
         ),
     }));
 
+    const titleSlideStyle = useAnimatedStyle(() => ({
+        transform: [
+            {
+                translateY: interpolate(
+                    collapseProgress.value,
+                    [0, 1],
+                    [0, TITLE_SLIDE]
+                ),
+            },
+        ],
+    }));
+
     const titleCompleteStyle = useAnimatedStyle(() => ({
         color: interpolateColor(
             completeProgress.value,
@@ -265,6 +283,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
             [0, 1],
             [WORKOUT_COLORS.placeholder, COMPLETE_INK]
         ),
+        opacity: interpolate(collapseProgress.value, [0, 1], [1, 0]),
     }));
 
     const doneLabelStyle = useAnimatedStyle(() => ({
@@ -340,7 +359,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                 cardSizeRef.current = { width, height };
             }}
         >
-            <View style={[styles.headerRow, collapsed && styles.headerRowCollapsed]}>
+            <View style={styles.headerRow}>
                 <TouchableOpacity
                     style={styles.titleWrap}
                     onPress={toggleCollapsed}
@@ -369,14 +388,17 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                         </Reanimated.View>
                     </View>
                     <View style={styles.titleTextWrap}>
-                        <Reanimated.Text style={[styles.title, titleCompleteStyle]}>
-                            {exercise.name.toLowerCase()}
-                        </Reanimated.Text>
-                        {collapsed ? (
-                            <Reanimated.Text style={[styles.collapsedSummary, summaryCompleteStyle]}>
-                                {collapsedSummary}
+                        <Reanimated.View style={titleSlideStyle}>
+                            <Reanimated.Text style={[styles.title, titleCompleteStyle]}>
+                                {exercise.name.toLowerCase()}
                             </Reanimated.Text>
-                        ) : null}
+                        </Reanimated.View>
+                        <Reanimated.Text
+                            style={[styles.collapsedSummary, summaryCompleteStyle]}
+                            pointerEvents="none"
+                        >
+                            {collapsedSummary}
+                        </Reanimated.Text>
                     </View>
                 </TouchableOpacity>
                 {allSetsComplete ? (
@@ -416,14 +438,23 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                 }}
             >
             {noteVisible ? (
-                <TextInput
-                    style={styles.noteInput}
-                    value={exercise.note}
-                    onChangeText={onUpdateNote}
-                    placeholder="add a note"
-                    placeholderTextColor={WORKOUT_COLORS.placeholder}
-                    multiline
-                />
+                <View style={styles.noteSection}>
+                    <TextInput
+                        ref={noteRef}
+                        style={styles.noteInput}
+                        value={exercise.note}
+                        onChangeText={onUpdateNote}
+                        placeholder="add a note"
+                        placeholderTextColor={WORKOUT_COLORS.placeholder}
+                        multiline
+                        blurOnSubmit
+                        returnKeyType="done"
+                        onBlur={() => {
+                            if (!exercise.note.trim()) setNoteVisible(false);
+                        }}
+                        accessibilityLabel={`Note for ${exercise.name}`}
+                    />
+                </View>
             ) : null}
 
             <SetTableHeader showRpe={showRpe} />
@@ -442,7 +473,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                 />
             ))}
 
-            <View style={styles.setActionsRow}>
+            <View style={[styles.setActionsRow, allSetsComplete && styles.setActionsRowComplete]}>
                 <TouchableOpacity
                     style={styles.setActionButton}
                     onPress={handleRemoveLastSet}
@@ -469,7 +500,12 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                     </Text>
                 </TouchableOpacity>
 
-                <View style={styles.setActionDivider} />
+                <View
+                    style={[
+                        styles.setActionDivider,
+                        allSetsComplete && styles.setActionDividerComplete,
+                    ]}
+                />
 
                 <TouchableOpacity style={styles.setActionButton} onPress={handleAddSet}>
                     <FlatPlus
@@ -523,10 +559,6 @@ const styles = StyleSheet.create({
         paddingTop: 14,
         paddingBottom: 8,
     },
-    headerRowCollapsed: {
-        paddingTop: 12,
-        paddingBottom: 12,
-    },
     collapsibleOuter: {
         overflow: 'hidden',
     },
@@ -558,6 +590,8 @@ const styles = StyleSheet.create({
     titleTextWrap: {
         flex: 1,
         minWidth: 0,
+        minHeight: 40,
+        justifyContent: 'flex-start',
     },
     title: {
         fontFamily: fonts.bold,
@@ -581,22 +615,30 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
+    noteSection: {
+        paddingHorizontal: 12,
+        paddingBottom: 6,
+    },
     noteInput: {
-        marginHorizontal: 14,
-        marginBottom: 8,
-        padding: 10,
-        borderRadius: 12,
-        backgroundColor: '#F7F7F7',
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        borderRadius: 8,
+        backgroundColor: '#FAFAFA',
         fontFamily: fonts.regular,
         fontSize: 14,
+        lineHeight: 18,
         color: WORKOUT_COLORS.text,
-        minHeight: 44,
+        minHeight: 36,
+        maxHeight: 72,
     },
     setActionsRow: {
         flexDirection: 'row',
         alignItems: 'stretch',
         borderTopWidth: 1,
         borderTopColor: '#F0F0F0',
+    },
+    setActionsRowComplete: {
+        borderTopWidth: 0,
     },
     setActionButton: {
         flex: 1,
@@ -609,6 +651,9 @@ const styles = StyleSheet.create({
     setActionDivider: {
         width: 1,
         backgroundColor: '#F0F0F0',
+    },
+    setActionDividerComplete: {
+        backgroundColor: COMPLETE_LINE,
     },
     setActionText: {
         fontFamily: fonts.bold,

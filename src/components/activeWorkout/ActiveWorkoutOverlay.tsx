@@ -65,6 +65,7 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
         expand,
         finishWorkout,
         addSet,
+        addWarmupSets,
         updateSet,
         toggleSetComplete,
         removeSet,
@@ -326,13 +327,7 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
                                         }
                                         onRemoveSet={(setId) => removeSet(exercise.id, setId)}
                                         onRemoveExercise={() => removeExercise(exercise.id)}
-                                        onAddWarmupSets={() => {
-                                            addSet(exercise.id);
-                                            const latest = exercise.sets[exercise.sets.length - 1];
-                                            if (latest) {
-                                                changeSetType(exercise.id, latest.id, 'warmup');
-                                            }
-                                        }}
+                                        onAddWarmupSets={() => addWarmupSets(exercise.id)}
                                         onAddToSuperset={() => addToSuperset([exercise.id])}
                                     />
                                 </View>

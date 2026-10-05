@@ -11,6 +11,7 @@ import {
     SILHOUETTE_PATHS,
 } from '../startWorkout/bodyMapPaths';
 import { MuscleMapPath } from './MuscleMapPath';
+import { getBodyPartStamp } from '../icons/PlatesIcon';
 
 const DEFINITION_OPACITY = 0.4;
 const DEFINITION_STROKE = 1.75;
@@ -41,12 +42,14 @@ export const SelectableBodyMapFront: React.FC<SelectableBodyMapFrontProps> = ({
         if (pathKeys.length === 0) return [];
 
         const isSelected = selectedMuscles.includes(muscle);
+        const selectedFill = getBodyPartStamp(muscle).fill;
 
         return pathKeys.map((key) => (
             <MuscleMapPath
                 key={key}
                 d={FRONT_MUSCLE_PATHS[key]}
                 isSelected={isSelected}
+                selectedFill={selectedFill}
                 onPress={() => handlePress(muscle)}
                 accessibilityLabel={formatMuscleSelectAccessibilityLabel(
                     muscle,

@@ -161,6 +161,30 @@ export function activeWorkoutReducer(
                 }),
             };
 
+        case 'ADD_WARMUP_SETS':
+            if (!state.workout) return state;
+            return {
+                ...state,
+                workout: mapExercise(state.workout, action.payload.exerciseId, (exercise) => {
+                    const warmup = {
+                        ...createDefaultSet(),
+                        type: 'warmup' as const,
+                        weight: '',
+                        reps: '',
+                    };
+                    const insertAt = exercise.sets.findIndex((set) => set.type !== 'warmup');
+                    const at = insertAt === -1 ? exercise.sets.length : insertAt;
+                    return {
+                        ...exercise,
+                        sets: [
+                            ...exercise.sets.slice(0, at),
+                            warmup,
+                            ...exercise.sets.slice(at),
+                        ],
+                    };
+                }),
+            };
+
         case 'UPDATE_SET':
             if (!state.workout) return state;
             return {

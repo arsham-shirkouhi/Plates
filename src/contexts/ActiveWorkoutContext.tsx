@@ -41,6 +41,7 @@ interface ActiveWorkoutContextValue {
     updateExerciseNote: (exerciseId: string, note: string) => void;
     updateRestSeconds: (exerciseId: string, restSeconds: number) => void;
     addSet: (exerciseId: string) => void;
+    addWarmupSets: (exerciseId: string) => void;
     updateSet: (
         exerciseId: string,
         setId: string,
@@ -186,6 +187,10 @@ export const ActiveWorkoutProvider: React.FC<{ children: React.ReactNode }> = ({
         dispatch({ type: 'ADD_SET', payload: { exerciseId } });
     }, []);
 
+    const addWarmupSets = useCallback((exerciseId: string) => {
+        dispatch({ type: 'ADD_WARMUP_SETS', payload: { exerciseId } });
+    }, []);
+
     const updateSet = useCallback(
         (
             exerciseId: string,
@@ -324,6 +329,7 @@ export const ActiveWorkoutProvider: React.FC<{ children: React.ReactNode }> = ({
             updateExerciseNote,
             updateRestSeconds,
             addSet,
+            addWarmupSets,
             updateSet,
             toggleSetComplete,
             removeSet,
@@ -355,6 +361,7 @@ export const ActiveWorkoutProvider: React.FC<{ children: React.ReactNode }> = ({
             updateExerciseNote,
             updateRestSeconds,
             addSet,
+            addWarmupSets,
             updateSet,
             toggleSetComplete,
             removeSet,

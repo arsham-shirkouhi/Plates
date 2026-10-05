@@ -244,6 +244,48 @@ simulator (needs Xcode), `a` = Android emulator.
 - **2026-10-04 — Cursor:** Rest square next to add exercise uses a timer icon, not the ⏱ emoji.
 - **2026-10-04 — Cursor:** Rest button + rest progress bar are back to app blue (`#526EFF`). Completed exercise cards stay blue.
 - **2026-10-04 — Cursor:** Slowed add-exercise fly particles (~1s, ease-in start) so you can see them leave the plus toward “N added”.
+- **2026-10-05 — Cursor:** Revamped workout wrap-up overlay: Cal (phones/chart art) peeks in from the right over a 3×2 hard-shadow stat grid (exercises, duration, volume, sets, PR, streak) plus a hard lifts card. Dropped aura balls, confetti, and standouts.
+- **2026-10-05 — Cursor:** Log-food search uses HardSearchBar (same as add-exercise). Meal tags are per-meal colors (breakfast gold, lunch orange, dinner blue, snacks green).
+- **2026-10-05 — Cursor:** Wrap-up Cal swapped to the right-edge phones/chart illustration (full transparent canvas, pinned top-right of the recap).
+- **2026-10-05 — Cursor:** Wrap-up uses dashboard ScrollingGridBackground. Cal docks on the right edge (tap to tuck off-screen) so he no longer covers the recap cards.
+- **2026-10-05 — Cursor:** Wrap-up layout no longer shifts for Cal. Cal floats in front on the right at ~82% opacity. Stat cards are per-stat colors; lifts card has a blue wash + accent.
+- **2026-10-05 — Cursor:** Wrap-up Cal pops fuller on the right edge (tap to tuck). “your lifts” collapses/expands. Recap colors limited to red/green/yellow/blue.
+- **2026-10-05 — Cursor:** Wrap-up Cal sits beside the lifts list. Stat boxes are all blue; top accent bars removed.
+- **2026-10-05 — Cursor:** Wrap-up no longer shows Cal. Lifts list stays open. Volume/streak units (`kg`, `d`) match duration `s` size.
+- **2026-10-05 — Cursor:** Wrap-up restyled as a nutrition-facts label (Workout Facts, thick black bars, volume as calories, lifts as the lower panel).
+- **2026-10-05 — Cursor:** Wrap-up save is a square bookmark beside Done. Label + buttons use tighter side padding so they’re wider.
+- **2026-10-05 — Cursor:** Wrap-up label/footer capped at 360 to match the app’s full-width buttons.
+- **2026-10-05 — Cursor:** Wrap-up facts label: blue wash/title/values, green PRs, larger type.
+- **2026-10-05 — Cursor:** Wrap-up facts: more inner/top padding, black thick bar, blue PRs, Ionicons on rows.
+- **2026-10-05 — Cursor:** Wrap-up facts: no icons, “Workout Facts” one line, serving size replaced with `1 session {workout}`.
+- **2026-10-05 — Cursor:** Wrap-up button says “done!”; less space under save/done.
+- **2026-10-05 — Cursor:** Wrap-up label stamps in on open. Saving a preset pops the bookmark with a confetti burst.
+- **2026-10-05 — Cursor:** Empty-workout Cal no longer has the hard drop shadow.
+- **2026-10-05 — Cursor:** Add-exercise fly particles isolated (no list re-render) and sped up. Pick-exercises search/select rows match add-exercise (stamp + plus/tick).
+- **2026-10-05 — Cursor:** Pick-exercises muscle tags use the same colored BodyPartChip as add-exercise filters.
+- **2026-10-05 — Cursor:** Pick-exercises tags sit under search. Add/remove uses the same plus→check toggle as mid-workout.
+- **2026-10-05 — Cursor:** Body-map muscle fills use the same stamp colors as the tags (chest blue, back green, shoulders orange, arms purple, legs indigo, core amber). Name-picker checkboxes match too.
+- **2026-10-05 — Cursor:** Muscle/tag colors now use app RGBY first (chest blue, back green, shoulders yellow, arms red) plus purple legs and orange core. Body map, pick-workout list, and add-exercise tags all share that palette.
+- **2026-10-05 — Cursor:** Selected body-part names (pick-workout list + muscle-select chips) keep the original dark text; only the figure/tags use the RGBY fills.
+- **2026-10-05 — Cursor:** Pick-exercises add stays in place (plus→check like add-exercise) with a pencil to edit sets/reps/rest. Search lists selected matches first, then the rest.
+- **2026-10-05 — Cursor:** Pick-exercises edit expands the subtitle line into compact sets/reps/rest +/− (workout-card language), not a separate stepper panel.
+- **2026-10-05 — Cursor:** Pick-exercises edit keeps original title/meta color. Sets/reps/rest are the old − value + steppers, just shorter so they stay tappable.
+- **2026-10-05 — Cursor:** Pick-exercises expand uses a rotating chevron (no pencil). Title slides down into the meta slot while sets/reps/body-part fade out, then the compact steppers open.
+- **2026-10-05 — Cursor:** Pick-exercises matches in-workout add-exercise: filled pencil edit, same plus/tick, and the same search/tag/row spacing.
+- **2026-10-05 — Cursor:** Added rows keep body-part meta only. Sets/reps/rest open when you tap edit.
+- **2026-10-05 — Cursor:** Restored pick-exercises edit (panel mounts again so it actually opens). In-workout add-exercise rows use the same staggered load-in.
+- **2026-10-05 — Cursor:** Fixed pick-exercises edit: duplicate `cardLayout` crash + overflow clipping hid sets/reps/rest.
+- **2026-10-05 — Cursor:** Edit keeps the title vertically centered on the row. Pencil replaced with a thick slider/tune mark.
+- **2026-10-05 — Cursor:** In-workout add-exercise now mounts rows one-by-one like pick-exercises (no shared delay that dumped them all at once).
+- **2026-10-05 — Cursor:** Pick-exercises title eases down into the row on edit. Tune icon stays gray until selected (then blue).
+- **2026-10-05 — Cursor:** Sets/reps/rest fade in with the title when you open edit.
+- **2026-10-05 — Cursor:** Edit expand is one motion — row grows, rows below ease down, and sets/reps/rest fade in on the same curve.
+- **2026-10-05 — Cursor:** Only one pick-exercises row stays in edit at a time — opening another collapses the current one.
+- **2026-10-05 — Cursor:** Exercise notes sit on their own line above set/previous, using the same off-white `#FAFAFA` field as kg/reps. Hidden until Add/Edit Note; clears if left empty.
+- **2026-10-05 — Cursor:** Hide the divider above remove/add once an exercise card is complete (blue).
+- **2026-10-05 — Cursor:** Active-workout exercise title slides down on expand and back on collapse (same motion as pick-exercises edit), while the set count fades.
+- **2026-10-05 — Cursor:** Completed exercise lines are mid-blue (`#B8C4FF` / `#8FA4FF`), lighter than the title ink.
+- **2026-10-05 — Cursor:** Add Warm-up Set inserts one W set above working sets; tap again to add another.
 
 ## 10. What to do next (as of the top of §9)
 

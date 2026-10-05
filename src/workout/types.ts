@@ -75,6 +75,7 @@ export type ActiveWorkoutAction =
     | { type: 'UPDATE_EXERCISE_NOTE'; payload: { exerciseId: string; note: string } }
     | { type: 'UPDATE_REST_SECONDS'; payload: { exerciseId: string; restSeconds: number } }
     | { type: 'ADD_SET'; payload: { exerciseId: string } }
+    | { type: 'ADD_WARMUP_SETS'; payload: { exerciseId: string } }
     | { type: 'UPDATE_SET'; payload: { exerciseId: string; setId: string; patch: Partial<Pick<WorkoutSet, 'weight' | 'reps' | 'rpe'>> } }
     | { type: 'TOGGLE_SET_COMPLETE'; payload: { exerciseId: string; setId: string; now: number } }
     | { type: 'REMOVE_SET'; payload: { exerciseId: string; setId: string } }

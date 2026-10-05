@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     View,
     Text,
@@ -15,8 +15,12 @@ import Reanimated, {
     Easing,
     FadeIn,
     FadeOut,
+    interpolate,
     Keyframe,
     LinearTransition,
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming,
 } from 'react-native-reanimated';
 import { fonts } from '../../constants/fonts';
 import { PICK_WORKOUT_LAYOUT, WORKOUT_COLORS } from '../../workout/constants';
@@ -28,28 +32,19 @@ import { createUniqueId } from '../../workout/workoutSelectors';
 import { useAuth } from '../../context/AuthContext';
 import { PendingReviewWorkout } from './PickWorkoutScreen';
 import { HardSearchBar } from '../ui/HardSearchBar';
+import { HardStamp } from '../ui/HardListCard';
+import { BodyPartChip } from '../ui/BodyPartChip';
+import { AddTickToggle } from '../ui/AddTickToggle';
+import { getBodyPartStamp, PlatesIcon } from '../icons/PlatesIcon';
+import { FlatTune } from '../activeWorkout/FlatMark';
 
-const SWAP_DURATION = 300;
+const EDIT_MS = 280;
+const TITLE_SLIDE = 8;
+const expandEase = Easing.inOut(Easing.cubic);
 
-/**
- * Both lists live in one parent, so moving a row between "your workout" and
- * "recommended" is a single layout animation: the row keeps its identity and
- * physically slides + resizes into its new slot. No enter/exit fades fire on a
- * move, which is what previously caused the overlapping/clashing look.
- */
-const cardLayout = LinearTransition.duration(SWAP_DURATION).easing(
-    Easing.inOut(Easing.cubic)
-);
-
-// Only used for rows that genuinely mount (the initial reveal, or an item that
-// enters the recommended list for the first time) — never on a move.
-const cardEnter = FadeIn.duration(220).easing(Easing.out(Easing.cubic));
-
-// The edit panel keeps itself mounted through an exit animation so, on collapse,
-// the card shrinks and clips the panel away (mirroring the expand) instead of the
-// panel vanishing instantly — which made the list below chop up before settling.
-const editPanelEnter = FadeIn.duration(SWAP_DURATION).easing(Easing.out(Easing.cubic));
-const editPanelExit = FadeOut.duration(SWAP_DURATION).easing(Easing.in(Easing.cubic));
+const cardLayout = LinearTransition.duration(EDIT_MS).easing(expandEase);
+const editFadeIn = FadeIn.duration(EDIT_MS).easing(expandEase);
+const editFadeOut = FadeOut.duration(EDIT_MS).easing(expandEase);
 
 /** Recommended rows land one at a time after the screen arrives. */
 const recEnter = new Keyframe({
@@ -135,12 +130,131 @@ interface ReviewWorkoutScreenProps {
 }
 
 function formatExerciseMeta(exercise: WorkoutExercise): string {
+    return bodyPartForExercise(exercise);
+}
+
+function bodyPartForExercise(exercise: WorkoutExercise): string {
     const muscle =
         mapBodyPartToMuscleGroup(undefined, exercise.name) ??
         ('chest' as MuscleGroup);
-    const setCount = exercise.sets.length;
-    const reps = exercise.sets[0]?.targetReps ?? exercise.sets[0]?.previous?.reps ?? 8;
-    return `${setCount} sets · ${reps} reps · ${MUSCLE_GROUP_LABELS[muscle]}`;
+    return MUSCLE_GROUP_LABELS[muscle];
+}
+
+function namesMatch(a: string, b: string) {
+    return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+function isSameExercise(workout: WorkoutExercise, search: Exercise) {
+    return (
+        (!!search.id && workout.exerciseId === search.id) ||
+        namesMatch(workout.name, search.name)
+    );
+}
+
+function SelectExerciseRow({
+    name,
+    meta,
+    bodyPart,
+    added,
+    isEditing,
+    onToggle,
+    onToggleEdit,
+    children,
+}: {
+    name: string;
+    meta?: string;
+    bodyPart?: string;
+    added?: boolean;
+    isEditing?: boolean;
+    onToggle: () => void;
+    onToggleEdit?: () => void;
+    children?: React.ReactNode;
+}) {
+    const stamp = getBodyPartStamp(bodyPart);
+    const canEdit = !!added && !!onToggleEdit;
+    const editProgress = useSharedValue(isEditing ? 1 : 0);
+
+    useEffect(() => {
+        editProgress.value = withTiming(isEditing ? 1 : 0, {
+            duration: EDIT_MS,
+            easing: expandEase,
+        });
+    }, [editProgress, isEditing]);
+
+    const titleStyle = useAnimatedStyle(() => ({
+        transform: [
+            { translateY: interpolate(editProgress.value, [0, 1], [0, TITLE_SLIDE]) },
+        ],
+    }));
+
+    const metaStyle = useAnimatedStyle(() => ({
+        opacity: interpolate(editProgress.value, [0, 1], [1, 0]),
+    }));
+
+    return (
+        <Reanimated.View style={styles.rowShell} layout={cardLayout}>
+            <View style={styles.pickRow}>
+                <View style={styles.pickRowMain}>
+                    <HardStamp icon={stamp.icon} fill={stamp.fill} size={40} style={styles.pickStamp} />
+                    <TouchableOpacity
+                        style={styles.rowCopy}
+                        onPress={canEdit ? onToggleEdit : undefined}
+                        activeOpacity={canEdit ? 0.7 : 1}
+                        disabled={!canEdit}
+                    >
+                        <Reanimated.View style={titleStyle}>
+                            <Text style={styles.rowTitle} numberOfLines={2}>
+                                {name.toLowerCase()}
+                            </Text>
+                        </Reanimated.View>
+                        {meta ? (
+                            <Reanimated.View style={metaStyle} pointerEvents="none">
+                                <Text style={styles.rowMeta} numberOfLines={1}>
+                                    {meta}
+                                </Text>
+                            </Reanimated.View>
+                        ) : null}
+                    </TouchableOpacity>
+                </View>
+                {canEdit ? (
+                    <TouchableOpacity
+                        onPress={onToggleEdit}
+                        accessibilityRole="button"
+                        accessibilityLabel={
+                            isEditing ? `Done editing ${name}` : `Edit ${name}`
+                        }
+                        style={styles.editButton}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                        <FlatTune
+                            size={20}
+                            color={isEditing ? WORKOUT_COLORS.accent : '#ADADAD'}
+                        />
+                    </TouchableOpacity>
+                ) : null}
+                <TouchableOpacity
+                    style={styles.addButton}
+                    onPress={onToggle}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={added ? `Remove ${name}` : `Add ${name}`}
+                >
+                    <AddTickToggle added={!!added} />
+                </TouchableOpacity>
+            </View>
+            <Reanimated.View layout={cardLayout} style={styles.editClip}>
+                {canEdit && isEditing ? (
+                    <Reanimated.View
+                        style={styles.editRow}
+                        entering={editFadeIn}
+                        exiting={editFadeOut}
+                    >
+                        {children}
+                    </Reanimated.View>
+                ) : null}
+            </Reanimated.View>
+        </Reanimated.View>
+    );
 }
 
 export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
@@ -149,25 +263,19 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
     onStartWorkout,
 }) => {
     const { user } = useAuth();
-    // The workout starts empty — the user quick-adds from the recommendations.
-    const [added, setAdded] = useState<WorkoutExercise[]>([]);
-    const [recommended, setRecommended] = useState<WorkoutExercise[]>(() =>
+    const [catalog, setCatalog] = useState<WorkoutExercise[]>(() =>
         pending.exercises.map((exercise) => withDefaults(exercise))
     );
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
     const [revealedIds, setRevealedIds] = useState<Set<string>>(() => new Set());
-    // Once the initial staggered reveal is done, recommended rows returning after
-    // a delete should fade in like the added card (a true mirror of the add),
-    // instead of using the intro cascade's rise+scale pop.
     const [introDone, setIntroDone] = useState(false);
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<Exercise[]>([]);
     const [searching, setSearching] = useState(false);
-    const [editingIds, setEditingIds] = useState<Set<string>>(new Set());
-    const [swapping, setSwapping] = useState(false);
-    const swapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [editingId, setEditingId] = useState<string | null>(null);
 
     useEffect(() => {
-        const ids = recommended.map((item) => item.id);
+        const ids = catalog.map((item) => item.id);
         const timers = ids.map((id, index) =>
             setTimeout(() => {
                 setRevealedIds((current) => {
@@ -185,7 +293,6 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
         );
 
         return () => {
-            if (swapTimer.current) clearTimeout(swapTimer.current);
             timers.forEach(clearTimeout);
             clearTimeout(introTimer);
         };
@@ -195,12 +302,7 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
 
     const toggleEditing = useCallback((id: string) => {
         Haptics.selectionAsync();
-        setEditingIds((current) => {
-            const next = new Set(current);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
-            return next;
-        });
+        setEditingId((current) => (current === id ? null : id));
     }, []);
 
     const trimmedQuery = query.trim();
@@ -231,14 +333,30 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
         };
     }, [trimmedQuery, isSearching]);
 
-    const addExercise = useCallback((exercise: WorkoutExercise) => {
+    const added = useMemo(
+        () => catalog.filter((exercise) => selectedIds.has(exercise.id)),
+        [catalog, selectedIds]
+    );
+
+    const toggleSelect = useCallback((exercise: WorkoutExercise) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        setAdded((current) => [...current, exercise]);
-        setRecommended((current) => current.filter((item) => item !== exercise));
+        setSelectedIds((current) => {
+            const next = new Set(current);
+            if (next.has(exercise.id)) next.delete(exercise.id);
+            else next.add(exercise.id);
+            return next;
+        });
+        setEditingId((current) => (current === exercise.id ? null : current));
     }, []);
 
     const addFromSearch = useCallback(
         async (exercise: Exercise) => {
+            const existing = catalog.find((item) => isSameExercise(item, exercise));
+            if (existing) {
+                toggleSelect(existing);
+                return;
+            }
+
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             const previousSets = await getLastExercisePreviousSets(
                 exercise.id,
@@ -249,15 +367,25 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
                 { exerciseId: exercise.id, name: exercise.name },
                 previousSets
             );
-            setAdded((current) => [...current, built]);
+            setCatalog((current) => [...current, built]);
+            setSelectedIds((current) => {
+                const next = new Set(current);
+                next.add(built.id);
+                return next;
+            });
+            setRevealedIds((current) => {
+                const next = new Set(current);
+                next.add(built.id);
+                return next;
+            });
         },
-        [user?.id]
+        [catalog, toggleSelect, user?.id]
     );
 
-    const updateAdded = useCallback(
-        (target: WorkoutExercise, updater: (exercise: WorkoutExercise) => WorkoutExercise) => {
-            setAdded((current) =>
-                current.map((exercise) => (exercise === target ? updater(exercise) : exercise))
+    const updateCatalog = useCallback(
+        (id: string, updater: (exercise: WorkoutExercise) => WorkoutExercise) => {
+            setCatalog((current) =>
+                current.map((exercise) => (exercise.id === id ? updater(exercise) : exercise))
             );
         },
         []
@@ -266,7 +394,7 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
     const changeSets = useCallback(
         (target: WorkoutExercise, delta: number) => {
             Haptics.selectionAsync();
-            updateAdded(target, (exercise) => {
+            updateCatalog(target.id, (exercise) => {
                 const count = Math.min(MAX_SETS, Math.max(1, exercise.sets.length + delta));
                 if (count === exercise.sets.length) return exercise;
                 if (count < exercise.sets.length) {
@@ -281,13 +409,13 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
                 return { ...exercise, sets: [...exercise.sets, ...extra] };
             });
         },
-        [updateAdded]
+        [updateCatalog]
     );
 
     const changeReps = useCallback(
         (target: WorkoutExercise, delta: number) => {
             Haptics.selectionAsync();
-            updateAdded(target, (exercise) => {
+            updateCatalog(target.id, (exercise) => {
                 const reps = Math.min(MAX_REPS, Math.max(1, repsOf(exercise) + delta));
                 return {
                     ...exercise,
@@ -299,13 +427,13 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
                 };
             });
         },
-        [updateAdded]
+        [updateCatalog]
     );
 
     const changeRest = useCallback(
         (target: WorkoutExercise, delta: number) => {
             Haptics.selectionAsync();
-            updateAdded(target, (exercise) => {
+            updateCatalog(target.id, (exercise) => {
                 const restSeconds = Math.min(
                     MAX_REST,
                     Math.max(0, (exercise.restSeconds ?? DEFAULT_REST) + delta)
@@ -313,42 +441,30 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
                 return { ...exercise, restSeconds };
             });
         },
-        [updateAdded]
+        [updateCatalog]
     );
 
-    const removeExercise = useCallback((exercise: WorkoutExercise) => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        setAdded((current) => current.filter((item) => item !== exercise));
-        setRecommended((current) => [exercise, ...current]);
-        // Guarantee the row is visible in the recommended list so it slides back
-        // into place (search-added items would otherwise not be in revealedIds).
-        setRevealedIds((current) => {
-            if (current.has(exercise.id)) return current;
-            const next = new Set(current);
-            next.add(exercise.id);
-            return next;
-        });
-    }, []);
+    const visibleRows = useMemo(() => {
+        const source =
+            isSearching || introDone
+                ? catalog
+                : catalog.filter((item) => revealedIds.has(item.id));
 
-    const moveExercise = useCallback(
-        (index: number, direction: -1 | 1) => {
-            if (swapping) return;
-            const target = index + direction;
-            if (target < 0 || target >= added.length) return;
+        if (!isSearching) return source;
 
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setSwapping(true);
-            setAdded((current) => {
-                const next = [...current];
-                [next[index], next[target]] = [next[target], next[index]];
-                return next;
-            });
+        const needle = trimmedQuery.toLowerCase();
+        const matches = source.filter((item) => item.name.toLowerCase().includes(needle));
+        const selected = matches.filter((item) => selectedIds.has(item.id));
+        const rest = matches.filter((item) => !selectedIds.has(item.id));
+        return [...selected, ...rest];
+    }, [catalog, introDone, isSearching, revealedIds, selectedIds, trimmedQuery]);
 
-            if (swapTimer.current) clearTimeout(swapTimer.current);
-            swapTimer.current = setTimeout(() => setSwapping(false), SWAP_DURATION + 40);
-        },
-        [added.length, swapping]
-    );
+    const extraSearchResults = useMemo(() => {
+        if (!isSearching) return [];
+        return results.filter(
+            (item) => !catalog.some((exercise) => isSameExercise(exercise, item))
+        );
+    }, [catalog, isSearching, results]);
 
     const handleStart = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -356,26 +472,44 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
     };
 
     const startLabel = added.length > 0 ? 'start workout' : 'start empty workout';
-    const visibleRecommended = recommended.filter((item) => revealedIds.has(item.id));
+    const showSearchEmpty =
+        isSearching &&
+        !searching &&
+        visibleRows.length === 0 &&
+        extraSearchResults.length === 0;
 
     return (
         <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
             <ReviewHeader onBack={onBack} />
 
-            <View style={styles.chipRow}>
-                {pending.selectedMuscles.map((muscle) => (
-                    <View key={muscle} style={styles.chip}>
-                        <Text style={styles.chipText}>{MUSCLE_GROUP_LABELS[muscle]}</Text>
-                    </View>
-                ))}
-            </View>
+            <HardSearchBar
+                value={query}
+                onChangeText={setQuery}
+                placeholder="search exercises"
+                containerStyle={styles.searchBar}
+            />
 
-            <View style={styles.searchArea}>
-                <HardSearchBar
-                    value={query}
-                    onChangeText={setQuery}
-                    placeholder="search exercises"
-                />
+            <View style={styles.filterRow}>
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.filterContent}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    {pending.selectedMuscles.map((muscle) => {
+                        const stamp = getBodyPartStamp(MUSCLE_GROUP_LABELS[muscle]);
+                        return (
+                            <BodyPartChip
+                                key={muscle}
+                                label={MUSCLE_GROUP_LABELS[muscle]}
+                                icon={stamp.icon}
+                                fill={stamp.fill}
+                                wash={stamp.wash}
+                                isActive
+                            />
+                        );
+                    })}
+                </ScrollView>
             </View>
 
             <View style={styles.body}>
@@ -384,113 +518,70 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
-                    {/*
-                      Both lists share ONE parent so every row keeps its identity
-                      when it moves between "your workout" and "recommended". React
-                      reuses the keyed wrapper across the section boundary, and
-                      `cardLayout` (LinearTransition) physically slides + resizes it
-                      into place — a single smooth motion with no cross-fade/overlap.
-                    */}
-                    <View>
-                        {added.length > 0 ? (
-                            <Text key="heading-added" style={styles.sectionHeading}>
-                                your workout
-                            </Text>
-                        ) : null}
-                        {added.map((item, index) => (
-                            <Reanimated.View key={item.id} layout={cardLayout} style={styles.itemWrapper}>
-                                <AddedCard
-                                    item={item}
-                                    isEditing={editingIds.has(item.id)}
-                                    canMoveUp={index > 0 && !swapping}
-                                    canMoveDown={index < added.length - 1 && !swapping}
-                                    onMoveUp={() => moveExercise(index, -1)}
-                                    onMoveDown={() => moveExercise(index, 1)}
-                                    onToggleEdit={() => toggleEditing(item.id)}
-                                    onRemove={() => removeExercise(item)}
-                                    onChangeSets={(delta) => changeSets(item, delta)}
-                                    onChangeReps={(delta) => changeReps(item, delta)}
-                                    onChangeRest={(delta) => changeRest(item, delta)}
-                                />
-                            </Reanimated.View>
-                        ))}
-
-                        {visibleRecommended.length > 0 ? (
-                            <Text
-                                key="heading-recommended"
-                                style={[
-                                    styles.sectionHeading,
-                                    added.length > 0 && styles.sectionHeadingDivider,
-                                ]}
-                            >
-                                recommended
-                            </Text>
-                        ) : null}
-                        {visibleRecommended.map((item) => (
+                    {showSearchEmpty ? (
+                        <Text style={styles.emptyText}>
+                            no exercises match “{trimmedQuery}”.
+                        </Text>
+                    ) : null}
+                    {isSearching && searching && visibleRows.length === 0 ? (
+                        <Text style={styles.emptyText}>searching…</Text>
+                    ) : null}
+                    {visibleRows.map((item) => {
+                        const selected = selectedIds.has(item.id);
+                        const isEditing = editingId === item.id;
+                        return (
                             <Reanimated.View
                                 key={item.id}
                                 layout={cardLayout}
-                                entering={introDone ? cardEnter : recEnter}
+                                entering={introDone || isSearching ? undefined : recEnter}
                                 style={styles.itemWrapper}
                             >
-                                <TouchableOpacity
-                                    style={styles.row}
-                                    onPress={() => addExercise(item)}
-                                    accessibilityRole="button"
-                                    accessibilityLabel={`Add ${item.name}`}
-                                    activeOpacity={0.7}
+                                <SelectExerciseRow
+                                    name={item.name}
+                                    meta={formatExerciseMeta(item)}
+                                    bodyPart={bodyPartForExercise(item)}
+                                    added={selected}
+                                    isEditing={isEditing}
+                                    onToggle={() => toggleSelect(item)}
+                                    onToggleEdit={() => toggleEditing(item.id)}
                                 >
-                                    <View style={styles.rowCopy}>
-                                        <Text style={styles.rowTitle}>{item.name.toLowerCase()}</Text>
-                                        <Text style={styles.rowMeta}>{formatExerciseMeta(item)}</Text>
+                                    <View style={styles.editLine}>
+                                        <CompactStep
+                                            label="sets"
+                                            value={`${item.sets.length}`}
+                                            onDecrement={() => changeSets(item, -1)}
+                                            onIncrement={() => changeSets(item, 1)}
+                                        />
+                                        <CompactStep
+                                            label="reps"
+                                            value={`${repsOf(item)}`}
+                                            onDecrement={() => changeReps(item, -1)}
+                                            onIncrement={() => changeReps(item, 1)}
+                                        />
+                                        <CompactStep
+                                            label="rest"
+                                            value={`${item.restSeconds ?? DEFAULT_REST}s`}
+                                            onDecrement={() => changeRest(item, -REST_STEP)}
+                                            onIncrement={() => changeRest(item, REST_STEP)}
+                                        />
                                     </View>
-                                    <Icon name="add" size={28} color="#ADADAD" />
-                                </TouchableOpacity>
+                                </SelectExerciseRow>
                             </Reanimated.View>
-                        ))}
-                    </View>
-                </ScrollView>
-
-                {isSearching ? (
-                    <View style={styles.searchOverlay} pointerEvents="box-none">
-                        <View style={styles.searchDropdown}>
-                            <ScrollView
-                                keyboardShouldPersistTaps="handled"
-                                nestedScrollEnabled
-                                showsVerticalScrollIndicator={false}
-                            >
-                                {searching ? (
-                                    <Text style={styles.emptyText}>searching…</Text>
-                                ) : results.length > 0 ? (
-                                    results.map((item, index) => (
-                                        <TouchableOpacity
-                                            key={`res-${item.id}-${index}`}
-                                            style={styles.row}
-                                            onPress={() => addFromSearch(item)}
-                                            accessibilityRole="button"
-                                            accessibilityLabel={`Add ${item.name}`}
-                                            activeOpacity={0.7}
-                                        >
-                                            <View style={styles.rowCopy}>
-                                                <Text style={styles.rowTitle}>{item.name.toLowerCase()}</Text>
-                                                {item.bodyPart ? (
-                                                    <Text style={styles.rowMeta}>
-                                                        {item.bodyPart.toLowerCase()}
-                                                    </Text>
-                                                ) : null}
-                                            </View>
-                                            <Icon name="add" size={28} color="#ADADAD" />
-                                        </TouchableOpacity>
-                                    ))
-                                ) : (
-                                    <Text style={styles.emptyText}>
-                                        no exercises match “{trimmedQuery}”.
-                                    </Text>
-                                )}
-                            </ScrollView>
+                        );
+                    })}
+                    {extraSearchResults.map((item, index) => (
+                        <View key={`res-${item.id}-${index}`} style={styles.itemWrapper}>
+                            <SelectExerciseRow
+                                name={item.name}
+                                meta={item.bodyPart?.toLowerCase()}
+                                bodyPart={item.bodyPart}
+                                onToggle={() => {
+                                    void addFromSearch(item);
+                                }}
+                            />
                         </View>
-                    </View>
-                ) : null}
+                    ))}
+                </ScrollView>
             </View>
 
             <View style={styles.footer}>
@@ -499,206 +590,6 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
         </SafeAreaView>
     );
 };
-
-function AddedCard({
-    item,
-    isEditing,
-    canMoveUp,
-    canMoveDown,
-    onMoveUp,
-    onMoveDown,
-    onToggleEdit,
-    onRemove,
-    onChangeSets,
-    onChangeReps,
-    onChangeRest,
-}: {
-    item: WorkoutExercise;
-    isEditing: boolean;
-    canMoveUp: boolean;
-    canMoveDown: boolean;
-    onMoveUp: () => void;
-    onMoveDown: () => void;
-    onToggleEdit: () => void;
-    onRemove: () => void;
-    onChangeSets: (delta: number) => void;
-    onChangeReps: (delta: number) => void;
-    onChangeRest: (delta: number) => void;
-}) {
-    return (
-        <View style={styles.addedCard}>
-            <View style={styles.addedTop}>
-                <View style={styles.rowCopy}>
-                    <Text style={styles.rowTitle} numberOfLines={1}>
-                        {item.name.toLowerCase()}
-                    </Text>
-                    <Text style={styles.rowMeta}>
-                        {`${item.sets.length} sets · ${repsOf(item)} reps · ${
-                            item.restSeconds ?? DEFAULT_REST
-                        }s rest`}
-                    </Text>
-                </View>
-                <TouchableOpacity
-                    onPress={onToggleEdit}
-                    accessibilityRole="button"
-                    accessibilityLabel={
-                        isEditing ? `Done editing ${item.name}` : `Edit ${item.name}`
-                    }
-                    style={styles.iconButton}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                    <Icon
-                        name={isEditing ? 'checkmark' : 'pencil-outline'}
-                        size={20}
-                        color={isEditing ? WORKOUT_COLORS.accent : WORKOUT_COLORS.text}
-                    />
-                </TouchableOpacity>
-                <RotatingAddRemoveButton onRemove={onRemove} label={`Remove ${item.name}`} />
-            </View>
-            {isEditing ? (
-                <Reanimated.View
-                    style={styles.editPanel}
-                    entering={editPanelEnter}
-                    exiting={editPanelExit}
-                >
-                    <View style={styles.stepperRow}>
-                        <Stepper
-                            label="sets"
-                            value={`${item.sets.length}`}
-                            onDecrement={() => onChangeSets(-1)}
-                            onIncrement={() => onChangeSets(1)}
-                        />
-                        <Stepper
-                            label="reps"
-                            value={`${repsOf(item)}`}
-                            onDecrement={() => onChangeReps(-1)}
-                            onIncrement={() => onChangeReps(1)}
-                        />
-                        <Stepper
-                            label="rest"
-                            value={`${item.restSeconds ?? DEFAULT_REST}s`}
-                            onDecrement={() => onChangeRest(-REST_STEP)}
-                            onIncrement={() => onChangeRest(REST_STEP)}
-                        />
-                    </View>
-                    <View style={styles.reorderRow}>
-                        <TouchableOpacity
-                            onPress={onMoveUp}
-                            disabled={!canMoveUp}
-                            accessibilityRole="button"
-                            accessibilityLabel={`Move ${item.name} up`}
-                            style={[styles.reorderButton, !canMoveUp && styles.reorderButtonDisabled]}
-                            activeOpacity={0.7}
-                        >
-                            <Icon
-                                name="chevron-up"
-                                size={16}
-                                color={canMoveUp ? WORKOUT_COLORS.text : WORKOUT_COLORS.placeholder}
-                            />
-                            <Text
-                                style={[
-                                    styles.reorderLabel,
-                                    !canMoveUp && styles.reorderLabelDisabled,
-                                ]}
-                            >
-                                up
-                            </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={onMoveDown}
-                            disabled={!canMoveDown}
-                            accessibilityRole="button"
-                            accessibilityLabel={`Move ${item.name} down`}
-                            style={[
-                                styles.reorderButton,
-                                !canMoveDown && styles.reorderButtonDisabled,
-                            ]}
-                            activeOpacity={0.7}
-                        >
-                            <Icon
-                                name="chevron-down"
-                                size={16}
-                                color={canMoveDown ? WORKOUT_COLORS.text : WORKOUT_COLORS.placeholder}
-                            />
-                            <Text
-                                style={[
-                                    styles.reorderLabel,
-                                    !canMoveDown && styles.reorderLabelDisabled,
-                                ]}
-                            >
-                                down
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                </Reanimated.View>
-            ) : null}
-        </View>
-    );
-}
-
-const SPIN_MS = 150;
-/** A short beat so the ＋→✕ spin plays as the row slides into the workout list. */
-const SPIN_START_DELAY = 40;
-
-/**
- * The remove control on an added exercise. It reuses the same "add" (＋) glyph
- * from the recommended rows and rotates it 45° so it reads as an ✕.
- *
- * - On add, the ＋ visibly spins into an ✕ (kicked off once the card has faded
- *   in, so the motion is actually seen and not masked by the entrance fade).
- * - On close, the exact same spin runs in reverse (✕ → ＋) before the card is
- *   handed back to the recommended list, so removal mirrors the add.
- */
-function RotatingAddRemoveButton({ onRemove, label }: { onRemove: () => void; label: string }) {
-    const spin = useRef(new RNAnimated.Value(0)).current;
-    const removingRef = useRef(false);
-
-    useEffect(() => {
-        const anim = RNAnimated.timing(spin, {
-            toValue: 1,
-            duration: SPIN_MS,
-            delay: SPIN_START_DELAY,
-            easing: RNEasing.out(RNEasing.cubic),
-            useNativeDriver: true,
-        });
-        anim.start();
-        return () => anim.stop();
-    }, [spin]);
-
-    const handlePress = () => {
-        if (removingRef.current) return;
-        removingRef.current = true;
-        // Reverse the spin (✕ → ＋) first, then remove once it settles.
-        RNAnimated.timing(spin, {
-            toValue: 0,
-            duration: SPIN_MS,
-            easing: RNEasing.in(RNEasing.cubic),
-            useNativeDriver: true,
-        }).start(({ finished }) => {
-            if (finished) onRemove();
-        });
-    };
-
-    const rotate = spin.interpolate({
-        inputRange: [0, 1],
-        outputRange: ['0deg', '45deg'],
-    });
-
-    return (
-        <TouchableOpacity
-            onPress={handlePress}
-            accessibilityRole="button"
-            accessibilityLabel={label}
-            style={styles.iconButton}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            activeOpacity={0.6}
-        >
-            <RNAnimated.View style={{ transform: [{ rotate }] }}>
-                <Icon name="add" size={28} color={WORKOUT_COLORS.accent} />
-            </RNAnimated.View>
-        </TouchableOpacity>
-    );
-}
 
 function ShadowButton({ label, onPress }: { label: string; onPress: () => void }) {
     const pressAnim = useRef(new RNAnimated.Value(0)).current;
@@ -735,7 +626,7 @@ function ShadowButton({ label, onPress }: { label: string; onPress: () => void }
     );
 }
 
-function Stepper({
+function CompactStep({
     label,
     value,
     onDecrement,
@@ -776,20 +667,23 @@ function ReviewHeader({ onBack }: { onBack: () => void }) {
     return (
         <View style={styles.header}>
             <TouchableOpacity
-                style={styles.headerSide}
+                style={styles.backButton}
                 onPress={onBack}
                 accessibilityRole="button"
                 accessibilityLabel="Back to pick workout"
+                activeOpacity={0.7}
             >
-                <Icon name="arrow-back" size={22} color={WORKOUT_COLORS.text} />
+                <PlatesIcon name="chevronLeft" size={22} color={WORKOUT_COLORS.text} />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>pick exercises</Text>
-            <View style={styles.headerSide} />
+            <View style={styles.headerCenter}>
+                <Text style={styles.headerTitle}>pick exercises</Text>
+            </View>
+            <View style={styles.headerRight} />
         </View>
     );
 }
 
-const { padding, borderWidth, buttonRadius, touchTarget } = PICK_WORKOUT_LAYOUT;
+const { borderWidth, buttonRadius } = PICK_WORKOUT_LAYOUT;
 
 const styles = StyleSheet.create({
     root: {
@@ -797,168 +691,139 @@ const styles = StyleSheet.create({
         backgroundColor: WORKOUT_COLORS.background,
     },
     header: {
-        height: 56,
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: padding,
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 6,
     },
-    headerSide: {
-        width: touchTarget + 40,
-        height: touchTarget,
+    backButton: {
+        width: 32,
+        height: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerCenter: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    headerRight: {
+        width: 32,
+        alignItems: 'center',
         justifyContent: 'center',
     },
     headerTitle: {
-        flex: 1,
-        textAlign: 'center',
+        fontSize: 18,
         fontFamily: fonts.bold,
-        fontSize: 16,
-        color: WORKOUT_COLORS.text,
+        color: '#252525',
         textTransform: 'lowercase',
     },
-    chipRow: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-        paddingHorizontal: padding,
-        paddingBottom: padding,
-    },
-    chip: {
-        paddingHorizontal: 12,
-        paddingVertical: 7,
-        borderRadius: 999,
-        backgroundColor: '#F2F2F2',
-    },
-    chipText: {
-        fontFamily: fonts.bold,
-        fontSize: 13,
-        color: '#616161',
-        textTransform: 'lowercase',
-    },
-    searchArea: {
-        marginHorizontal: padding,
+    searchBar: {
+        marginTop: 16,
         marginBottom: 8,
+        marginHorizontal: 20,
+    },
+    filterRow: {
+        marginTop: 2,
+        marginBottom: 2,
+    },
+    filterContent: {
+        paddingHorizontal: 20,
+        paddingVertical: 8,
+        gap: 8,
     },
     body: {
         flex: 1,
         minHeight: 0,
         position: 'relative',
     },
-    searchOverlay: {
-        ...StyleSheet.absoluteFill,
-        zIndex: 30,
-        elevation: 30,
-        paddingHorizontal: padding,
-        paddingTop: 0,
-    },
-    searchDropdown: {
-        maxHeight: '70%',
-        backgroundColor: WORKOUT_COLORS.background,
-        borderRadius: 12,
-        overflow: 'hidden',
-    },
-    row: {
+    pickRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingVertical: 14,
+    },
+    rowShell: {
+        paddingTop: 8,
+        paddingBottom: 14,
         paddingHorizontal: 7,
         borderBottomWidth: 2,
         borderBottomColor: '#F0F0F0',
     },
-    rowCopy: {
+    pickRowMain: {
         flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
         marginRight: 12,
         minWidth: 0,
     },
+    pickStamp: {
+        borderWidth: 0,
+    },
+    addButton: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 4,
+        paddingVertical: 4,
+    },
+    editButton: {
+        width: 28,
+        height: 28,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 2,
+    },
+    rowCopy: {
+        flex: 1,
+        minWidth: 0,
+        minHeight: 40,
+        justifyContent: 'flex-start',
+    },
     rowTitle: {
-        fontFamily: fonts.regular,
         fontSize: 18,
+        fontFamily: fonts.regular,
         color: WORKOUT_COLORS.text,
         textTransform: 'lowercase',
     },
     rowMeta: {
-        fontFamily: fonts.regular,
         fontSize: 14,
+        fontFamily: fonts.regular,
         color: '#999',
         textTransform: 'lowercase',
         marginTop: 2,
     },
-    addedCard: {
-        paddingVertical: 14,
-        paddingHorizontal: 7,
-        borderBottomWidth: 2,
-        borderBottomColor: '#F0F0F0',
-    },
-    addedTop: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    scrollContent: {
-        paddingHorizontal: padding,
-        paddingBottom: padding,
-    },
-    section: {
-        marginBottom: 8,
-    },
-    /**
-     * Clip each row to its animated frame so that when the edit panel expands the
-     * card grows top-down (revealed by the layout animation) instead of the panel
-     * appearing instantly and overlapping the card below during the transition.
-     */
-    itemWrapper: {
+    editClip: {
         overflow: 'hidden',
     },
-    sectionHeading: {
-        fontFamily: fonts.bold,
-        fontSize: 14,
-        color: WORKOUT_COLORS.muted,
-        textTransform: 'lowercase',
-        letterSpacing: 0.5,
-        marginTop: 8,
-        marginBottom: 8,
+    editRow: {
+        paddingTop: 12,
+        paddingBottom: 4,
     },
-    /** Extra gap so "recommended" reads as its own block below the workout. */
-    sectionHeadingDivider: {
-        marginTop: 40,
-    },
-    iconButton: {
-        width: 32,
-        height: 32,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    editPanel: {
-        marginTop: 12,
-        gap: 10,
-    },
-    stepperRow: {
+    editLine: {
         flexDirection: 'row',
-        gap: 8,
+        gap: 6,
     },
     stepper: {
         flex: 1,
         alignItems: 'center',
-        gap: 6,
+        gap: 4,
     },
     stepperLabel: {
         fontFamily: fonts.regular,
-        fontSize: 12,
+        fontSize: 11,
         color: WORKOUT_COLORS.muted,
         textTransform: 'lowercase',
-        letterSpacing: 0.5,
+        letterSpacing: 0.4,
     },
     stepperControls: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 6,
-        borderWidth,
-        borderColor: WORKOUT_COLORS.border,
-        borderRadius: buttonRadius,
-        backgroundColor: WORKOUT_COLORS.background,
-        paddingHorizontal: 4,
-        height: 34,
+        height: 28,
         alignSelf: 'stretch',
+        borderWidth: 1.5,
+        borderColor: WORKOUT_COLORS.border,
+        borderRadius: 10,
+        backgroundColor: WORKOUT_COLORS.background,
+        paddingHorizontal: 2,
     },
     stepperBtn: {
         width: 28,
@@ -970,40 +835,19 @@ const styles = StyleSheet.create({
         flex: 1,
         textAlign: 'center',
         fontFamily: fonts.bold,
-        fontSize: 15,
-        color: WORKOUT_COLORS.text,
-        textTransform: 'lowercase',
-    },
-    reorderRow: {
-        flexDirection: 'row',
-        gap: 8,
-    },
-    reorderButton: {
-        flex: 1,
-        height: 36,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 4,
-        borderRadius: buttonRadius,
-        backgroundColor: WORKOUT_COLORS.background,
-        borderWidth,
-        borderColor: WORKOUT_COLORS.border,
-    },
-    reorderButtonDisabled: {
-        opacity: 0.4,
-    },
-    reorderLabel: {
-        fontFamily: fonts.bold,
         fontSize: 13,
         color: WORKOUT_COLORS.text,
         textTransform: 'lowercase',
     },
-    reorderLabelDisabled: {
-        color: WORKOUT_COLORS.placeholder,
+    scrollContent: {
+        paddingHorizontal: 20,
+        paddingTop: 0,
+        paddingBottom: 28,
     },
+    itemWrapper: {},
     footer: {
-        padding: padding,
+        paddingHorizontal: 20,
+        paddingVertical: 20,
         borderTopWidth: StyleSheet.hairlineWidth,
         borderTopColor: WORKOUT_COLORS.divider,
     },

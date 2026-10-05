@@ -13,6 +13,7 @@ import { fonts } from '../constants/fonts';
 import * as Haptics from 'expo-haptics';
 import { Button } from './Button';
 import { FoodItem } from '../services/foodService';
+import { MEAL_TAG_COLORS } from '../food/types';
 
 interface FoodDetailViewProps {
     food: FoodItem;
@@ -184,23 +185,28 @@ export const FoodDetailView: React.FC<FoodDetailViewProps> = ({
                             <View style={styles.mealButtonsContainer}>
                                 {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map((meal) => {
                                     const isSelected = selectedMeal === meal;
-                                    const isBreakfast = meal === 'breakfast';
+                                    const colors = MEAL_TAG_COLORS[meal];
                                     return (
                                         <TouchableOpacity
                                             key={meal}
                                             style={[
                                                 styles.mealButton,
-                                                isBreakfast && styles.mealButtonBreakfast,
-                                                isSelected && styles.mealButtonSelected,
+                                                meal === 'breakfast' && styles.mealButtonBreakfast,
+                                                {
+                                                    backgroundColor: isSelected ? colors.fill : colors.wash,
+                                                    borderColor: colors.fill,
+                                                },
                                             ]}
                                             onPress={() => handleMealPress(meal)}
                                             activeOpacity={0.7}
                                         >
-                                            <Text style={[
-                                                styles.mealButtonText,
-                                                isSelected && styles.mealButtonTextSelected,
-                                            ]}>
-                                                {meal}
+                                            <Text
+                                                style={[
+                                                    styles.mealButtonText,
+                                                    { color: isSelected ? colors.ink : colors.fill },
+                                                ]}
+                                            >
+                                                {meal === 'snack' ? 'snacks' : meal}
                                             </Text>
                                         </TouchableOpacity>
                                     );
@@ -429,25 +435,17 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         borderRadius: 10,
         borderWidth: 2,
-        borderColor: '#252525',
         paddingVertical: 10,
-        paddingHorizontal: 12,
+        paddingHorizontal: 8,
         minHeight: 38,
     },
     mealButtonBreakfast: {
         flex: 1.28,
     },
-    mealButtonSelected: {
-        backgroundColor: '#4463F7',
-    },
     mealButtonText: {
-        fontSize: 14,
+        fontSize: 13,
         fontFamily: fonts.bold,
-        color: '#252525',
         textTransform: 'lowercase',
-    },
-    mealButtonTextSelected: {
-        color: '#fff',
     },
     addButtonWrapper: {
         paddingHorizontal: 7,

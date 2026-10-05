@@ -2,7 +2,8 @@ import React from 'react';
 import Svg, { Circle, Line, Polyline, Rect } from 'react-native-svg';
 
 export const COMPLETE_BG = '#EAEEFF';
-export const COMPLETE_BORDER = '#526EFF';
+export const COMPLETE_BORDER = '#8FA4FF';
+export const COMPLETE_LINE = '#B8C4FF';
 export const COMPLETE_INK = '#526EFF';
 
 interface MarkProps {
@@ -56,5 +57,15 @@ export const FlatDots: React.FC<MarkProps> = ({ color, size = 16 }) => (
         <Circle cx={3.2} cy={8} r={1.5} fill={color} />
         <Circle cx={8} cy={8} r={1.5} fill={color} />
         <Circle cx={12.8} cy={8} r={1.5} fill={color} />
+    </Svg>
+);
+
+/** Two thick sliders — adjust amounts, same weight as plus/tick. */
+export const FlatTune: React.FC<MarkProps> = ({ color, size = 16, strokeWidth = 2.2 }) => (
+    <Svg width={size} height={size} viewBox="0 0 16 16">
+        <Line x1={2} y1={5} x2={14} y2={5} stroke={color} strokeWidth={strokeWidth} strokeLinecap="square" />
+        <Rect x={9} y={3} width={4} height={4} fill={color} />
+        <Line x1={2} y1={11} x2={14} y2={11} stroke={color} strokeWidth={strokeWidth} strokeLinecap="square" />
+        <Rect x={3} y={9} width={4} height={4} fill={color} />
     </Svg>
 );

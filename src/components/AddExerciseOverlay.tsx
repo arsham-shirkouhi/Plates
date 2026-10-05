@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useEffect, useState } from 'react';
+import React, { useCallback, useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import {
     View,
     Text,
@@ -22,12 +22,15 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { Icon } from './icons/Icon';
 import { WORKOUT_COLORS } from '../workout/constants';
 import { FlatPlus } from './activeWorkout/FlatMark';
-import { getBodyPartStamp, PlatesIcon, type PlatesIconName } from './icons/PlatesIcon';
+import { getBodyPartStamp, PlatesIcon } from './icons/PlatesIcon';
 import { HardSearchBar } from './ui/HardSearchBar';
 import { HardStamp } from './ui/HardListCard';
+import { BodyPartChip } from './ui/BodyPartChip';
+import { AddTickToggle } from './ui/AddTickToggle';
 import Reanimated, {
     Easing as ReanimatedEasing,
     interpolate,
+    Keyframe,
     runOnJS,
     useAnimatedStyle,
     useSharedValue,
@@ -38,8 +41,27 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
+const recEnter = new Keyframe({
+    0: {
+        opacity: 0,
+        transform: [{ translateY: 18 }, { scale: 0.97 }],
+    },
+    100: {
+        opacity: 1,
+        transform: [{ translateY: 0 }, { scale: 1 }],
+        easing: ReanimatedEasing.out(ReanimatedEasing.cubic),
+    },
+}).duration(320);
+
+const REVEAL_START_MS = 220;
+const REVEAL_STAGGER_MS = 150;
+
 function createUniqueId(): string {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function exerciseRowKey(exercise: Exercise, index: number) {
+    return `${exercise.id || ''}:${exercise.name || ''}:${index}`;
 }
 
 function exerciseMatchKeys(exercise: Pick<Exercise, 'id' | 'name'>): string[] {
@@ -69,6 +91,14 @@ interface FlyParticle {
     duration?: number;
 }
 
+type Point = { x: number; y: number };
+
+export type AddParticleHandle = {
+    spawnFly: (start: Point, end: Point, color: string) => void;
+    spawnBurst: (origin: Point, color: string) => void;
+    clear: () => void;
+};
+
 const AddFlyParticle: React.FC<FlyParticle & { onDone: (id: number) => void }> = ({
     id,
     x0,
@@ -79,16 +109,17 @@ const AddFlyParticle: React.FC<FlyParticle & { onDone: (id: number) => void }> =
     y2,
     size,
     color,
-    duration = 360,
+    duration = 480,
     onDone,
 }) => {
     const progress = useSharedValue(0);
 
     useEffect(() => {
         const finish = () => onDone(id);
+        progress.value = 0;
         progress.value = withTiming(
             1,
-            { duration, easing: ReanimatedEasing.bezier(0.42, 0.0, 0.18, 1) },
+            { duration, easing: ReanimatedEasing.bezier(0.2, 0.0, 0.18, 1) },
             (finished) => {
                 if (finished) runOnJS(finish)();
             }
@@ -98,8 +129,8 @@ const AddFlyParticle: React.FC<FlyParticle & { onDone: (id: number) => void }> =
     const style = useAnimatedStyle(() => {
         const x = quadBezier(progress.value, x0, x1, x2);
         const y = quadBezier(progress.value, y0, y1, y2);
-        const scale = interpolate(progress.value, [0, 0.14, 1], [1.05, 1.28, 0.28]);
-        const opacity = progress.value > 0.9 ? 1 - (progress.value - 0.9) / 0.1 : 1;
+        const scale = interpolate(progress.value, [0, 0.12, 1], [1.05, 1.22, 0.28]);
+        const opacity = progress.value > 0.88 ? 1 - (progress.value - 0.88) / 0.12 : 1;
         return {
             opacity,
             transform: [
@@ -129,90 +160,66 @@ const AddFlyParticle: React.FC<FlyParticle & { onDone: (id: number) => void }> =
     );
 };
 
-interface FilterChipProps {
-    label: string;
-    icon: PlatesIconName;
-    fill: string;
-    wash: string;
-    isActive: boolean;
-    onPress: (origin: { x: number; y: number }) => void;
-}
+const AddParticleLayer = forwardRef<AddParticleHandle>(function AddParticleLayer(_, ref) {
+    const [particles, setParticles] = useState<FlyParticle[]>([]);
+    const dismiss = useCallback((id: number) => {
+        setParticles((prev) => prev.filter((particle) => particle.id !== id));
+    }, []);
 
-const FilterChip: React.FC<FilterChipProps> = ({ label, icon, fill, wash, isActive, onPress }) => {
-    const chipRef = useRef<View>(null);
-
-    return (
-        <View ref={chipRef} collapsable={false}>
-            <TouchableOpacity
-                style={[
-                    styles.filterChip,
-                    { backgroundColor: wash, borderColor: fill },
-                    isActive && { backgroundColor: fill, borderColor: fill },
-                ]}
-                onPress={() => {
-                    chipRef.current?.measureInWindow((x, y, width, height) => {
-                        onPress({ x: x + width / 2, y: y + height / 2 });
-                    });
-                }}
-                activeOpacity={0.85}
-            >
-                <PlatesIcon
-                    name={icon}
-                    size={15}
-                    color={isActive ? '#FFFFFF' : fill}
-                    fill={isActive ? '#FFFFFF' : fill}
-                />
-                <Text
-                    style={[
-                        styles.filterChipText,
-                        { color: fill },
-                        isActive && styles.filterChipTextActive,
-                    ]}
-                >
-                    {label}
-                </Text>
-            </TouchableOpacity>
-        </View>
-    );
-};
-
-const AddTickToggle: React.FC<{ added: boolean }> = ({ added }) => {
-    const progress = useSharedValue(added ? 1 : 0);
-
-    useEffect(() => {
-        progress.value = withTiming(added ? 1 : 0, {
-            duration: 220,
-            easing: ReanimatedEasing.bezier(0.2, 0.8, 0.24, 1),
-        });
-    }, [added, progress]);
-
-    const plusStyle = useAnimatedStyle(() => ({
-        opacity: 1 - progress.value,
-        transform: [
-            { rotate: `${progress.value * 90}deg` },
-            { scale: 1 - progress.value * 0.28 },
-        ],
-    }));
-
-    const tickStyle = useAnimatedStyle(() => ({
-        opacity: progress.value,
-        transform: [
-            { rotate: `${-36 + progress.value * 36}deg` },
-            { scale: 0.62 + progress.value * 0.38 },
-        ],
+    useImperativeHandle(ref, () => ({
+        spawnFly(start, end, color) {
+            if (!end.x && !end.y) return;
+            const count = 2 + Math.floor(Math.random() * 2);
+            const next: FlyParticle[] = Array.from({ length: count }, (_, i) => {
+                const side = Math.random() < 0.5 ? -1 : 1;
+                return {
+                    id: Date.now() + i + Math.random(),
+                    x0: start.x,
+                    y0: start.y,
+                    x1: (start.x + end.x) / 2 + side * (24 + Math.random() * 40),
+                    y1: Math.min(start.y, end.y) - (14 + Math.random() * 36),
+                    x2: end.x,
+                    y2: end.y,
+                    size: i === 0 ? 14 : 6 + Math.random() * 4,
+                    color,
+                    duration: 420 + Math.round(Math.random() * 80),
+                };
+            });
+            setParticles((prev) => [...prev, ...next]);
+        },
+        spawnBurst(origin, color) {
+            const count = 6;
+            const next: FlyParticle[] = Array.from({ length: count }, (_, i) => {
+                const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
+                const dist = 28 + Math.random() * 28;
+                return {
+                    id: Date.now() + i + Math.random(),
+                    x0: origin.x,
+                    y0: origin.y,
+                    x1: origin.x + Math.cos(angle) * dist * 0.5,
+                    y1: origin.y + Math.sin(angle) * dist * 0.5,
+                    x2: origin.x + Math.cos(angle) * dist,
+                    y2: origin.y + Math.sin(angle) * dist,
+                    size: 5 + Math.random() * 4,
+                    color,
+                    duration: 280,
+                };
+            });
+            setParticles((prev) => [...prev, ...next]);
+        },
+        clear() {
+            setParticles([]);
+        },
     }));
 
     return (
-        <View style={styles.addTickHit}>
-            <Reanimated.View style={[styles.addTickLayer, plusStyle]}>
-                <Icon name="add" size={28} color="#ADADAD" />
-            </Reanimated.View>
-            <Reanimated.View style={[styles.addTickLayer, tickStyle]}>
-                <Icon name="checkmark" size={28} color={WORKOUT_COLORS.accent} />
-            </Reanimated.View>
+        <View pointerEvents="none" style={styles.flyLayer}>
+            {particles.map((particle) => (
+                <AddFlyParticle key={particle.id} {...particle} onDone={dismiss} />
+            ))}
         </View>
     );
-};
+});
 
 interface AnimatedExerciseRowProps {
     exercise: Exercise;
@@ -323,12 +330,14 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
     const [optimisticAddedKeys, setOptimisticAddedKeys] = useState<Set<string>>(new Set());
     const [optimisticRemovedKeys, setOptimisticRemovedKeys] = useState<Set<string>>(new Set());
     const [bodyPartFilter, setBodyPartFilter] = useState<string | null>(null);
-    const [flyParticles, setFlyParticles] = useState<FlyParticle[]>([]);
+    const particleRef = useRef<AddParticleHandle>(null);
     const addedTargetRef = useRef<View>(null);
     const addedTargetPos = useRef({ x: 0, y: 0 });
     const addedPulse = useRef(new Animated.Value(1)).current;
     const loadedForOpenRef = useRef(false);
     const wasVisibleRef = useRef(false);
+    const [rowIntroDone, setRowIntroDone] = useState(false);
+    const [revealedKeys, setRevealedKeys] = useState<Set<string>>(() => new Set());
 
     // Load exercises once when the overlay opens; reset local state when it closes.
     useEffect(() => {
@@ -338,6 +347,8 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
                 setExercises([]);
                 setOffset(0);
                 setHasMore(true);
+                setRowIntroDone(false);
+                setRevealedKeys(new Set());
                 loadExercises(0, true);
             }
             wasVisibleRef.current = true;
@@ -356,7 +367,7 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
             setOptimisticAddedKeys(new Set());
             setOptimisticRemovedKeys(new Set());
             setBodyPartFilter(null);
-            setFlyParticles([]);
+            particleRef.current?.clear();
         }
 
         loadedForOpenRef.current = false;
@@ -609,56 +620,26 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
         onSelectionCommitted?.(1);
     };
 
-    const measureAddedTarget = (done: (target: { x: number; y: number }) => void) => {
+    const measureAddedTarget = (done?: (target: { x: number; y: number }) => void) => {
         if (!addedTargetRef.current) {
-            done(addedTargetPos.current);
+            done?.(addedTargetPos.current);
             return;
         }
         addedTargetRef.current.measureInWindow((ax, ay, aw, ah) => {
             if (aw > 0 || ah > 0) {
-                const target = { x: ax + aw / 2, y: ay + ah / 2 };
-                addedTargetPos.current = target;
-                done(target);
-                return;
+                addedTargetPos.current = { x: ax + aw / 2, y: ay + ah / 2 };
             }
-            done(addedTargetPos.current);
+            done?.(addedTargetPos.current);
         });
     };
 
-    const dismissParticle = useCallback((id: number) => {
-        setFlyParticles((prev) => prev.filter((particle) => particle.id !== id));
-    }, []);
-
-    const spawnAddFly = (
-        start: { x: number; y: number },
-        end: { x: number; y: number },
-        color: string
-    ) => {
-        if (!end.x && !end.y) return;
-        const count = 3 + Math.floor(Math.random() * 3);
-        const next: FlyParticle[] = Array.from({ length: count }, (_, i) => {
-            const side = Math.random() < 0.5 ? -1 : 1;
-            return {
-                id: Date.now() + i + Math.random(),
-                x0: start.x,
-                y0: start.y,
-                x1: (start.x + end.x) / 2 + side * (28 + Math.random() * 54),
-                y1: Math.min(start.y, end.y) - (18 + Math.random() * 46),
-                x2: end.x,
-                y2: end.y,
-                size: i === 0 ? 16 : 7 + Math.random() * 5,
-                color,
-                duration: 980 + Math.round(Math.random() * 160),
-            };
-        });
-        setFlyParticles((prev) => [...prev, ...next]);
+    const pulseAddedCount = () => {
         addedPulse.setValue(1);
         Animated.sequence([
-            Animated.delay(880),
-            Animated.spring(addedPulse, {
-                toValue: 1.2,
-                friction: 5,
-                tension: 240,
+            Animated.timing(addedPulse, {
+                toValue: 1.16,
+                duration: 120,
+                easing: Easing.out(Easing.cubic),
                 useNativeDriver: true,
             }),
             Animated.spring(addedPulse, {
@@ -672,33 +653,21 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
 
     const launchAddParticles = (origin: { x: number; y: number }, exercise: Exercise) => {
         const stamp = getBodyPartStamp(exercise.bodyPart);
-        measureAddedTarget((target) => {
-            spawnAddFly(origin, target, stamp.fill);
-        });
+        const cached = addedTargetPos.current;
+        if (cached.x || cached.y) {
+            particleRef.current?.spawnFly(origin, cached, stamp.fill);
+        } else {
+            measureAddedTarget((target) => {
+                particleRef.current?.spawnFly(origin, target, stamp.fill);
+            });
+        }
+        measureAddedTarget();
+        pulseAddedCount();
         handleAddExercise(exercise);
     };
 
     const launchChipBurst = (origin: { x: number; y: number }, color: string) => {
-        const count = 8 + Math.floor(Math.random() * 4);
-        const next: FlyParticle[] = Array.from({ length: count }, (_, i) => {
-            const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.55;
-            const dist = 38 + Math.random() * 48;
-            const x2 = origin.x + Math.cos(angle) * dist;
-            const y2 = origin.y + Math.sin(angle) * dist;
-            const bend = (Math.random() - 0.5) * 0.9;
-            return {
-                id: Date.now() + i + Math.random(),
-                x0: origin.x,
-                y0: origin.y,
-                x1: origin.x + Math.cos(angle + bend) * dist * 0.48,
-                y1: origin.y + Math.sin(angle + bend) * dist * 0.48,
-                x2,
-                y2,
-                size: 5 + Math.random() * 6,
-                color,
-            };
-        });
-        setFlyParticles((prev) => [...prev, ...next]);
+        particleRef.current?.spawnBurst(origin, color);
     };
 
     const handleRemoveAddedExercise = (exercise: Exercise) => {
@@ -764,6 +733,49 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
           )
         : displayedExercises;
     const addedInView = filteredExercises.filter(isExerciseAdded).length;
+    const listedExercises = rowIntroDone
+        ? filteredExercises
+        : filteredExercises.filter((exercise, index) =>
+              revealedKeys.has(exerciseRowKey(exercise, index))
+          );
+
+    useEffect(() => {
+        if (!visible || loading || displayedExercises.length === 0 || rowIntroDone) return;
+        if (searchQuery.trim().length > 0 || bodyPartFilter) {
+            setRowIntroDone(true);
+            return;
+        }
+
+        const keys = displayedExercises.map((exercise, index) =>
+            exerciseRowKey(exercise, index)
+        );
+        const timers = keys.map((key, index) =>
+            setTimeout(() => {
+                setRevealedKeys((current) => {
+                    if (current.has(key)) return current;
+                    const next = new Set(current);
+                    next.add(key);
+                    return next;
+                });
+            }, REVEAL_START_MS + index * REVEAL_STAGGER_MS)
+        );
+        const introTimer = setTimeout(
+            () => setRowIntroDone(true),
+            REVEAL_START_MS + keys.length * REVEAL_STAGGER_MS + 320
+        );
+        return () => {
+            timers.forEach(clearTimeout);
+            clearTimeout(introTimer);
+        };
+    }, [
+        visible,
+        loading,
+        displayedExercises.length,
+        displayedExercises[0]?.id,
+        rowIntroDone,
+        searchQuery,
+        bodyPartFilter,
+    ]);
 
     const handleSelectBodyPartFilter = (
         value: string | null,
@@ -928,7 +940,7 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
                                                 contentContainerStyle={styles.filterContent}
                                                 keyboardShouldPersistTaps="handled"
                                             >
-                                                <FilterChip
+                                                <BodyPartChip
                                                     label="all"
                                                     icon="dumbbell"
                                                     fill="#526EFF"
@@ -941,7 +953,7 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
                                                 {availableBodyParts.map((part) => {
                                                     const stamp = getBodyPartStamp(part);
                                                     return (
-                                                        <FilterChip
+                                                        <BodyPartChip
                                                             key={part}
                                                             label={part}
                                                             icon={stamp.icon}
@@ -1018,15 +1030,19 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
                                                     </View>
                                                 ) : (
                                                     <>
-                                                        {filteredExercises.map((exercise, index) => (
-                                                            <AnimatedExerciseRow
-                                                                key={`exercise-${index}-${exercise.id || exercise.name || 'item'}`}
-                                                                exercise={exercise}
-                                                                isAdded={isExerciseAdded(exercise)}
-                                                                onOpen={() => handleExerciseTitlePress(exercise)}
-                                                                onAdd={(origin) => launchAddParticles(origin, exercise)}
-                                                                onRemove={() => handleRemoveAddedExercise(exercise)}
-                                                            />
+                                                        {listedExercises.map((exercise, index) => (
+                                                            <Reanimated.View
+                                                                key={exerciseRowKey(exercise, index)}
+                                                                entering={rowIntroDone ? undefined : recEnter}
+                                                            >
+                                                                <AnimatedExerciseRow
+                                                                    exercise={exercise}
+                                                                    isAdded={isExerciseAdded(exercise)}
+                                                                    onOpen={() => handleExerciseTitlePress(exercise)}
+                                                                    onAdd={(origin) => launchAddParticles(origin, exercise)}
+                                                                    onRemove={() => handleRemoveAddedExercise(exercise)}
+                                                                />
+                                                            </Reanimated.View>
                                                         ))}
                                                         {loadingMore && (
                                                             <View style={styles.loadingMoreContainer}>
@@ -1043,15 +1059,7 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
                             )}
                         </View>
                     </Animated.View>
-                    <View pointerEvents="none" style={styles.flyLayer}>
-                        {flyParticles.map((particle) => (
-                            <AddFlyParticle
-                                key={particle.id}
-                                {...particle}
-                                onDone={dismissParticle}
-                            />
-                        ))}
-                    </View>
+                    <AddParticleLayer ref={particleRef} />
                 </View>
             </Modal>
         </>
@@ -1190,17 +1198,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         padding: 4,
     },
-    addTickHit: {
-        width: 28,
-        height: 28,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    addTickLayer: {
-        position: 'absolute',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
     filterRow: {
         marginTop: 2,
         marginBottom: 2,
@@ -1209,24 +1206,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingVertical: 8,
         gap: 8,
-    },
-    filterChip: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingLeft: 5,
-        paddingRight: 12,
-        paddingVertical: 5,
-        borderRadius: 12,
-        borderWidth: 2,
-        gap: 7,
-    },
-    filterChipText: {
-        fontSize: 13,
-        fontFamily: fonts.bold,
-        textTransform: 'lowercase',
-    },
-    filterChipTextActive: {
-        color: '#FFFFFF',
     },
     emptyContainer: {
         flex: 1,

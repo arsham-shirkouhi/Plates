@@ -56,7 +56,15 @@ export const MuscleNamePicker: React.FC<MuscleNamePickerProps> = ({
                                     stamp={<HardStamp icon={stamp.icon} fill={stamp.fill} />}
                                     highlighted={selected}
                                     trailing={
-                                        <View style={[styles.checkbox, selected && styles.checkboxChecked]}>
+                                        <View
+                                            style={[
+                                                styles.checkbox,
+                                                selected && {
+                                                    backgroundColor: stamp.fill,
+                                                    borderColor: WORKOUT_COLORS.border,
+                                                },
+                                            ]}
+                                        >
                                             {selected ? <FlatTick size={12} color="#FFFFFF" /> : null}
                                         </View>
                                     }
@@ -132,9 +140,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: WORKOUT_COLORS.background,
-    },
-    checkboxChecked: {
-        backgroundColor: WORKOUT_COLORS.accent,
     },
     doneButton: {
         marginTop: 14,
