@@ -10,11 +10,13 @@ import { Button } from '../Button';
 import { fonts } from '../../constants/fonts';
 import { WORKOUT_COLORS } from '../../workout/constants';
 import { PlatesIcon } from '../icons/PlatesIcon';
+import { Icon } from '../icons/Icon';
 
 interface ActiveWorkoutHeaderProps {
     title?: string;
     onCollapse: () => void;
     onFinish: () => void;
+    onScanEquipment?: () => void;
     collapsePanHandlers?: GestureResponderHandlers;
 }
 
@@ -22,6 +24,7 @@ export const ActiveWorkoutHeader: React.FC<ActiveWorkoutHeaderProps> = ({
     title = 'workout',
     onCollapse,
     onFinish,
+    onScanEquipment,
     collapsePanHandlers,
 }) => {
     return (
@@ -37,6 +40,16 @@ export const ActiveWorkoutHeader: React.FC<ActiveWorkoutHeaderProps> = ({
                 <Text style={styles.title} numberOfLines={1}>
                     {title.toLowerCase()}
                 </Text>
+                {onScanEquipment && (
+                    <TouchableOpacity
+                        onPress={onScanEquipment}
+                        style={styles.scanButton}
+                        accessibilityLabel="Scan gym equipment"
+                        accessibilityHint="Opens the camera to identify a machine or instruction label"
+                    >
+                        <Icon name="camera-outline" size={23} color={WORKOUT_COLORS.text} />
+                    </TouchableOpacity>
+                )}
                 <Button
                     title="finish"
                     onPress={onFinish}
@@ -79,6 +92,13 @@ const styles = StyleSheet.create({
     },
     finishButtonWrap: {
         width: 84,
+    },
+    scanButton: {
+        width: 36,
+        height: 36,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 2,
     },
     finishButtonBody: {
         minHeight: 36,

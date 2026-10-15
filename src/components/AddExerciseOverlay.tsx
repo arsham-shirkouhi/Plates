@@ -10,9 +10,12 @@ import {
     ScrollView,
     Dimensions,
     ActivityIndicator,
+    Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { fonts } from '../constants/fonts';
 import { getExercisesList, searchExercises, Exercise, getExerciseDetails, ExerciseDetails } from '../services/exerciseService';
 import { useRegisterOverlay } from '../contexts/OverlayContext';
@@ -27,6 +30,8 @@ import { HardSearchBar } from './ui/HardSearchBar';
 import { HardStamp } from './ui/HardListCard';
 import { BodyPartChip } from './ui/BodyPartChip';
 import { AddTickToggle } from './ui/AddTickToggle';
+import { ExerciseGif } from './ExerciseGif';
+import { scanExerciseEquipment } from '../services/equipmentScanService';
 import Reanimated, {
     Easing as ReanimatedEasing,
     interpolate,
@@ -291,6 +296,10 @@ const AnimatedExerciseRow: React.FC<AnimatedExerciseRowProps> = ({
 
 interface AddExerciseOverlayProps {
     visible: boolean;
+    /** Increments when the active-workout header camera should launch a scan. */
+    equipmentScanRequestId?: number;
+    /** Pre-captured header-camera image; opens results after the camera closes. */
+    equipmentScanImageDataUrl?: string | null;
     onClose: () => void;
     onSelectExercise: (exercise: Exercise) => void;
     onSelectExerciseAndNavigate?: (exercise: Exercise, createdExercise: { id: string; name: string; sets: Array<{ id: string; reps: string; weight: string }> }, allExercises: Array<{ id: string; name: string; sets: Array<{ id: string; reps: string; weight: string }> }>, exerciseIndex: number) => void;
@@ -302,6 +311,8 @@ interface AddExerciseOverlayProps {
 
 export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
     visible,
+    equipmentScanRequestId = 0,
+    equipmentScanImageDataUrl = null,
     onClose,
     onSelectExercise,
     onSelectExerciseAndNavigate,
@@ -338,6 +349,10 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
     const wasVisibleRef = useRef(false);
     const [rowIntroDone, setRowIntroDone] = useState(false);
     const [revealedKeys, setRevealedKeys] = useState<Set<string>>(() => new Set());
+    const [isScanningEquipment, setIsScanningEquipment] = useState(false);
+    const [scanResultMessage, setScanResultMessage] = useState<string | null>(null);
+    const [showingScanResults, setShowingScanResults] = useState(false);
+    const lastEquipmentScanRequestRef = useRef(0);
 
     // Load exercises once when the overlay opens; reset local state when it closes.
     useEffect(() => {
@@ -367,6 +382,9 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
             setOptimisticAddedKeys(new Set());
             setOptimisticRemovedKeys(new Set());
             setBodyPartFilter(null);
+            setIsScanningEquipment(false);
+            setScanResultMessage(null);
+            setShowingScanResults(false);
             particleRef.current?.clear();
         }
 
@@ -407,7 +425,7 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
 
     // Search exercises when search query changes (skip the initial empty query on open).
     useEffect(() => {
-        if (!visible || searchQuery.trim().length === 0) return;
+        if (!visible || searchQuery.trim().length === 0 || showingScanResults) return;
 
         const timeout = setTimeout(() => {
             setOffset(0);
@@ -418,7 +436,7 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
         return () => {
             clearTimeout(timeout);
         };
-    }, [searchQuery, visible]);
+    }, [searchQuery, visible, showingScanResults]);
 
     const loadExercises = async (currentOffset: number = 0, isInitial: boolean = false) => {
         if (isInitial) {
@@ -479,6 +497,86 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
             setLoading(false);
         }
     };
+
+    const handleSearchChange = (value: string) => {
+        setSearchQuery(value);
+        setShowingScanResults(false);
+        setScanResultMessage(null);
+    };
+
+    const handleScanEquipment = async (capturedImageDataUrl?: string | null) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        try {
+            let imageDataUrl = capturedImageDataUrl;
+            if (!imageDataUrl) {
+                const permission = await ImagePicker.requestCameraPermissionsAsync();
+                if (!permission.granted) {
+                    Alert.alert('Camera access needed', 'Allow camera access in iPhone Settings → Expo Go → Camera, then try again.');
+                    return;
+                }
+                const result = await ImagePicker.launchCameraAsync({
+                    mediaTypes: ['images'],
+                    quality: 0.9,
+                    allowsEditing: false,
+                });
+                if (result.canceled || !result.assets[0]?.uri) return;
+                const normalized = await ImageManipulator.manipulateAsync(
+                    result.assets[0].uri,
+                    [{ resize: { width: 1600 } }],
+                    { base64: true, compress: 0.85, format: ImageManipulator.SaveFormat.JPEG },
+                );
+                if (!normalized.base64) throw new Error('Unable to prepare that machine photo.');
+                imageDataUrl = `data:image/jpeg;base64,${normalized.base64}`;
+            }
+
+            setIsScanningEquipment(true);
+            setScanResultMessage(null);
+            const scan = await scanExerciseEquipment(imageDataUrl);
+            if (scan.candidates.length === 0) {
+                setExercises([]);
+                setHasMore(false);
+                setShowingScanResults(true);
+                setScanResultMessage('couldn’t identify the equipment — try a straight-on photo of its name or exercise placard');
+                return;
+            }
+
+            const resultSets = await Promise.all(scan.candidates.map((name) => searchExercises(name)));
+            const seen = new Set<string>();
+            const matches = resultSets.flat().filter((exercise) => {
+                const key = exercise.id || exercise.name.toLowerCase();
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            }).slice(0, 6);
+
+            setExercises(matches);
+            setOffset(matches.length);
+            setHasMore(false);
+            setBodyPartFilter(null);
+            setShowingScanResults(true);
+            setScanResultMessage(
+                matches.length > 0
+                    ? 'possible matches — tap one to verify its demo and instructions before adding'
+                    : 'we read the machine, but found no matching exercise in the current catalog — try its exercise name below',
+            );
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unable to scan that equipment.';
+            setScanResultMessage(message);
+            Alert.alert('Equipment scan unavailable', message);
+        } finally {
+            setIsScanningEquipment(false);
+        }
+    };
+
+    useEffect(() => {
+        if (!visible || equipmentScanRequestId === 0 || lastEquipmentScanRequestRef.current === equipmentScanRequestId) {
+            return;
+        }
+        lastEquipmentScanRequestRef.current = equipmentScanRequestId;
+        // Run immediately: the overlay's initial exercise load also updates
+        // state, which would cancel a deferred frame before the scan starts.
+        void handleScanEquipment(equipmentScanImageDataUrl);
+    }, [visible, equipmentScanRequestId, equipmentScanImageDataUrl, handleScanEquipment]);
 
     // Animate in/out
     useEffect(() => {
@@ -880,6 +978,14 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
                                                 <Text style={styles.value}>{exerciseDetails.Title}</Text>
                                             </View>
 
+                                            {exerciseDetails.gifUrl && (
+                                                <ExerciseGif
+                                                    uri={exerciseDetails.gifUrl}
+                                                    accessibilityLabel={`${exerciseDetails.Title} demonstration`}
+                                                    style={styles.exerciseDemo}
+                                                />
+                                            )}
+
                                             {/* Description */}
                                             {exerciseDetails.Desc && (
                                                 <View style={styles.section}>
@@ -919,6 +1025,17 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
                                                     <Text style={styles.value}>{exerciseDetails.Level}</Text>
                                                 </View>
                                             )}
+
+                                            {Array.isArray(exerciseDetails.instructions) && exerciseDetails.instructions.length > 0 && (
+                                                <View style={styles.section}>
+                                                    <Text style={styles.label}>how to do it</Text>
+                                                    {exerciseDetails.instructions.map((instruction, index) => (
+                                                        <Text key={`${instruction}-${index}`} style={styles.instruction}>
+                                                            {index + 1}. {instruction}
+                                                        </Text>
+                                                    ))}
+                                                </View>
+                                            )}
                                         </ScrollView>
                                     )}
                                 </View>
@@ -927,10 +1044,30 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
                                 <>
                                     <HardSearchBar
                                         value={searchQuery}
-                                        onChangeText={setSearchQuery}
+                                        onChangeText={handleSearchChange}
                                         placeholder="search exercises"
                                         containerStyle={styles.searchBar}
                                     />
+
+                                    <TouchableOpacity
+                                        style={styles.scanEquipmentButton}
+                                        onPress={() => void handleScanEquipment()}
+                                        disabled={isScanningEquipment}
+                                        activeOpacity={0.75}
+                                    >
+                                        {isScanningEquipment ? (
+                                            <ActivityIndicator size="small" color="#252525" />
+                                        ) : (
+                                            <Icon name="camera" size={18} color="#252525" />
+                                        )}
+                                        <Text style={styles.scanEquipmentButtonText}>
+                                            {isScanningEquipment ? 'reading equipment…' : 'scan machine or instruction label'}
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    {scanResultMessage && (
+                                        <Text style={styles.scanResultMessage}>{scanResultMessage}</Text>
+                                    )}
 
                                     {!loading && availableBodyParts.length > 0 && (
                                         <View style={styles.filterRow}>
@@ -1126,6 +1263,35 @@ const styles = StyleSheet.create({
         marginBottom: 8,
         marginHorizontal: 20,
     },
+    scanEquipmentButton: {
+        minHeight: 40,
+        marginHorizontal: 20,
+        marginBottom: 4,
+        borderWidth: 2,
+        borderColor: '#252525',
+        borderRadius: 10,
+        paddingHorizontal: 13,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 7,
+    },
+    scanEquipmentButtonText: {
+        color: '#252525',
+        fontFamily: fonts.bold,
+        fontSize: 13,
+        textTransform: 'lowercase',
+    },
+    scanResultMessage: {
+        marginHorizontal: 20,
+        marginTop: 7,
+        color: '#777',
+        fontFamily: fonts.regular,
+        fontSize: 13,
+        lineHeight: 18,
+        textAlign: 'center',
+        textTransform: 'lowercase',
+    },
     scrollView: {
         flex: 1,
     },
@@ -1269,5 +1435,16 @@ const styles = StyleSheet.create({
         textTransform: 'lowercase',
         lineHeight: 26,
     },
+    exerciseDemo: {
+        marginBottom: 24,
+        aspectRatio: 1.25,
+    },
+    instruction: {
+        fontSize: 16,
+        fontFamily: fonts.regular,
+        color: '#252525',
+        lineHeight: 24,
+        marginBottom: 10,
+        textTransform: 'lowercase',
+    },
 });
-

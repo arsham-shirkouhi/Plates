@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { useWorkoutOverlay } from '../contexts/WorkoutOverlayContext';
 import { useActiveWorkout } from '../contexts/ActiveWorkoutContext';
 import { useAuth } from '../context/AuthContext';
@@ -47,6 +49,8 @@ export const ActiveWorkoutScreen: React.FC = () => {
     const { user } = useAuth();
 
     const [showAddExerciseOverlay, setShowAddExerciseOverlay] = useState(false);
+    const [equipmentScanRequestId, setEquipmentScanRequestId] = useState(0);
+    const [equipmentScanImageDataUrl, setEquipmentScanImageDataUrl] = useState<string | null>(null);
     const [showCountdown, setShowCountdown] = useState(false);
     const [savedWorkouts, setSavedWorkouts] = useState<SavedWorkoutSummary[]>([]);
 
@@ -106,6 +110,36 @@ export const ActiveWorkoutScreen: React.FC = () => {
     const finishCountdown = useCallback(() => {
         pendingStartRef.current = null;
         setShowCountdown(false);
+    }, []);
+
+    const handleHeaderEquipmentScan = useCallback(async () => {
+        try {
+            const permission = await ImagePicker.requestCameraPermissionsAsync();
+            if (!permission.granted) {
+                Alert.alert('Camera access needed', 'Allow camera access in iPhone Settings → Expo Go → Camera, then try again.');
+                return;
+            }
+            const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ['images'],
+                quality: 0.9,
+                allowsEditing: false,
+            });
+            if (result.canceled || !result.assets[0]?.uri) return;
+            const normalized = await ImageManipulator.manipulateAsync(
+                result.assets[0].uri,
+                [{ resize: { width: 1600 } }],
+                { base64: true, compress: 0.85, format: ImageManipulator.SaveFormat.JPEG },
+            );
+            if (!normalized.base64) throw new Error('Unable to prepare that machine photo.');
+            setEquipmentScanImageDataUrl(`data:image/jpeg;base64,${normalized.base64}`);
+            setEquipmentScanRequestId((current) => current + 1);
+            setShowAddExerciseOverlay(true);
+        } catch (error) {
+            Alert.alert(
+                'Equipment scan unavailable',
+                error instanceof Error ? error.message : 'Unable to open the equipment scanner.',
+            );
+        }
     }, []);
 
     const startWorkoutType = params?.startWorkoutType;
@@ -252,11 +286,17 @@ export const ActiveWorkoutScreen: React.FC = () => {
                 <>
                     <ActiveWorkoutOverlay
                         onAddExercises={() => setShowAddExerciseOverlay(true)}
+                        onScanEquipment={handleHeaderEquipmentScan}
                         onRequestWrapUp={requestWrapUp}
                     />
                     <AddExerciseOverlay
                         visible={showAddExerciseOverlay}
-                        onClose={() => setShowAddExerciseOverlay(false)}
+                        equipmentScanRequestId={equipmentScanRequestId}
+                        equipmentScanImageDataUrl={equipmentScanImageDataUrl}
+                        onClose={() => {
+                            setShowAddExerciseOverlay(false);
+                            setEquipmentScanImageDataUrl(null);
+                        }}
                         onSelectExercise={handleSelectExercise}
                         onRemoveExercise={handleRemoveExercise}
                         currentExerciseIds={state.workout.exercises.map((exercise) => exercise.exerciseId)}

@@ -50,11 +50,13 @@ const MINI_CORNER_RADIUS = 36;
 
 interface ActiveWorkoutOverlayProps {
     onAddExercises: () => void;
+    onScanEquipment: () => void;
     onRequestWrapUp: () => void;
 }
 
 export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
     onAddExercises,
+    onScanEquipment,
     onRequestWrapUp,
 }) => {
     const insets = useSafeAreaInsets();
@@ -275,6 +277,7 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
                     <ActiveWorkoutHeader
                         title={workout.title}
                         onCollapse={minimize}
+                        onScanEquipment={onScanEquipment}
                         onFinish={handleFinish}
                         collapsePanHandlers={collapsePanResponder.panHandlers}
                     />
