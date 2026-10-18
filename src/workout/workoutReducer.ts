@@ -208,8 +208,12 @@ export function activeWorkoutReducer(
                     let weight = set.weight;
                     let reps = set.reps;
                     if (completed) {
-                        if (!weight && set.previous) weight = String(set.previous.weight);
-                        if (!reps && set.previous) reps = String(set.previous.reps);
+                        if (!weight && set.previous && set.previous.weight > 0) {
+                            weight = String(set.previous.weight);
+                        }
+                        if (!reps && set.previous && set.previous.reps > 0) {
+                            reps = String(set.previous.reps);
+                        }
                     }
                     return { ...set, completed, weight, reps };
                 });

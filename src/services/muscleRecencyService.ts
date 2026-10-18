@@ -8,9 +8,9 @@ import {
     NEUTRAL_MUSCLE_RECENCY,
 } from '../workout/muscleGroups';
 import { StoredCompletedWorkout } from '../workout/workoutHistoryTypes';
+import { getCompletedWorkouts } from './workoutHistoryService';
 
 const RECENCY_CACHE_KEY = '@plates/muscle-recency/v1';
-const COMPLETED_KEY = '@plates/workout-completed/v1';
 
 function scopedKey(base: string, userId?: string | null): string {
     return userId ? `${base}:${userId}` : base;
@@ -29,13 +29,7 @@ function resolveExerciseBodyPart(exerciseId: string, name: string, bodyPart?: st
 }
 
 async function loadCompletedWorkouts(userId?: string | null): Promise<StoredCompletedWorkout[]> {
-    try {
-        const raw = await AsyncStorage.getItem(scopedKey(COMPLETED_KEY, userId));
-        if (!raw) return [];
-        return JSON.parse(raw) as StoredCompletedWorkout[];
-    } catch {
-        return [];
-    }
+    return getCompletedWorkouts(userId);
 }
 
 export function computeMuscleRecencyFromWorkouts(

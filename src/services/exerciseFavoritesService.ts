@@ -16,7 +16,7 @@ export const getFavoriteExercises = async (): Promise<Exercise[]> => {
         // First get the favorite exercise IDs
         const { data: favoritesData, error: favoritesError } = await supabase
             .from('user_exercise_favorites')
-            .select('exercise_id')
+            .select('exercise_id, exercise_name, body_part')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false });
 
@@ -29,34 +29,17 @@ export const getFavoriteExercises = async (): Promise<Exercise[]> => {
             return [];
         }
 
-        // Get the actual exercise details from exercises
-        const exerciseIds = favoritesData.map((item: any) => item.exercise_id);
-        const { data: exercisesData, error: exercisesError } = await supabase
-            .from('exercises')
-            .select('id, Title')
-            .in('id', exerciseIds);
-
-        if (exercisesError) {
-            console.error('Error fetching favorite exercise details:', exercisesError);
-            return [];
-        }
-
-        if (!exercisesData || exercisesData.length === 0) {
-            return [];
-        }
-
-        // Map the data to Exercise interface
-        const favorites = exercisesData
-            .map((exercise: any) => {
-                if (!exercise || !exercise.Title) return null;
+        return favoritesData
+            .map((row: { exercise_id?: string; exercise_name?: string | null; body_part?: string | null }) => {
+                const id = row.exercise_id?.toString() || '';
+                if (!id) return null;
                 return {
-                    id: exercise.id?.toString() || exercise.Title,
-                    name: exercise.Title || '',
+                    id,
+                    name: row.exercise_name?.trim() || id,
+                    bodyPart: row.body_part ?? undefined,
                 };
             })
             .filter((exercise: Exercise | null): exercise is Exercise => exercise !== null);
-
-        return favorites;
     } catch (error) {
         console.error('Exception in getFavoriteExercises:', error);
         return [];
@@ -66,7 +49,10 @@ export const getFavoriteExercises = async (): Promise<Exercise[]> => {
 /**
  * Add an exercise to favorites
  */
-export const addFavoriteExercise = async (exerciseId: string): Promise<boolean> => {
+export const addFavoriteExercise = async (
+    exerciseId: string,
+    details?: { name?: string; bodyPart?: string }
+): Promise<boolean> => {
     try {
         const { data: { user } } = await supabase.auth.getUser();
         
@@ -93,6 +79,8 @@ export const addFavoriteExercise = async (exerciseId: string): Promise<boolean> 
             .insert({
                 user_id: user.id,
                 exercise_id: exerciseId,
+                exercise_name: details?.name ?? null,
+                body_part: details?.bodyPart ?? null,
             });
 
         if (error) {

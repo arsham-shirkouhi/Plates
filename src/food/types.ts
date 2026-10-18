@@ -4,15 +4,14 @@ export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 
 export const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 
-/** Fill / wash / selected text — same hues as the food-log meal cards. */
-export const MEAL_TAG_COLORS: Record<
-    MealType,
-    { fill: string; wash: string; ink: string }
-> = {
-    breakfast: { fill: '#F9C117', wash: '#FFF6C8', ink: '#252525' },
-    lunch: { fill: '#FF8C42', wash: '#FFE6D4', ink: '#FFFFFF' },
-    dinner: { fill: '#526EFF', wash: '#EAEEFF', ink: '#FFFFFF' },
-    snack: { fill: '#22C55E', wash: '#D8FCE6', ink: '#FFFFFF' },
+export const MEAL_CHIP_FILL = '#526EFF';
+export const MEAL_CHIP_WASH = '#EAEEFF';
+
+export const MEAL_TAG_ICONS: Record<MealType, 'sunny-outline' | 'partly-sunny-outline' | 'moon-outline' | 'cafe-outline'> = {
+    breakfast: 'sunny-outline',
+    lunch: 'partly-sunny-outline',
+    dinner: 'moon-outline',
+    snack: 'cafe-outline',
 };
 
 export interface LoggedFoodEntry {

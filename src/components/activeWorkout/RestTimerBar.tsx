@@ -14,12 +14,22 @@ import { WORKOUT_COLORS } from '../../workout/constants';
 import { formatRestDuration } from '../../workout/workoutSelectors';
 import { Confetti, ConfettiParticle } from '../Confetti';
 
+const REST_PRESETS = [60, 90, 120] as const;
+
+function presetLabel(seconds: number): string {
+    const minutes = Math.floor(seconds / 60);
+    const rest = seconds % 60;
+    return `${minutes}:${rest.toString().padStart(2, '0')}`;
+}
+
 interface RestTimerBarProps {
     visible: boolean;
     remainingSeconds: number;
+    durationSeconds?: number;
     progress: SharedValue<number>;
     celebrateAt?: number;
     onAdjust: (deltaSeconds: number) => void;
+    onSetDuration: (seconds: number) => void;
     onSkip: () => void;
 }
 
@@ -32,10 +42,18 @@ interface PressButtonProps {
     onPress: () => void;
     buttonStyle: object;
     textStyle: object;
+    containerStyle?: object;
     hitSlop?: { top: number; bottom: number; left: number; right: number };
 }
 
-const PressButton: React.FC<PressButtonProps> = ({ label, onPress, buttonStyle, textStyle, hitSlop }) => {
+const PressButton: React.FC<PressButtonProps> = ({
+    label,
+    onPress,
+    buttonStyle,
+    textStyle,
+    containerStyle,
+    hitSlop,
+}) => {
     const translateY = useRef(new Animated.Value(0)).current;
     const shadowOpacity = useRef(new Animated.Value(1)).current;
 
@@ -74,7 +92,7 @@ const PressButton: React.FC<PressButtonProps> = ({ label, onPress, buttonStyle, 
     };
 
     return (
-        <View style={styles.pressWrap}>
+        <View style={[styles.pressWrap, containerStyle]}>
             <Animated.View style={[styles.pressShadow, { opacity: shadowOpacity }]} pointerEvents="none" />
             <TouchableOpacity
                 onPress={onPress}
@@ -94,9 +112,11 @@ const PressButton: React.FC<PressButtonProps> = ({ label, onPress, buttonStyle, 
 export const RestTimerBar: React.FC<RestTimerBarProps> = ({
     visible,
     remainingSeconds,
+    durationSeconds = 0,
     progress,
     celebrateAt = 0,
     onAdjust,
+    onSetDuration,
     onSkip,
 }) => {
     const [mounted, setMounted] = useState(visible);
@@ -226,6 +246,22 @@ export const RestTimerBar: React.FC<RestTimerBarProps> = ({
                     </View>
                 </View>
 
+                    <View style={styles.presetRow}>
+                        {REST_PRESETS.map((seconds) => {
+                            const selected = durationSeconds === seconds;
+                            return (
+                                <PressButton
+                                    key={seconds}
+                                    label={presetLabel(seconds)}
+                                    containerStyle={styles.presetSlot}
+                                    buttonStyle={selected ? styles.presetButtonOn : styles.presetButton}
+                                    textStyle={selected ? styles.presetTextOn : styles.presetText}
+                                    onPress={() => onSetDuration(seconds)}
+                                />
+                            );
+                        })}
+                    </View>
+
                     <View style={styles.progressTrack}>
                         <Reanimated.View style={[styles.progressFill, fillStyle]} />
                     </View>
@@ -335,6 +371,44 @@ const styles = StyleSheet.create({
         backgroundColor: WORKOUT_COLORS.accent,
     },
     skipText: {
+        fontFamily: fonts.bold,
+        fontSize: 13,
+        color: '#fff',
+    },
+    presetRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    presetSlot: {
+        flex: 1,
+    },
+    presetButton: {
+        width: '100%',
+        paddingVertical: 8,
+        borderRadius: 10,
+        borderWidth: 2,
+        borderColor: '#252525',
+        backgroundColor: '#FFFFFF',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    presetButtonOn: {
+        width: '100%',
+        paddingVertical: 8,
+        borderRadius: 10,
+        borderWidth: 2,
+        borderColor: '#252525',
+        backgroundColor: WORKOUT_COLORS.accent,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    presetText: {
+        fontFamily: fonts.bold,
+        fontSize: 13,
+        color: WORKOUT_COLORS.accent,
+    },
+    presetTextOn: {
         fontFamily: fonts.bold,
         fontSize: 13,
         color: '#fff',

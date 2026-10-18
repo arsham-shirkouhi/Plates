@@ -12,6 +12,9 @@ import { buildWorkoutExercisesFromExerciseTemplates } from '../workout/mockWorko
 import { WorkoutExercise } from '../workout/types';
 
 const MAX_EXERCISES = 6;
+/** Browse list on the pick-exercises screen. Recommended lifts stay first. */
+const PICK_CATALOG_LIMIT = 36;
+const PICK_PER_MUSCLE = 24;
 
 type ExerciseCandidate = {
     exerciseId: string;
@@ -111,6 +114,32 @@ async function buildLibraryForGroups(selectedGroups: MuscleGroup[]): Promise<Exe
     // Fallback: broad list from WorkoutX / Supabase / mocks.
     const broad = await getExercisesList(100, 0);
     return broad.length > 0 ? broad : MOCK_EXERCISES;
+}
+
+/** Longer catalog for the muscles the user tapped, mixed evenly across groups. */
+export async function listExercisesForMuscleGroups(
+    selectedGroups: MuscleGroup[]
+): Promise<Exercise[]> {
+    if (selectedGroups.length === 0) return [];
+
+    const buckets = await Promise.all(
+        selectedGroups.map((group) => getExercisesForMuscleGroup(group, PICK_PER_MUSCLE))
+    );
+    const merged: Exercise[] = [];
+    const seen = new Set<string>();
+    const depth = Math.max(0, ...buckets.map((bucket) => bucket.length));
+
+    for (let index = 0; index < depth && merged.length < PICK_CATALOG_LIMIT; index += 1) {
+        for (const bucket of buckets) {
+            if (merged.length >= PICK_CATALOG_LIMIT) break;
+            const exercise = bucket[index];
+            if (!exercise || seen.has(exercise.id)) continue;
+            seen.add(exercise.id);
+            merged.push(exercise);
+        }
+    }
+
+    return merged;
 }
 
 export async function countExercisesForMuscleGroups(

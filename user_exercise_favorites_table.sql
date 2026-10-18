@@ -1,5 +1,5 @@
--- Create user_exercise_favorites table
--- Run this SQL in your Supabase SQL Editor
+-- Favorites now live in supabase/migrations/20261018_workout_history.sql,
+-- which also stores exercise_name and body_part. This file is the earlier draft.
 
 CREATE TABLE IF NOT EXISTS user_exercise_favorites (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

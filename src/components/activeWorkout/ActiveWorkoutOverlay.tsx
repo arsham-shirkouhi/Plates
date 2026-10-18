@@ -384,9 +384,11 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
                 <RestTimerBar
                     visible={isFullscreen && isRunning}
                     remainingSeconds={remainingSeconds}
+                    durationSeconds={state.restTimer?.durationSeconds}
                     progress={progress}
                     celebrateAt={restCelebrateAt}
                     onAdjust={adjustRestTimer}
+                    onSetDuration={applyRestDuration}
                     onSkip={skipRestTimer}
                 />
             </View>

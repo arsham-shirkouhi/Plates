@@ -16,7 +16,6 @@ import Reanimated, {
     FadeIn,
     FadeOut,
     interpolate,
-    Keyframe,
     LinearTransition,
     useAnimatedStyle,
     useSharedValue,
@@ -24,8 +23,9 @@ import Reanimated, {
 } from 'react-native-reanimated';
 import { fonts } from '../../constants/fonts';
 import { PICK_WORKOUT_LAYOUT, WORKOUT_COLORS } from '../../workout/constants';
-import { MUSCLE_GROUP_LABELS, MuscleGroup, mapBodyPartToMuscleGroup } from '../../workout/muscleGroups';
+import { MUSCLE_GROUP_LABELS, mapBodyPartToMuscleGroup } from '../../workout/muscleGroups';
 import { WorkoutExercise, WorkoutSet } from '../../workout/types';
+import { listExercisesForMuscleGroups } from '../../services/workoutAssemblyService';
 import { getLastExercisePreviousSets } from '../../services/workoutHistoryService';
 import { searchExercises, Exercise } from '../../services/exerciseService';
 import { createUniqueId } from '../../workout/workoutSelectors';
@@ -45,22 +45,7 @@ const expandEase = Easing.inOut(Easing.cubic);
 const cardLayout = LinearTransition.duration(EDIT_MS).easing(expandEase);
 const editFadeIn = FadeIn.duration(EDIT_MS).easing(expandEase);
 const editFadeOut = FadeOut.duration(EDIT_MS).easing(expandEase);
-
-/** Recommended rows land one at a time after the screen arrives. */
-const recEnter = new Keyframe({
-    0: {
-        opacity: 0,
-        transform: [{ translateY: 18 }, { scale: 0.97 }],
-    },
-    100: {
-        opacity: 1,
-        transform: [{ translateY: 0 }, { scale: 1 }],
-        easing: Easing.out(Easing.cubic),
-    },
-}).duration(320);
-
-const REVEAL_START_MS = 220;
-const REVEAL_STAGGER_MS = 150;
+const rowEnter = FadeIn.duration(220).easing(Easing.out(Easing.cubic));
 
 const DEFAULT_SETS = 3;
 const DEFAULT_REPS = 10;
@@ -134,10 +119,9 @@ function formatExerciseMeta(exercise: WorkoutExercise): string {
 }
 
 function bodyPartForExercise(exercise: WorkoutExercise): string {
-    const muscle =
-        mapBodyPartToMuscleGroup(undefined, exercise.name) ??
-        ('chest' as MuscleGroup);
-    return MUSCLE_GROUP_LABELS[muscle];
+    const muscle = mapBodyPartToMuscleGroup(exercise.bodyPart, exercise.name);
+    if (muscle) return MUSCLE_GROUP_LABELS[muscle];
+    return exercise.bodyPart?.toLowerCase() ?? '';
 }
 
 function namesMatch(a: string, b: string) {
@@ -263,42 +247,51 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
     onStartWorkout,
 }) => {
     const { user } = useAuth();
-    const [catalog, setCatalog] = useState<WorkoutExercise[]>(() =>
-        pending.exercises.map((exercise) => withDefaults(exercise))
-    );
-    const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
-    const [revealedIds, setRevealedIds] = useState<Set<string>>(() => new Set());
-    const [introDone, setIntroDone] = useState(false);
+    const seeded = useRef<{ catalog: WorkoutExercise[]; selected: Set<string> } | null>(null);
+    if (seeded.current === null) {
+        const nextCatalog = pending.exercises.map((exercise) => withDefaults(exercise));
+        seeded.current = {
+            catalog: nextCatalog,
+            selected: new Set(nextCatalog.map((exercise) => exercise.id)),
+        };
+    }
+    const [catalog, setCatalog] = useState<WorkoutExercise[]>(seeded.current.catalog);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(seeded.current.selected);
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<Exercise[]>([]);
     const [searching, setSearching] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
 
     useEffect(() => {
-        const ids = catalog.map((item) => item.id);
-        const timers = ids.map((id, index) =>
-            setTimeout(() => {
-                setRevealedIds((current) => {
-                    if (current.has(id)) return current;
-                    const next = new Set(current);
-                    next.add(id);
-                    return next;
+        let cancelled = false;
+        listExercisesForMuscleGroups(pending.selectedMuscles)
+            .then((found) => {
+                if (cancelled || found.length === 0) return;
+                setCatalog((current) => {
+                    const knownIds = new Set(current.map((exercise) => exercise.exerciseId));
+                    const knownNames = new Set(
+                        current.map((exercise) => exercise.name.trim().toLowerCase())
+                    );
+                    const extras = found
+                        .filter((exercise) => {
+                            const name = exercise.name.trim().toLowerCase();
+                            return !knownIds.has(exercise.id) && !knownNames.has(name);
+                        })
+                        .map((exercise) => ({
+                            ...withDefaults({ exerciseId: exercise.id, name: exercise.name }),
+                            bodyPart: exercise.bodyPart,
+                        }));
+                    if (extras.length === 0) return current;
+                    return [...current, ...extras];
                 });
-            }, REVEAL_START_MS + index * REVEAL_STAGGER_MS)
-        );
-
-        const introTimer = setTimeout(
-            () => setIntroDone(true),
-            REVEAL_START_MS + ids.length * REVEAL_STAGGER_MS + 320
-        );
-
+            })
+            .catch(() => {
+                // The recommended rows are already on screen.
+            });
         return () => {
-            timers.forEach(clearTimeout);
-            clearTimeout(introTimer);
+            cancelled = true;
         };
-        // Intro cascade only on first mount.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [pending.selectedMuscles]);
 
     const toggleEditing = useCallback((id: string) => {
         Haptics.selectionAsync();
@@ -373,11 +366,6 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
                 next.add(built.id);
                 return next;
             });
-            setRevealedIds((current) => {
-                const next = new Set(current);
-                next.add(built.id);
-                return next;
-            });
         },
         [catalog, toggleSelect, user?.id]
     );
@@ -445,10 +433,7 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
     );
 
     const visibleRows = useMemo(() => {
-        const source =
-            isSearching || introDone
-                ? catalog
-                : catalog.filter((item) => revealedIds.has(item.id));
+        const source = catalog;
 
         if (!isSearching) return source;
 
@@ -457,7 +442,7 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
         const selected = matches.filter((item) => selectedIds.has(item.id));
         const rest = matches.filter((item) => !selectedIds.has(item.id));
         return [...selected, ...rest];
-    }, [catalog, introDone, isSearching, revealedIds, selectedIds, trimmedQuery]);
+    }, [catalog, isSearching, selectedIds, trimmedQuery]);
 
     const extraSearchResults = useMemo(() => {
         if (!isSearching) return [];
@@ -471,7 +456,7 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
         onStartWorkout({ title: pending.title, exercises: added });
     };
 
-    const startLabel = added.length > 0 ? 'start workout' : 'start empty workout';
+    const startLabel = added.length > 0 ? 'start' : 'start empty workout';
     const showSearchEmpty =
         isSearching &&
         !searching &&
@@ -533,7 +518,7 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
                             <Reanimated.View
                                 key={item.id}
                                 layout={cardLayout}
-                                entering={introDone || isSearching ? undefined : recEnter}
+                                entering={rowEnter}
                                 style={styles.itemWrapper}
                             >
                                 <SelectExerciseRow

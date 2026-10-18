@@ -12,9 +12,13 @@ import { useAuth } from '../../context/AuthContext';
 import { useWorkoutOverlay } from '../../contexts/WorkoutOverlayContext';
 import { useMuscleRecency } from '../../hooks/useMuscleRecency';
 import { assembleWorkoutFromMuscleGroups } from '../../services/workoutAssemblyService';
+import { getCompletedWorkouts, getWorkoutPresets } from '../../services/workoutHistoryService';
 import { PICK_WORKOUT_LAYOUT, WORKOUT_COLORS } from '../../workout/constants';
-import { MuscleGroup } from '../../workout/muscleGroups';
+import { MUSCLE_GROUP_LABELS, MuscleGroup } from '../../workout/muscleGroups';
+import { getMostOverdueMuscle } from '../../workout/muscleSelectSelectors';
+import { buildWorkoutExercisesFromExerciseTemplates } from '../../workout/mockWorkoutData';
 import { StartWorkoutRoutine } from '../../workout/startWorkoutTypes';
+import { StoredWorkoutPreset } from '../../workout/workoutHistoryTypes';
 import { WorkoutExercise } from '../../workout/types';
 import { ScrollingGridBackground } from '../ScrollingGridBackground';
 import { BODY_MAP_VIEWBOX } from '../startWorkout/bodyMapPaths';
@@ -41,16 +45,46 @@ interface PickWorkoutScreenProps {
     onReviewWorkout: (pending: PendingReviewWorkout) => void;
     onStartRoutine: (routine: StartWorkoutRoutine) => void;
     onStartEmpty: () => void;
+    onRepeatLast: (payload: { title: string; exercises: WorkoutExercise[] }) => void;
+}
+
+function startLabel(title: string): string {
+    const cleaned = title.replace(/\s*workout\s*$/i, '').trim();
+    return `start ${(cleaned || title).toLowerCase()}`;
+}
+
+function sameWorkout(
+    preset: StoredWorkoutPreset,
+    last: { title: string; exercises: Array<{ exerciseId: string; name: string }> } | null
+): boolean {
+    if (!last) return false;
+    const presetTitle = preset.title.trim().toLowerCase();
+    const lastTitle = last.title.trim().toLowerCase();
+    if (presetTitle && presetTitle === lastTitle) return true;
+
+    const presetIds = preset.exercises.map(
+        (exercise) => exercise.exerciseId || exercise.name.trim().toLowerCase()
+    );
+    const lastIds = new Set(
+        last.exercises.map((exercise) => exercise.exerciseId || exercise.name.trim().toLowerCase())
+    );
+    return (
+        presetIds.length > 0 &&
+        presetIds.length === lastIds.size &&
+        presetIds.every((id) => lastIds.has(id))
+    );
 }
 
 export const PickWorkoutScreen: React.FC<PickWorkoutScreenProps> = ({
     onReviewWorkout,
     onStartEmpty,
+    onRepeatLast,
 }) => {
     const { user } = useAuth();
     const { close: closeWorkoutOverlay } = useWorkoutOverlay();
     const insets = useSafeAreaInsets();
-    const { recency } = useMuscleRecency(user?.id);
+    const { recency, hasHistory } = useMuscleRecency(user?.id);
+    const [nextRoutine, setNextRoutine] = useState<StoredWorkoutPreset | null>(null);
 
     const [side, setSide] = useState<BodySide>('front');
     const [renderSide, setRenderSide] = useState<BodySide>('front');
@@ -69,6 +103,32 @@ export const PickWorkoutScreen: React.FC<PickWorkoutScreenProps> = ({
     const flipAnimating = useRef(false);
 
     const hasSelection = selectedMuscles.length > 0;
+
+    useEffect(() => {
+        let cancelled = false;
+        Promise.all([getCompletedWorkouts(user?.id), getWorkoutPresets(user?.id)]).then(
+            ([workouts, presets]) => {
+                if (cancelled) return;
+                const sorted = [...workouts].sort(
+                    (a, b) => Date.parse(b.completedAt) - Date.parse(a.completedAt)
+                );
+                const latest = sorted[0] ?? null;
+                const candidates = presets.filter(
+                    (preset) => preset.exercises.length > 0 && !sameWorkout(preset, latest)
+                );
+                const lastDoneAt = (preset: StoredWorkoutPreset) => {
+                    const title = preset.title.trim().toLowerCase();
+                    const match = sorted.find((workout) => workout.title.trim().toLowerCase() === title);
+                    return match ? Date.parse(match.completedAt) : 0;
+                };
+                const next = [...candidates].sort((a, b) => lastDoneAt(a) - lastDoneAt(b))[0] ?? null;
+                setNextRoutine(next);
+            }
+        );
+        return () => {
+            cancelled = true;
+        };
+    }, [user?.id]);
 
     const innerFigureWidth = Math.max(
         0,
@@ -232,30 +292,60 @@ export const PickWorkoutScreen: React.FC<PickWorkoutScreenProps> = ({
         setFigureLayout({ width, height });
     };
 
-    const handlePrimaryPress = async () => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-        // Body parts selected → go to the exercise-selection page for those
-        // muscle groups (pulls saved/known exercises for each body part).
-        if (selectedMuscles.length > 0) {
-            if (isReviewLoading) return;
+    const openReview = useCallback(
+        async (muscles: MuscleGroup[]) => {
+            if (muscles.length === 0 || isReviewLoading) return;
             setIsReviewLoading(true);
             try {
-                const assembled = await assembleWorkoutFromMuscleGroups(selectedMuscles, user?.id);
+                const assembled = await assembleWorkoutFromMuscleGroups(muscles, user?.id);
                 onReviewWorkout({
-                    selectedMuscles,
+                    selectedMuscles: muscles,
                     title: assembled.title,
                     exercises: assembled.exercises,
                 });
             } finally {
                 setIsReviewLoading(false);
             }
+        },
+        [isReviewLoading, onReviewWorkout, user?.id]
+    );
+
+    const handlePrimaryPress = async () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+        // Body parts selected → go to the exercise-selection page for those
+        // muscle groups (pulls saved/known exercises for each body part).
+        if (selectedMuscles.length > 0) {
+            await openReview(selectedMuscles);
             return;
         }
 
         // Nothing selected → jump straight into a blank workout.
         onStartEmpty();
     };
+
+    const overdueMuscle = getMostOverdueMuscle(recency);
+    const overdueDays = overdueMuscle ? recency[overdueMuscle] : null;
+    const shortcut = nextRoutine
+        ? {
+              label: startLabel(nextRoutine.title),
+              onPress: () => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  onRepeatLast({
+                      title: nextRoutine.title,
+                      exercises: buildWorkoutExercisesFromExerciseTemplates(nextRoutine.exercises),
+                  });
+              },
+          }
+        : hasHistory && overdueMuscle && overdueDays !== null && overdueDays >= 3
+          ? {
+                label: `${MUSCLE_GROUP_LABELS[overdueMuscle]} is overdue`,
+                onPress: () => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    void openReview([overdueMuscle]);
+                },
+            }
+          : null;
 
     return (
         <View style={styles.screen}>
@@ -347,6 +437,7 @@ export const PickWorkoutScreen: React.FC<PickWorkoutScreenProps> = ({
 
                 <PickWorkoutBottomBar
                     selectedMuscles={selectedMuscles}
+                    shortcut={shortcut}
                     onPrimaryPress={handlePrimaryPress}
                 />
             </View>

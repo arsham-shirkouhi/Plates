@@ -308,54 +308,86 @@ export const getDailySummariesRange = async (
     }
 };
 
+const inFlightDailyTaskCopies = new Map<string, Promise<void>>();
+
+const getYesterdayDateString = (today: string): string => {
+    const [year, month, day] = today.split('-').map(Number);
+    const yesterday = new Date(year, month - 1, day - 1);
+    const y = yesterday.getFullYear();
+    const m = String(yesterday.getMonth() + 1).padStart(2, '0');
+    const d = String(yesterday.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+};
+
 /**
  * Copy incomplete tasks from yesterday to today if today has no tasks
  * @param user - Supabase user
  */
 export const copyDailyTasksFromYesterday = async (user: User): Promise<void> => {
+    const today = getTodayDateString();
+    const copyKey = `${user.id}:${today}`;
+    const inFlight = inFlightDailyTaskCopies.get(copyKey);
+    if (inFlight) {
+        return inFlight;
+    }
+
+    const copyPromise = (async () => {
+        try {
+            const todayTasks = await getDailyTasks(user, today);
+            if (todayTasks.length > 0) {
+                return;
+            }
+
+            const yesterday = getYesterdayDateString(today);
+            const yesterdayTasks = await getDailyTasks(user, yesterday);
+            const incompleteTasks = yesterdayTasks.filter(task => !task.is_completed);
+
+            if (incompleteTasks.length === 0) {
+                return;
+            }
+
+            const seenTitles = new Set<string>();
+            const tasksToInsert = [];
+            for (const task of incompleteTasks) {
+                const title = task.title.trim();
+                if (!title || seenTitles.has(title)) {
+                    continue;
+                }
+                seenTitles.add(title);
+                tasksToInsert.push({
+                    user_id: user.id,
+                    log_date: today,
+                    title,
+                    is_completed: false,
+                    completed_at: null,
+                });
+            }
+
+            if (tasksToInsert.length === 0) {
+                return;
+            }
+
+            const { error } = await supabase
+                .from('daily_tasks')
+                .upsert(tasksToInsert, {
+                    onConflict: 'user_id,log_date,title',
+                    ignoreDuplicates: true,
+                });
+
+            if (error && error.code !== '23505') {
+                throw error;
+            }
+        } catch (error) {
+            console.error('Error copying daily tasks from yesterday:', error);
+            // Don't throw - allow the app to continue even if copy fails
+        }
+    })();
+
+    inFlightDailyTaskCopies.set(copyKey, copyPromise);
     try {
-        const today = getTodayDateString();
-        
-        // Check if today already has tasks
-        const todayTasks = await getDailyTasks(user, today);
-        if (todayTasks.length > 0) {
-            // Today already has tasks, don't copy
-            return;
-        }
-
-        // Get yesterday's date
-        const todayDate = new Date(today);
-        todayDate.setDate(todayDate.getDate() - 1);
-        const yesterday = todayDate.toISOString().split('T')[0];
-
-        // Get yesterday's incomplete tasks
-        const yesterdayTasks = await getDailyTasks(user, yesterday);
-        const incompleteTasks = yesterdayTasks.filter(task => !task.is_completed);
-
-        if (incompleteTasks.length === 0) {
-            // No incomplete tasks to copy
-            return;
-        }
-
-        // Copy incomplete tasks to today (reset completion status)
-        const tasksToInsert = incompleteTasks.map(task => ({
-            user_id: user.id,
-            log_date: today,
-            title: task.title,
-            is_completed: false,
-            completed_at: null,
-        }));
-
-        const { error } = await supabase
-            .from('daily_tasks')
-            .insert(tasksToInsert);
-
-        if (error) {
-            throw error;
-        }
-    } catch (error) {
-        console.error('Error copying daily tasks from yesterday:', error);
-        // Don't throw - allow the app to continue even if copy fails
+        await copyPromise;
+    } finally {
+        inFlightDailyTaskCopies.delete(copyKey);
     }
 };
 

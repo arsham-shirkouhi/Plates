@@ -94,10 +94,14 @@ export const ActiveWorkoutScreen: React.FC = () => {
     );
 
     const queueWorkoutStart = useCallback((pending: PendingStart) => {
+        if (!pending.exercises || pending.exercises.length === 0) {
+            startWorkoutDirect(pending);
+            return;
+        }
         pendingStartRef.current = pending;
         launchedWorkoutRef.current = false;
         setShowCountdown(true);
-    }, []);
+    }, [startWorkoutDirect]);
 
     const coverWithWorkout = useCallback(() => {
         if (launchedWorkoutRef.current) return;
@@ -275,6 +279,7 @@ export const ActiveWorkoutScreen: React.FC = () => {
                         }}
                         onStartRoutine={handleStartFromRoutine}
                         onStartEmpty={() => queueWorkoutStart({ title: 'workout' })}
+                        onRepeatLast={queueWorkoutStart}
                         onBack={() => setLogWorkoutStep('pick')}
                         onReviewExited={() => setPendingReview(null)}
                         onStartWorkout={queueWorkoutStart}

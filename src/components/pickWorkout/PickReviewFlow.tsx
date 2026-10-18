@@ -24,6 +24,7 @@ interface PickReviewFlowProps {
     onReviewWorkout: (pending: PendingReviewWorkout) => void;
     onStartRoutine: (routine: StartWorkoutRoutine) => void;
     onStartEmpty: () => void;
+    onRepeatLast: (payload: { title: string; exercises: WorkoutExercise[] }) => void;
     onBack: () => void;
     onReviewExited: () => void;
     onStartWorkout: (payload: { title: string; exercises: WorkoutExercise[] }) => void;
@@ -35,6 +36,7 @@ export const PickReviewFlow: React.FC<PickReviewFlowProps> = ({
     onReviewWorkout,
     onStartRoutine,
     onStartEmpty,
+    onRepeatLast,
     onBack,
     onReviewExited,
     onStartWorkout,
@@ -100,6 +102,7 @@ export const PickReviewFlow: React.FC<PickReviewFlowProps> = ({
                     onReviewWorkout={onReviewWorkout}
                     onStartRoutine={onStartRoutine}
                     onStartEmpty={onStartEmpty}
+                    onRepeatLast={onRepeatLast}
                 />
                 <Reanimated.View
                     pointerEvents="none"

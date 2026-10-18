@@ -134,14 +134,16 @@ export const SetRow: React.FC<SetRowProps> = ({
                     onChange({ weight: value });
                 }}
                 onBlur={() => {
-                    if (!weightDraft && set.previous) {
+                    if (!weightDraft && set.previous && set.previous.weight > 0) {
                         const next = String(set.previous.weight);
                         setWeightDraft(next);
                         onChange({ weight: next });
                     }
                 }}
                 keyboardType="decimal-pad"
-                placeholder={set.previous ? String(set.previous.weight) : '0'}
+                placeholder={
+                    set.previous && set.previous.weight > 0 ? String(set.previous.weight) : ''
+                }
                 placeholderTextColor={WORKOUT_COLORS.placeholder}
                 editable={!set.completed}
             />
@@ -154,14 +156,16 @@ export const SetRow: React.FC<SetRowProps> = ({
                     onChange({ reps: value });
                 }}
                 onBlur={() => {
-                    if (!repsDraft && set.previous) {
+                    if (!repsDraft && set.previous && set.previous.reps > 0) {
                         const next = String(set.previous.reps);
                         setRepsDraft(next);
                         onChange({ reps: next });
                     }
                 }}
                 keyboardType="number-pad"
-                placeholder={set.previous ? String(set.previous.reps) : '0'}
+                placeholder={
+                    set.previous && set.previous.reps > 0 ? String(set.previous.reps) : ''
+                }
                 placeholderTextColor={WORKOUT_COLORS.placeholder}
                 editable={!set.completed}
             />

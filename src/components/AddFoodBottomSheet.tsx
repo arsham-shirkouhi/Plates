@@ -27,7 +27,8 @@ import { BarcodeScannerModal } from './BarcodeScannerModal';
 import { PhotoMealReviewModal } from './PhotoMealReviewModal';
 import { useOverlay } from '../contexts/OverlayContext';
 import { HardSearchBar } from './ui/HardSearchBar';
-import { MealType, MEAL_TAG_COLORS } from '../food/types';
+import { MealTypeChips } from './ui/MealTypeChips';
+import { MealType } from '../food/types';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 
@@ -854,37 +855,11 @@ export const AddFoodBottomSheet: React.FC<AddFoodBottomSheetProps> = ({
                                     </View>
 
                                     {/* Meal Selection Pills */}
-                                    <View style={styles.mealButtonsContainer}>
-                                        {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map((meal) => {
-                                            const isSelected = selectedMeal === meal;
-                                            const colors = MEAL_TAG_COLORS[meal];
-
-                                            return (
-                                                <TouchableOpacity
-                                                    key={meal}
-                                                    style={[
-                                                        styles.mealButton,
-                                                        meal === 'breakfast' && styles.mealButtonBreakfast,
-                                                        {
-                                                            backgroundColor: isSelected ? colors.fill : colors.wash,
-                                                            borderColor: colors.fill,
-                                                        },
-                                                    ]}
-                                                    onPress={() => handleMealPress(meal)}
-                                                    activeOpacity={0.7}
-                                                >
-                                                    <Text
-                                                        style={[
-                                                            styles.mealButtonText,
-                                                            { color: isSelected ? colors.ink : colors.fill },
-                                                        ]}
-                                                    >
-                                                        {meal === 'snack' ? 'snacks' : meal}
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            );
-                                        })}
-                                    </View>
+                                    <MealTypeChips
+                                        selected={selectedMeal}
+                                        onSelect={handleMealPress}
+                                        style={styles.mealButtonsContainer}
+                                    />
                                 </View>
 
                                 {/* Quick Add List */}
@@ -1214,28 +1189,8 @@ const styles = StyleSheet.create({
     },
     mealButtonsContainer: {
         flexDirection: 'row',
-        gap: 8,
-        marginTop: 12,
-        paddingTop: 12,
-    },
-    mealButton: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#fff',
-        borderRadius: 10,
-        borderWidth: 2,
-        paddingVertical: 10,
-        paddingHorizontal: 8,
-        minHeight: 38,
-    },
-    mealButtonBreakfast: {
-        flex: 1.25,
-    },
-    mealButtonText: {
-        fontSize: 13,
-        fontFamily: fonts.bold,
-        textTransform: 'lowercase',
+        flexWrap: 'nowrap',
+        gap: 6,
     },
     aiSuggestionContainer: {
         position: 'absolute',

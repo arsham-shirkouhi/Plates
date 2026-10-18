@@ -34,8 +34,8 @@ import { ExerciseGif } from './ExerciseGif';
 import { scanExerciseEquipment } from '../services/equipmentScanService';
 import Reanimated, {
     Easing as ReanimatedEasing,
+    FadeIn,
     interpolate,
-    Keyframe,
     runOnJS,
     useAnimatedStyle,
     useSharedValue,
@@ -45,21 +45,8 @@ import Reanimated, {
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
-
-const recEnter = new Keyframe({
-    0: {
-        opacity: 0,
-        transform: [{ translateY: 18 }, { scale: 0.97 }],
-    },
-    100: {
-        opacity: 1,
-        transform: [{ translateY: 0 }, { scale: 1 }],
-        easing: ReanimatedEasing.out(ReanimatedEasing.cubic),
-    },
-}).duration(320);
-
-const REVEAL_START_MS = 220;
-const REVEAL_STAGGER_MS = 150;
+const EXERCISE_PAGE_SIZE = 40;
+const rowEnter = FadeIn.duration(220).easing(ReanimatedEasing.out(ReanimatedEasing.cubic));
 
 function createUniqueId(): string {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -347,8 +334,6 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
     const addedPulse = useRef(new Animated.Value(1)).current;
     const loadedForOpenRef = useRef(false);
     const wasVisibleRef = useRef(false);
-    const [rowIntroDone, setRowIntroDone] = useState(false);
-    const [revealedKeys, setRevealedKeys] = useState<Set<string>>(() => new Set());
     const [isScanningEquipment, setIsScanningEquipment] = useState(false);
     const [scanResultMessage, setScanResultMessage] = useState<string | null>(null);
     const [showingScanResults, setShowingScanResults] = useState(false);
@@ -362,8 +347,6 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
                 setExercises([]);
                 setOffset(0);
                 setHasMore(true);
-                setRowIntroDone(false);
-                setRevealedKeys(new Set());
                 loadExercises(0, true);
             }
             wasVisibleRef.current = true;
@@ -446,7 +429,7 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
         }
 
         try {
-            const exercisesList = await getExercisesList(20, currentOffset);
+            const exercisesList = await getExercisesList(EXERCISE_PAGE_SIZE, currentOffset);
 
             if (isInitial) {
                 setExercises(exercisesList);
@@ -455,7 +438,7 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
             }
 
             // Check if there are more exercises to load
-            setHasMore(exercisesList.length === 20);
+            setHasMore(exercisesList.length === EXERCISE_PAGE_SIZE);
             setOffset(currentOffset + exercisesList.length);
         } catch (error) {
             console.error('Error loading exercises:', error);
@@ -831,50 +814,6 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
           )
         : displayedExercises;
     const addedInView = filteredExercises.filter(isExerciseAdded).length;
-    const listedExercises = rowIntroDone
-        ? filteredExercises
-        : filteredExercises.filter((exercise, index) =>
-              revealedKeys.has(exerciseRowKey(exercise, index))
-          );
-
-    useEffect(() => {
-        if (!visible || loading || displayedExercises.length === 0 || rowIntroDone) return;
-        if (searchQuery.trim().length > 0 || bodyPartFilter) {
-            setRowIntroDone(true);
-            return;
-        }
-
-        const keys = displayedExercises.map((exercise, index) =>
-            exerciseRowKey(exercise, index)
-        );
-        const timers = keys.map((key, index) =>
-            setTimeout(() => {
-                setRevealedKeys((current) => {
-                    if (current.has(key)) return current;
-                    const next = new Set(current);
-                    next.add(key);
-                    return next;
-                });
-            }, REVEAL_START_MS + index * REVEAL_STAGGER_MS)
-        );
-        const introTimer = setTimeout(
-            () => setRowIntroDone(true),
-            REVEAL_START_MS + keys.length * REVEAL_STAGGER_MS + 320
-        );
-        return () => {
-            timers.forEach(clearTimeout);
-            clearTimeout(introTimer);
-        };
-    }, [
-        visible,
-        loading,
-        displayedExercises.length,
-        displayedExercises[0]?.id,
-        rowIntroDone,
-        searchQuery,
-        bodyPartFilter,
-    ]);
-
     const handleSelectBodyPartFilter = (
         value: string | null,
         origin?: { x: number; y: number },
@@ -1167,10 +1106,10 @@ export const AddExerciseOverlay: React.FC<AddExerciseOverlayProps> = ({
                                                     </View>
                                                 ) : (
                                                     <>
-                                                        {listedExercises.map((exercise, index) => (
+                                                        {filteredExercises.map((exercise, index) => (
                                                             <Reanimated.View
                                                                 key={exerciseRowKey(exercise, index)}
-                                                                entering={rowIntroDone ? undefined : recEnter}
+                                                                entering={rowEnter}
                                                             >
                                                                 <AnimatedExerciseRow
                                                                     exercise={exercise}

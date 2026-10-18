@@ -7,13 +7,20 @@ import { MuscleGroup } from '../../workout/muscleGroups';
 const HINT_LINE =
     'Tap muscles to pick exercises, or start an empty workout.';
 
+interface PickWorkoutShortcut {
+    label: string;
+    onPress: () => void;
+}
+
 interface PickWorkoutBottomBarProps {
     selectedMuscles: MuscleGroup[];
+    shortcut?: PickWorkoutShortcut | null;
     onPrimaryPress: () => void;
 }
 
 export const PickWorkoutBottomBar: React.FC<PickWorkoutBottomBarProps> = ({
     selectedMuscles,
+    shortcut = null,
     onPrimaryPress,
 }) => {
     const hasSelection = selectedMuscles.length > 0;
@@ -37,14 +44,26 @@ export const PickWorkoutBottomBar: React.FC<PickWorkoutBottomBarProps> = ({
     });
 
     const primaryLabel = hasSelection ? 'pick exercises' : 'start empty workout';
+    const showShortcut = !hasSelection && !!shortcut;
 
     return (
         <View style={styles.bar}>
             <View style={styles.row1}>
                 {hasSelection ? (
-                    <Text style={styles.selectionHint}>
+                    <Text style={styles.selectionHint} numberOfLines={1}>
                         tap a muscle on the left to remove
                     </Text>
+                ) : showShortcut && shortcut ? (
+                    <TouchableOpacity
+                        style={styles.shortcutHit}
+                        onPress={shortcut.onPress}
+                        accessibilityRole="button"
+                        accessibilityLabel={shortcut.label}
+                    >
+                        <Text style={styles.shortcutText} numberOfLines={1}>
+                            {shortcut.label}
+                        </Text>
+                    </TouchableOpacity>
                 ) : (
                     <Text style={styles.hintText}>{HINT_LINE}</Text>
                 )}
@@ -114,6 +133,18 @@ const styles = StyleSheet.create({
         fontFamily: fonts.regular,
         fontSize: 14,
         color: WORKOUT_COLORS.muted,
+        textTransform: 'lowercase',
+        textAlign: 'center',
+    },
+    shortcutHit: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    shortcutText: {
+        fontFamily: fonts.bold,
+        fontSize: 14,
+        color: WORKOUT_COLORS.accent,
         textTransform: 'lowercase',
         textAlign: 'center',
     },

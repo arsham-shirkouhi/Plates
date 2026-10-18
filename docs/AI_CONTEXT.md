@@ -286,6 +286,17 @@ simulator (needs Xcode), `a` = Android emulator.
 - **2026-10-05 — Cursor:** Active-workout exercise title slides down on expand and back on collapse (same motion as pick-exercises edit), while the set count fades.
 - **2026-10-05 — Cursor:** Completed exercise lines are mid-blue (`#B8C4FF` / `#8FA4FF`), lighter than the title ink.
 - **2026-10-05 — Cursor:** Add Warm-up Set inserts one W set above working sets; tap again to add another.
+- **2026-10-06 — Cursor:** Login errors: daily-task copy now upserts/ignores duplicates (Home was inserting twice); onboarding timeout no longer fires after a successful check.
+- **2026-10-06 — Cursor:** Installed `expo-asset@~57.0.19` as a direct dep and added its app.json plugin to fix "Cannot find native module ExpoAsset". Restart Metro with `-c`.
+- **2026-10-06 — Cursor:** Meal tags (add-food + food detail) are white with even widths; selected state is app blue.
+- **2026-10-06 — Cursor:** Tightened add-food meal-tag top gap to match the space above scan/take-photo.
+- **2026-10-06 — Cursor:** Meal tags now use the exercise chip (icon + wash/fill); all meals stay app blue.
+- **2026-10-17 — Cursor:** UX pass on the live workout path (home confirm → body map → pick exercises → countdown → session → wrap-up). Biggest gaps: recommended exercises start unchecked, saved/last workouts and exercise GIFs are unreachable, rest length is a hidden long-press. No code change.
+- **2026-10-17 — Cursor:** Workout feel pass, same chrome: home opens the body map with no confirm; recommended exercises start checked and the button says “start”; empty workouts skip the plate countdown; exercise title opens the GIF sheet; last weight/reps sit in the empty fields; rest bar has 1:00 / 1:30 / 2:00; body-map hint is “repeat {last}” or “{muscle} is overdue” when history exists.
+- **2026-10-17 — Cursor:** Removed the in-workout exercise demo. The card title collapses again; How to and the GIF sheet are gone from the session.
+- **2026-10-17 — Cursor:** Pick-exercises loads up to 36 for the chosen muscles (recommended stay checked, the rest are there to add). Rows fade in together. Add-exercise opens with 40 and the same fade, no stagger. Search is unchanged.
+- **2026-10-18 — Cursor:** Supabase now stores finished workouts (session, exercises, sets), saved routines, and exercise favorites. The app writes those when a user is signed in and copies any on-phone history up once. Meal items stay on the phone. Migration: `supabase/migrations/20261018_workout_history.sql`.
+- **2026-10-18 — Cursor:** Body-map shortcut no longer repeats the workout just finished. It offers a different saved routine (the one done least recently), or the overdue muscle when there isn’t another routine.
 
 ## 10. What to do next (as of the top of §9)
 

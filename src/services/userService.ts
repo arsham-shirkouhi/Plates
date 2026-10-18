@@ -131,12 +131,13 @@ export const initializeUser = async (user: User): Promise<void> => {
  * Check if user has completed onboarding
  */
 export const hasCompletedOnboarding = async (user: User): Promise<boolean> => {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     try {
         const timeoutPromise = new Promise<boolean>((resolve) => {
-            setTimeout(() => {
+            timeoutId = setTimeout(() => {
                 console.warn('Onboarding check timed out after 10s, assuming not completed');
                 resolve(false);
-            }, 10000); // 10 second timeout
+            }, 10000);
         });
 
         const docPromise = supabase
@@ -155,11 +156,14 @@ export const hasCompletedOnboarding = async (user: User): Promise<boolean> => {
                 return data?.onboarding_completed || false;
             });
 
-        // Race between the query and timeout
         return await Promise.race([docPromise, timeoutPromise]);
     } catch (error) {
         console.error('Error checking onboarding status:', error);
         return false;
+    } finally {
+        if (timeoutId !== undefined) {
+            clearTimeout(timeoutId);
+        }
     }
 };
 
