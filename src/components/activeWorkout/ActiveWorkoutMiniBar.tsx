@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing } from 'react-native';
 import { Icon } from '../icons/Icon';
+import { FlatArrowsOut } from './FlatMark';
 import { fonts } from '../../constants/fonts';
 import { WORKOUT_COLORS } from '../../workout/constants';
 import { formatRestDuration, formatWorkoutDurationShort } from '../../workout/workoutSelectors';
@@ -63,7 +64,7 @@ export const ActiveWorkoutMiniBar: React.FC<ActiveWorkoutMiniBarProps> = ({
         return (
             <TouchableOpacity style={styles.container} activeOpacity={0.92} onPress={onExpand}>
                 <View style={styles.row}>
-                    <Icon name="expand-outline" size={20} color={WORKOUT_COLORS.text} />
+                    <FlatArrowsOut color={WORKOUT_COLORS.text} size={20} />
                     <View style={styles.center}>
                         <Text style={styles.duration}>
                             {formatRestDuration(restRemainingSeconds)}
@@ -101,7 +102,7 @@ export const ActiveWorkoutMiniBar: React.FC<ActiveWorkoutMiniBarProps> = ({
     return (
         <TouchableOpacity style={styles.container} activeOpacity={0.92} onPress={onExpand}>
             <View style={styles.row}>
-                <Icon name="expand-outline" size={20} color={WORKOUT_COLORS.text} />
+                <FlatArrowsOut color={WORKOUT_COLORS.text} size={20} />
                 <View style={styles.center}>
                     <Text style={styles.duration}>{formatWorkoutDurationShort(elapsedSeconds)}</Text>
                     <Text style={styles.meta} numberOfLines={1}>

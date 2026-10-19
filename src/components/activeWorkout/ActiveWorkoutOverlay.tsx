@@ -2,10 +2,11 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     View,
     StyleSheet,
-    Dimensions,
+    useWindowDimensions,
     ScrollView,
     PanResponder,
     Alert,
+    LayoutChangeEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -39,12 +40,12 @@ import { Confetti, ConfettiParticle } from '../Confetti';
 
 const CONFETTI_COLORS = ['#526EFF', '#F9C117', '#FF5151', '#2ED573', '#B06BFF', '#FF8A3D'];
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const SCREEN_HEIGHT = Dimensions.get('window').height;
 const SHEET_MARGIN_H = 20;
 const SHEET_MARGIN_V = 4;
 const SHEET_MAX_WIDTH = 540;
 const WIDGET_FLOAT_BOTTOM = 10;
+/** Ignore a stuck keyboard inset so the minimized bar cannot be thrown off the top. */
+const BOTTOM_INSET_CAP = 64;
 const SHELL_CORNER_RADIUS = 22;
 const MINI_CORNER_RADIUS = 36;
 
@@ -60,6 +61,8 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
     onRequestWrapUp,
 }) => {
     const insets = useSafeAreaInsets();
+    const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+    const bottomSafe = Math.min(Math.max(insets.bottom, 0), BOTTOM_INSET_CAP);
     const { close: closeWorkoutOverlay } = useWorkoutOverlay();
     const {
         state,
@@ -76,9 +79,6 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
         updateExerciseNote,
         removeExercise,
         addToSuperset,
-        startRestTimer,
-        setDefaultRestSeconds,
-        adjustRestTimer,
         skipRestTimer,
         clearScrollTarget,
         dispatch,
@@ -88,23 +88,48 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
     const [expandTarget, setExpandTarget] = useState<{ id: string; nonce: number } | null>(null);
     const presentation = state.presentation;
     const isFullscreen = presentation === 'fullscreen';
-    const screenHeight = SCREEN_HEIGHT;
+    const [hostHeight, setHostHeight] = useState(windowHeight);
     const sheetPaddingTop = insets.top + SHEET_MARGIN_V;
-    const sheetPaddingBottom = insets.bottom + SHEET_MARGIN_V;
-    const expandedSheetHeight = screenHeight - sheetPaddingTop - sheetPaddingBottom;
-    const innerWidth = SCREEN_WIDTH - insets.left - insets.right;
+    const sheetPaddingBottom = bottomSafe + SHEET_MARGIN_V;
+    const layoutHeight = hostHeight > 0 ? hostHeight : windowHeight;
+    const expandedSheetHeight = Math.max(MINI_BAR_HEIGHT, layoutHeight - sheetPaddingTop - sheetPaddingBottom);
+    const innerWidth = windowWidth - insets.left - insets.right;
     const expandedCardWidth = Math.min(SHEET_MAX_WIDTH, innerWidth - 2 * SHEET_MARGIN_H);
     const expandedCardLeft = insets.left + (innerWidth - expandedCardWidth) / 2;
     const widgetBarWidth = innerWidth - 2 * SHEET_MARGIN_H;
     const widgetBarLeft = insets.left + SHEET_MARGIN_H;
-    const widgetBottomInset = insets.bottom + WIDGET_FLOAT_BOTTOM;
-    const minimizedShellTop = screenHeight - MINI_BAR_HEIGHT - widgetBottomInset;
+    const widgetBottomInset = bottomSafe + WIDGET_FLOAT_BOTTOM;
+    const minimizedShellTop = Math.max(
+        sheetPaddingTop,
+        layoutHeight - MINI_BAR_HEIGHT - widgetBottomInset
+    );
+
+    const handleHostLayout = (event: LayoutChangeEvent) => {
+        const nextHeight = event.nativeEvent.layout.height;
+        if (nextHeight > 0 && Math.abs(nextHeight - hostHeight) > 1) {
+            setHostHeight(nextHeight);
+        }
+    };
 
     const [bottomActionsHeight, setBottomActionsHeight] = useState(0);
     const [scrollViewportH, setScrollViewportH] = useState(0);
     const [scrollContentH, setScrollContentH] = useState(0);
     const [celebration, setCelebration] = useState<ConfettiParticle[]>([]);
     const expandProgress = useSharedValue(isFullscreen ? 1 : 0);
+    const shownFullscreen = useRef(isFullscreen);
+
+    const animateOpen = (fullscreen: boolean) => {
+        if (shownFullscreen.current === fullscreen) return;
+        shownFullscreen.current = fullscreen;
+        expandProgress.value = withTiming(fullscreen ? 1 : 0, {
+            duration: 220,
+            easing: Easing.out(Easing.cubic),
+        });
+    };
+
+    if (shownFullscreen.current !== isFullscreen) {
+        animateOpen(isFullscreen);
+    }
 
     const handleCompletedAllSets = useCallback(
         (exerciseId: string) => {
@@ -147,12 +172,15 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
         onComplete: handleRestComplete,
     });
 
-    useEffect(() => {
-        expandProgress.value = withTiming(isFullscreen ? 1 : 0, {
-            duration: 180,
-            easing: Easing.out(Easing.cubic),
-        });
-    }, [isFullscreen, expandProgress]);
+    const handleExpand = () => {
+        animateOpen(true);
+        expand();
+    };
+
+    const handleMinimize = () => {
+        animateOpen(false);
+        minimize();
+    };
 
     useEffect(() => {
         if (!state.scrollTargetExerciseId) return;
@@ -172,7 +200,7 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
             onPanResponderRelease: (_, gesture) => {
                 // Require a deliberate pull — avoid accidental minimize from light drags.
                 if (gesture.dy > 160 || gesture.vy > 1.6) {
-                    minimize();
+                    handleMinimize();
                 }
             },
         })
@@ -235,32 +263,8 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
         ]);
     };
 
-    const handleStartRest = () => {
-        const started = startRestTimer();
-        if (!started) {
-            handlePickRestDuration();
-        }
-    };
-
-    const handlePickRestDuration = () => {
-        Alert.alert('Rest timer', 'Choose rest duration for this workout', [
-            { text: 'Off', onPress: () => setDefaultRestSeconds(0) },
-            { text: '1:00', onPress: () => applyRestDuration(60) },
-            { text: '1:30', onPress: () => applyRestDuration(90) },
-            { text: '2:00', onPress: () => applyRestDuration(120) },
-            { text: '2:30', onPress: () => applyRestDuration(150) },
-            { text: '3:00', onPress: () => applyRestDuration(180) },
-            { text: 'Cancel', style: 'cancel' },
-        ]);
-    };
-
-    const applyRestDuration = (restSeconds: number) => {
-        setDefaultRestSeconds(restSeconds);
-        startRestTimer(restSeconds);
-    };
-
     return (
-        <View style={styles.host} pointerEvents="box-none" collapsable={false}>
+        <View style={styles.host} pointerEvents="box-none" collapsable={false} onLayout={handleHostLayout}>
             <Reanimated.View
                 pointerEvents={isFullscreen ? 'auto' : 'none'}
                 style={[StyleSheet.absoluteFill, styles.backdrop, backdropStyle]}
@@ -275,10 +279,9 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
                     style={[styles.expandedLayer, expandedStyle]}
                 >
                     <ActiveWorkoutHeader
-                        title={workout.title}
-                        onCollapse={minimize}
+                        onCollapse={handleMinimize}
                         onScanEquipment={onScanEquipment}
-                        onFinish={handleFinish}
+                        onAddExercises={onAddExercises}
                         collapsePanHandlers={collapsePanResponder.panHandlers}
                     />
                     <ActiveWorkoutStatsStrip elapsedSeconds={elapsedSeconds} volume={volume} sets={sets} />
@@ -342,13 +345,7 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
                         style={styles.bottomActionsLayer}
                         onLayout={(event) => setBottomActionsHeight(event.nativeEvent.layout.height)}
                     >
-                        <ActiveWorkoutBottomActions
-                            onAddExercises={onAddExercises}
-                            showRest={!isEmptyList}
-                            restActive={isRunning}
-                            onRest={handleStartRest}
-                            onPickRestDuration={handlePickRestDuration}
-                        />
+                        <ActiveWorkoutBottomActions onFinish={handleFinish} />
                     </View>
                 </Reanimated.View>
 
@@ -363,7 +360,7 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
                         totalSets={currentProgress.total}
                         restRemainingSeconds={remainingSeconds}
                         restActive={isRunning}
-                        onExpand={expand}
+                        onExpand={handleExpand}
                         onSkipRest={skipRestTimer}
                         onCelebrate={celebrateAtPoint}
                     />
@@ -377,18 +374,16 @@ export const ActiveWorkoutOverlay: React.FC<ActiveWorkoutOverlayProps> = ({
                     {
                         left: expandedCardLeft,
                         width: expandedCardWidth,
-                        bottom: sheetPaddingBottom + bottomActionsHeight,
+                        bottom: sheetPaddingBottom + bottomActionsHeight + 8,
                     },
                 ]}
             >
                 <RestTimerBar
+                    key={state.restTimer?.startedAt ?? 'rest'}
                     visible={isFullscreen && isRunning}
                     remainingSeconds={remainingSeconds}
-                    durationSeconds={state.restTimer?.durationSeconds}
                     progress={progress}
                     celebrateAt={restCelebrateAt}
-                    onAdjust={adjustRestTimer}
-                    onSetDuration={applyRestDuration}
                     onSkip={skipRestTimer}
                 />
             </View>
@@ -448,6 +443,8 @@ const styles = StyleSheet.create({
     bottomActionsLayer: {
         zIndex: 2,
         backgroundColor: WORKOUT_COLORS.background,
+        borderTopWidth: 1,
+        borderTopColor: '#ECECEC',
     },
     scroll: {
         flex: 1,

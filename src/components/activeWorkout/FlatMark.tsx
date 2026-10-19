@@ -60,6 +60,118 @@ export const FlatDots: React.FC<MarkProps> = ({ color, size = 16 }) => (
     </Svg>
 );
 
+/** Four corners and a label line — scan a tag, not a camera. */
+export const FlatScan: React.FC<MarkProps> = ({ color, size = 22, strokeWidth = 2.2 }) => (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+        <Polyline
+            points="3.5,9 3.5,3.5 9,3.5"
+            fill="none"
+            stroke={color}
+            strokeWidth={strokeWidth}
+            strokeLinecap="square"
+            strokeLinejoin="miter"
+        />
+        <Polyline
+            points="15,3.5 20.5,3.5 20.5,9"
+            fill="none"
+            stroke={color}
+            strokeWidth={strokeWidth}
+            strokeLinecap="square"
+            strokeLinejoin="miter"
+        />
+        <Polyline
+            points="20.5,15 20.5,20.5 15,20.5"
+            fill="none"
+            stroke={color}
+            strokeWidth={strokeWidth}
+            strokeLinecap="square"
+            strokeLinejoin="miter"
+        />
+        <Polyline
+            points="9,20.5 3.5,20.5 3.5,15"
+            fill="none"
+            stroke={color}
+            strokeWidth={strokeWidth}
+            strokeLinecap="square"
+            strokeLinejoin="miter"
+        />
+        <Line
+            x1={7.5}
+            y1={12}
+            x2={16.5}
+            y2={12}
+            stroke={color}
+            strokeWidth={strokeWidth}
+            strokeLinecap="square"
+        />
+    </Svg>
+);
+
+/** Straight shaft with an open arrowhead, each barb 45° off the line. */
+function LineArrow({
+    x1,
+    y1,
+    x2,
+    y2,
+    color,
+    strokeWidth,
+}: {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    color: string;
+    strokeWidth: number;
+}) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const length = Math.hypot(dx, dy) || 1;
+    const ux = dx / length;
+    const uy = dy / length;
+    const barb = 3.15;
+    const cos = Math.cos(Math.PI / 4);
+    const sin = Math.sin(Math.PI / 4);
+    const backX = -ux;
+    const backY = -uy;
+    const leftX = x2 + (backX * cos - backY * sin) * barb;
+    const leftY = y2 + (backX * sin + backY * cos) * barb;
+    const rightX = x2 + (backX * cos + backY * sin) * barb;
+    const rightY = y2 + (-backX * sin + backY * cos) * barb;
+    const stroke = {
+        stroke: color,
+        strokeWidth,
+        strokeLinecap: 'round' as const,
+    };
+
+    return (
+        <>
+            <Line x1={x1} y1={y1} x2={x2} y2={y2} {...stroke} />
+            <Line x1={x2} y1={y2} x2={leftX} y2={leftY} {...stroke} />
+            <Line x1={x2} y1={y2} x2={rightX} y2={rightY} {...stroke} />
+        </>
+    );
+}
+
+/** Four diagonal line arrows aimed at the middle, with a wide gap — minimize. */
+export const FlatArrowsIn: React.FC<MarkProps> = ({ color, size = 22, strokeWidth = 2.15 }) => (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+        <LineArrow x1={2.4} y1={2.4} x2={8.6} y2={8.6} color={color} strokeWidth={strokeWidth} />
+        <LineArrow x1={21.6} y1={2.4} x2={15.4} y2={8.6} color={color} strokeWidth={strokeWidth} />
+        <LineArrow x1={2.4} y1={21.6} x2={8.6} y2={15.4} color={color} strokeWidth={strokeWidth} />
+        <LineArrow x1={21.6} y1={21.6} x2={15.4} y2={15.4} color={color} strokeWidth={strokeWidth} />
+    </Svg>
+);
+
+/** Four diagonal line arrows aimed at the corners, with the same gap — maximize. */
+export const FlatArrowsOut: React.FC<MarkProps> = ({ color, size = 22, strokeWidth = 2.15 }) => (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+        <LineArrow x1={8.6} y1={8.6} x2={2.4} y2={2.4} color={color} strokeWidth={strokeWidth} />
+        <LineArrow x1={15.4} y1={8.6} x2={21.6} y2={2.4} color={color} strokeWidth={strokeWidth} />
+        <LineArrow x1={8.6} y1={15.4} x2={2.4} y2={21.6} color={color} strokeWidth={strokeWidth} />
+        <LineArrow x1={15.4} y1={15.4} x2={21.6} y2={21.6} color={color} strokeWidth={strokeWidth} />
+    </Svg>
+);
+
 /** Two thick sliders — adjust amounts, same weight as plus/tick. */
 export const FlatTune: React.FC<MarkProps> = ({ color, size = 16, strokeWidth = 2.2 }) => (
     <Svg width={size} height={size} viewBox="0 0 16 16">

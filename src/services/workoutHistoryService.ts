@@ -6,7 +6,7 @@ import {
     StoredWorkoutPreset,
     WorkoutWrapUpSummary,
 } from '../workout/workoutHistoryTypes';
-import { Workout, WorkoutSetType } from '../workout/types';
+import { PreviousSetSnapshot, Workout, WorkoutExercise, WorkoutSetType } from '../workout/types';
 import { createUniqueId, formatWorkoutDurationShort } from '../workout/workoutSelectors';
 import { supabase } from './supabase';
 
@@ -104,13 +104,19 @@ function workoutToSessionPayload(summary: WorkoutWrapUpSummary) {
             body_part: exercise.bodyPart ?? null,
             note: exercise.note || null,
             rest_seconds: exercise.restSeconds ?? 60,
-            sets: exercise.sets.map((set) => ({
-                set_type: asSetType(set.type),
-                weight: parseFloat(set.weight) || set.previous?.weight || 0,
-                reps: parseInt(set.reps, 10) || set.previous?.reps || 0,
-                rpe: set.rpe ? asNumber(set.rpe) : null,
-                completed: !!set.completed,
-            })),
+            sets: exercise.sets
+                .filter((set) => {
+                    const weight = parseFloat(set.weight) || 0;
+                    const reps = parseInt(set.reps, 10) || 0;
+                    return set.completed || weight > 0 || reps > 0;
+                })
+                .map((set) => ({
+                    set_type: asSetType(set.type),
+                    weight: parseFloat(set.weight) || set.previous?.weight || 0,
+                    reps: parseInt(set.reps, 10) || set.previous?.reps || 0,
+                    rpe: set.rpe ? asNumber(set.rpe) : null,
+                    completed: !!set.completed,
+                })),
         })),
     };
 }
@@ -458,17 +464,25 @@ export async function getCompletedWorkouts(userId?: string | null): Promise<Stor
     return loadCompleted(userId);
 }
 
-/** Most recent completed sets for an exercise, used as the "previous" column. */
-export async function getLastExercisePreviousSets(
+function performedSets(sets: MockExerciseTemplate['sets']): PreviousSetSnapshot[] {
+    return sets
+        .map((set) => ({
+            type: set.type ?? 'normal',
+            weight: set.previous?.weight ?? 0,
+            reps: set.previous?.reps ?? 0,
+        }))
+        .filter((set) => set.weight > 0 || set.reps > 0);
+}
+
+function lastPerformedSets(
+    completed: StoredCompletedWorkout[],
     exerciseId: string,
-    name: string,
-    userId?: string | null
-): Promise<Array<{ weight: number; reps: number }>> {
-    const completed = await loadCompleted(userId);
+    name: string
+): PreviousSetSnapshot[] {
+    const normalizedName = name.trim().toLowerCase();
     const sorted = [...completed].sort(
         (a, b) => Date.parse(b.completedAt) - Date.parse(a.completedAt)
     );
-    const normalizedName = name.trim().toLowerCase();
 
     for (const workout of sorted) {
         const match = workout.exercises.find(
@@ -477,14 +491,101 @@ export async function getLastExercisePreviousSets(
                 exercise.name.trim().toLowerCase() === normalizedName
         );
         if (!match?.sets?.length) continue;
-
-        return match.sets.map((set) => ({
-            weight: set.previous?.weight ?? 0,
-            reps: set.previous?.reps ?? 0,
-        }));
+        const performed = performedSets(match.sets);
+        if (performed.length > 0) return performed;
     }
 
     return [];
+}
+
+/** Most recent logged sets for an exercise, used as the "previous" column. */
+export async function getLastExercisePreviousSets(
+    exerciseId: string,
+    name: string,
+    userId?: string | null
+): Promise<PreviousSetSnapshot[]> {
+    const completed = await loadCompleted(userId);
+    return lastPerformedSets(completed, exerciseId, name);
+}
+
+function fieldsAreEmpty(set: WorkoutExercise['sets'][number]): boolean {
+    const weight = parseFloat(set.weight) || 0;
+    const reps = parseInt(set.reps, 10) || 0;
+    return !set.completed && weight <= 0 && reps <= 0;
+}
+
+/** The stock 3 working sets, before last time's count and warm-ups are applied. */
+function isUntouchedDefault(sets: WorkoutExercise['sets']): boolean {
+    return (
+        sets.length === 3 &&
+        sets.every((set) => (set.type ?? 'normal') === 'normal' && fieldsAreEmpty(set))
+    );
+}
+
+function setsFromHistory(history: PreviousSetSnapshot[]): WorkoutExercise['sets'] {
+    return history.map((logged) => ({
+        id: createUniqueId('set-'),
+        type: logged.type ?? 'normal',
+        weight: '',
+        reps: '',
+        completed: false,
+        previous: { weight: logged.weight, reps: logged.reps },
+    }));
+}
+
+/** Warm-up numbers stay on warm-up sets; working sets only see working sets. */
+function previousByType(
+    sets: WorkoutExercise['sets'],
+    history: PreviousSetSnapshot[]
+): WorkoutExercise['sets'] {
+    const cursor: Partial<Record<WorkoutSetType, number>> = {};
+    return sets.map((set) => {
+        const key = set.type ?? 'normal';
+        const matches = history.filter((item) => (item.type ?? 'normal') === key);
+        const index = cursor[key] ?? 0;
+        cursor[key] = index + 1;
+        const logged = matches[index];
+        return {
+            ...set,
+            previous: logged
+                ? { weight: logged.weight, reps: logged.reps }
+                : set.previous && set.previous.weight > 0
+                  ? { weight: set.previous.weight, reps: set.previous.reps }
+                  : undefined,
+        };
+    });
+}
+
+/**
+ * Last session decides the set list when this exercise is still the default 3.
+ * A list the user already changed keeps its length, and previous weight is
+ * matched by set type so a warm-up never becomes the number for a working set.
+ */
+export async function withLastPerformance(
+    exercises: WorkoutExercise[],
+    userId?: string | null
+): Promise<WorkoutExercise[]> {
+    if (exercises.length === 0) return exercises;
+    const completed = await loadCompleted(userId);
+
+    return exercises.map((exercise) => {
+        const history = lastPerformedSets(completed, exercise.exerciseId, exercise.name);
+        if (history.length === 0) {
+            return {
+                ...exercise,
+                sets: exercise.sets.map((set) => ({
+                    ...set,
+                    previous: set.previous && set.previous.weight > 0 ? set.previous : undefined,
+                })),
+            };
+        }
+        return {
+            ...exercise,
+            sets: isUntouchedDefault(exercise.sets)
+                ? setsFromHistory(history)
+                : previousByType(exercise.sets, history),
+        };
+    });
 }
 
 export async function deleteWorkoutPreset(presetId: string, userId?: string | null): Promise<void> {

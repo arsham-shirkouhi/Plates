@@ -34,7 +34,8 @@ function shouldStartRestTimer(
 ): RestTimerState | null {
     if (restSeconds <= 0) return null;
     const nextSet = getNextSetInExercise(exercise, setId);
-    if (nextSet?.type === 'drop') return null;
+    // Last set of this exercise is a transition, not a rest.
+    if (!nextSet || nextSet.type === 'drop') return null;
     const now = Date.now();
     return {
         exerciseId: exercise.id,

@@ -5,6 +5,7 @@ export type OverlayPresentation = 'fullscreen' | 'minimized' | 'dismissed';
 export interface PreviousSetSnapshot {
     weight: number;
     reps: number;
+    type?: WorkoutSetType;
 }
 
 export interface WorkoutSet {

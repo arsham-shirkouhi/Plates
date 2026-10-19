@@ -1,6 +1,7 @@
 import {
     ActiveWorkoutStoreState,
     OverlayPresentation,
+    PreviousSetSnapshot,
     RestTimerState,
     Workout,
     WorkoutExercise,
@@ -49,7 +50,8 @@ export function formatRestDuration(seconds: number): string {
 }
 
 export function formatPreviousSet(previous?: { weight: number; reps: number }): string {
-    if (!previous) return '—';
+    if (!previous || (previous.weight <= 0 && previous.reps <= 0)) return '—';
+    if (previous.weight <= 0) return `${previous.reps}`;
     return `${previous.weight}kg × ${previous.reps}`;
 }
 
@@ -163,11 +165,11 @@ export function createWorkoutExercise(input: {
     name: string;
     bodyPart?: string;
     thumbnailUrl?: string;
-    previousSets?: Array<{ weight: number; reps: number }>;
+    previousSets?: PreviousSetSnapshot[];
 }): WorkoutExercise {
     const DEFAULT_SET_COUNT = 3;
     const history = input.previousSets ?? [];
-    const fallback = history[history.length - 1];
+    const count = history.length > 0 ? history.length : DEFAULT_SET_COUNT;
 
     return {
         id: createUniqueId('wx-'),
@@ -177,11 +179,12 @@ export function createWorkoutExercise(input: {
         thumbnailUrl: input.thumbnailUrl,
         note: '',
         restSeconds: 60,
-        sets: Array.from({ length: DEFAULT_SET_COUNT }, (_, index) => {
-            const previous = history[index] ?? fallback;
+        sets: Array.from({ length: count }, (_, index) => {
+            const logged = history[index];
             return {
                 ...createDefaultSet(),
-                previous: previous ?? undefined,
+                type: logged?.type ?? 'normal',
+                previous: logged ? { weight: logged.weight, reps: logged.reps } : undefined,
             };
         }),
     };

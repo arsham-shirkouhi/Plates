@@ -1,7 +1,6 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { User } from '@supabase/supabase-js';
 import { LoginScreen } from '../screens/LoginScreen';
 import { SignupScreen } from '../screens/SignupScreen';
 import { VerificationScreen } from '../screens/VerificationScreen';
@@ -28,21 +27,24 @@ import type { RootStackParamList } from './navigationParamList';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+export type AppStartRoute = 'Login' | 'Home' | 'Onboarding' | 'Verification';
+
 interface AppNavigatorProps {
-    user: User | null;
+    initialRouteName: AppStartRoute;
 }
 
-const NavigatorWithNavBar: React.FC = () => {
+const NavigatorWithNavBar: React.FC<{ initialRouteName: AppStartRoute }> = ({ initialRouteName }) => {
     return (
         <>
             <Stack.Navigator
+                key={initialRouteName}
                 screenOptions={{
                     headerShown: false,
                     contentStyle: { flex: 1 },
                     animation: 'fade',
                     animationDuration: 200,
                 }}
-                initialRouteName="Login"
+                initialRouteName={initialRouteName}
             >
                 <Stack.Screen
                     name="Login"
@@ -153,12 +155,12 @@ const NavigatorWithNavBar: React.FC = () => {
     );
 };
 
-export const AppNavigator: React.FC<AppNavigatorProps> = ({ user }) => {
+export const AppNavigator: React.FC<AppNavigatorProps> = ({ initialRouteName }) => {
     return (
         <ActiveWorkoutProvider>
             <WorkoutOverlayProvider>
                 <NavigationContainer ref={rootNavigationRef}>
-                    <NavigatorWithNavBar />
+                    <NavigatorWithNavBar initialRouteName={initialRouteName} />
                     <WorkoutOverlayHost />
                 </NavigationContainer>
             </WorkoutOverlayProvider>

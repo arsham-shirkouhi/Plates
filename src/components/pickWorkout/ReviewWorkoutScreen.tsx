@@ -26,7 +26,7 @@ import { PICK_WORKOUT_LAYOUT, WORKOUT_COLORS } from '../../workout/constants';
 import { MUSCLE_GROUP_LABELS, mapBodyPartToMuscleGroup } from '../../workout/muscleGroups';
 import { WorkoutExercise, WorkoutSet } from '../../workout/types';
 import { listExercisesForMuscleGroups } from '../../services/workoutAssemblyService';
-import { getLastExercisePreviousSets } from '../../services/workoutHistoryService';
+import { getLastExercisePreviousSets, withLastPerformance } from '../../services/workoutHistoryService';
 import { searchExercises, Exercise } from '../../services/exerciseService';
 import { createUniqueId } from '../../workout/workoutSelectors';
 import { useAuth } from '../../context/AuthContext';
@@ -70,17 +70,21 @@ function makeSet(
     };
 }
 
-/** Every exercise defaults to 3 sets, using the user's last weights when available. */
+/** Match the last logged sets, including warm-ups. Fall back to 3 working sets. */
 function withDefaults(
     exercise: Pick<WorkoutExercise, 'exerciseId' | 'name'> &
         Partial<Pick<WorkoutExercise, 'sets' | 'restSeconds'>>,
-    previousSets?: Array<{ weight: number; reps: number }>
+    previousSets?: Array<{ weight: number; reps: number; type?: WorkoutSet['type'] }>
 ): WorkoutExercise {
     const fromExisting = (exercise.sets ?? [])
-        .map((set) => set.previous)
-        .filter((snapshot): snapshot is NonNullable<typeof snapshot> => !!snapshot);
+        .map((set) =>
+            set.previous
+                ? { ...set.previous, type: set.type }
+                : undefined
+        )
+        .filter((snapshot): snapshot is NonNullable<typeof snapshot> => !!snapshot && (snapshot.weight > 0 || snapshot.reps > 0));
     const history = previousSets?.length ? previousSets : fromExisting;
-    const fallback = history[history.length - 1];
+    const count = history.length > 0 ? history.length : DEFAULT_SETS;
 
     return {
         id: createUniqueId('wx-'),
@@ -88,15 +92,15 @@ function withDefaults(
         name: exercise.name,
         note: '',
         restSeconds: DEFAULT_REST,
-        sets: Array.from({ length: DEFAULT_SETS }, (_, index) => {
-            const previous = history[index] ?? fallback;
+        sets: Array.from({ length: count }, (_, index) => {
+            const logged = history[index];
             return {
                 id: createUniqueId('set-'),
-                type: 'normal' as const,
+                type: logged?.type ?? 'normal',
                 weight: '',
                 reps: '',
                 completed: false,
-                previous: previous ?? { weight: 0, reps: DEFAULT_REPS },
+                previous: logged ? { weight: logged.weight, reps: logged.reps } : undefined,
             };
         }),
     };
@@ -262,36 +266,36 @@ export const ReviewWorkoutScreen: React.FC<ReviewWorkoutScreenProps> = ({
     const [searching, setSearching] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
 
+    const catalogRef = useRef(catalog);
+    catalogRef.current = catalog;
+
     useEffect(() => {
         let cancelled = false;
-        listExercisesForMuscleGroups(pending.selectedMuscles)
-            .then((found) => {
-                if (cancelled || found.length === 0) return;
-                setCatalog((current) => {
-                    const knownIds = new Set(current.map((exercise) => exercise.exerciseId));
-                    const knownNames = new Set(
-                        current.map((exercise) => exercise.name.trim().toLowerCase())
-                    );
-                    const extras = found
-                        .filter((exercise) => {
-                            const name = exercise.name.trim().toLowerCase();
-                            return !knownIds.has(exercise.id) && !knownNames.has(name);
-                        })
-                        .map((exercise) => ({
-                            ...withDefaults({ exerciseId: exercise.id, name: exercise.name }),
-                            bodyPart: exercise.bodyPart,
-                        }));
-                    if (extras.length === 0) return current;
-                    return [...current, ...extras];
-                });
-            })
-            .catch(() => {
-                // The recommended rows are already on screen.
-            });
+        (async () => {
+            const found = await listExercisesForMuscleGroups(pending.selectedMuscles).catch(() => []);
+            if (cancelled) return;
+            const current = catalogRef.current;
+            const knownIds = new Set(current.map((exercise) => exercise.exerciseId));
+            const knownNames = new Set(current.map((exercise) => exercise.name.trim().toLowerCase()));
+            const extras = found
+                .filter((exercise) => {
+                    const name = exercise.name.trim().toLowerCase();
+                    return !knownIds.has(exercise.id) && !knownNames.has(name);
+                })
+                .map((exercise) => ({
+                    ...withDefaults({ exerciseId: exercise.id, name: exercise.name }),
+                    bodyPart: exercise.bodyPart,
+                }));
+            const hydrated = await withLastPerformance(
+                extras.length > 0 ? [...current, ...extras] : current,
+                user?.id
+            );
+            if (!cancelled) setCatalog(hydrated);
+        })();
         return () => {
             cancelled = true;
         };
-    }, [pending.selectedMuscles]);
+    }, [pending.selectedMuscles, user?.id]);
 
     const toggleEditing = useCallback((id: string) => {
         Haptics.selectionAsync();

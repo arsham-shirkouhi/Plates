@@ -297,6 +297,12 @@ simulator (needs Xcode), `a` = Android emulator.
 - **2026-10-17 — Cursor:** Pick-exercises loads up to 36 for the chosen muscles (recommended stay checked, the rest are there to add). Rows fade in together. Add-exercise opens with 40 and the same fade, no stagger. Search is unchanged.
 - **2026-10-18 — Cursor:** Supabase now stores finished workouts (session, exercises, sets), saved routines, and exercise favorites. The app writes those when a user is signed in and copies any on-phone history up once. Meal items stay on the phone. Migration: `supabase/migrations/20261018_workout_history.sql`.
 - **2026-10-18 — Cursor:** Body-map shortcut no longer repeats the workout just finished. It offers a different saved routine (the one done least recently), or the overdue muscle when there isn’t another routine.
+- **2026-10-18 — Cursor:** Minimized workout bar is placed from the overlay’s measured height. Tapping it starts the expand animation immediately, before the workout sheet re-renders.
+- **2026-10-18 — Cursor:** Rest stays automatic except on the last set of an exercise. The running timer is a compact floating card: countdown, check to finish, and a bar that drains smoothly.
+- **2026-10-18 — Cursor:** A saved Supabase session opens Home (or onboarding / verification) instead of the login screen. An in-progress workout is stored per account and only restored while that person is signed in.
+- **2026-10-18 — Cursor:** Starting or adding an exercise fills each set’s previous column from the last time that exercise was logged (weight × reps), matched by set number.
+- **2026-10-18 — Cursor:** The next loadout uses last time’s set count and warm-ups. Warm-up weight stays on warm-up sets. Older sessions stay in Supabase as one small row per set (blank sets are not stored).
+- **2026-10-18 — Cursor:** Workout header is three buttons: white minimize (arrows in), white scan, blue plus. The minimized bar uses arrows out. The generated workout title is hidden there and still saved with the session. Finish workout is the full-width button at the bottom.
 
 ## 10. What to do next (as of the top of §9)
 

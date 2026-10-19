@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useSharedValue, SharedValue } from 'react-native-reanimated';
+import { Easing, useSharedValue, withTiming, SharedValue } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { RestTimerState } from '../workout/types';
 import { getRestProgress, getRestRemainingSeconds } from '../workout/workoutSelectors';
@@ -38,7 +38,10 @@ export function useRestTimer({
         const tick = () => {
             const now = Date.now();
             const remaining = getRestRemainingSeconds(restTimer, now);
-            progress.value = getRestProgress(restTimer, now);
+            progress.value = withTiming(getRestProgress(restTimer, now), {
+                duration: 100,
+                easing: Easing.linear,
+            });
             setRemainingSeconds((prev) => (prev === remaining ? prev : remaining));
 
             if (remaining === 0 && completedRef.current !== restTimer.setId) {

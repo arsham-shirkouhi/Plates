@@ -84,31 +84,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Listen for auth changes
         const {
             data: { subscription },
-        } = supabase.auth.onAuthStateChange(async (event, session) => {
+        } = supabase.auth.onAuthStateChange((event, session) => {
             const currentUser = session?.user ?? null;
             setUser(currentUser);
-
-            if (currentUser && event === 'SIGNED_IN') {
-                // Check if this is a new user (first time sign-in)
-                // If user document doesn't exist, initialize it
-                try {
-                    const { getUserProfile, initializeUser, updateLastLogin } = await import('../services/userService');
-                    const existingProfile = await getUserProfile(currentUser);
-                    if (!existingProfile) {
-                        // New user - initialize document
-                        await initializeUser(currentUser);
-                        console.log('New user - document initialized');
-                    } else {
-                        // Existing user - update last login
-                        await updateLastLogin(currentUser);
-                    }
-                } catch (userError) {
-                    console.error('Error checking/initializing user document:', userError);
-                    // Don't throw - this shouldn't block auth state change
-                }
-            }
-
             setLoading(false);
+
+            if (!currentUser || event !== 'SIGNED_IN') return;
+
+            // Defer profile work so this callback does not hold the auth lock.
+            // Awaiting inside onAuthStateChange can block session restore on the next launch.
+            setTimeout(() => {
+                void (async () => {
+                    try {
+                        const { getUserProfile, initializeUser, updateLastLogin } = await import('../services/userService');
+                        const existingProfile = await getUserProfile(currentUser);
+                        if (!existingProfile) {
+                            await initializeUser(currentUser);
+                        } else {
+                            await updateLastLogin(currentUser);
+                        }
+                    } catch (userError) {
+                        console.error('Error checking/initializing user document:', userError);
+                    }
+                })();
+            }, 0);
         });
 
         return () => {

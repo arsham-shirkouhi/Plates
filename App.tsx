@@ -3,6 +3,9 @@ import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
 import { useFonts } from 'expo-font';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { AppStartRoute } from './src/navigation/AppNavigator';
+import { hasCompletedOnboarding } from './src/services/userService';
+import { isEmailVerified } from './src/utils/authHelpers';
 import { FoodLogProvider } from './src/context/FoodLogContext';
 import { AddFoodProvider } from './src/context/AddFoodContext';
 import { AppNavigator } from './src/navigation/AppNavigator';
@@ -45,8 +48,38 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
 
 const AppContent: React.FC = () => {
     const { user, loading } = useAuth();
+    const [gate, setGate] = useState<{ userId: string | null; route: AppStartRoute } | null>(null);
+    const userId = user?.id ?? null;
+    const verified = isEmailVerified(user);
 
-    if (loading) {
+    useEffect(() => {
+        if (loading) return;
+        let cancelled = false;
+
+        (async () => {
+            if (!user) {
+                if (!cancelled) setGate({ userId: null, route: 'Login' });
+                return;
+            }
+            if (!isEmailVerified(user)) {
+                if (!cancelled) setGate({ userId: user.id, route: 'Verification' });
+                return;
+            }
+            let done = false;
+            try {
+                done = await hasCompletedOnboarding(user);
+            } catch (error) {
+                console.warn('Could not check onboarding, sending the user through it', error);
+            }
+            if (!cancelled) setGate({ userId: user.id, route: done ? 'Home' : 'Onboarding' });
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [loading, userId, verified]);
+
+    if (loading || !gate || gate.userId !== userId) {
         return (
             <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#007AFF" />
@@ -54,7 +87,7 @@ const AppContent: React.FC = () => {
         );
     }
 
-    return <AppNavigator user={user} />;
+    return <AppNavigator initialRouteName={gate.route} />;
 };
 
 export default function App() {

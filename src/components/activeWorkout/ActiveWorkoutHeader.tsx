@@ -1,72 +1,153 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
     View,
-    Text,
     StyleSheet,
     TouchableOpacity,
+    Animated,
+    Easing,
     type GestureResponderHandlers,
 } from 'react-native';
-import { Button } from '../Button';
-import { fonts } from '../../constants/fonts';
 import { WORKOUT_COLORS } from '../../workout/constants';
-import { PlatesIcon } from '../icons/PlatesIcon';
-import { Icon } from '../icons/Icon';
+import { FlatArrowsIn, FlatPlus, FlatScan } from './FlatMark';
 
 interface ActiveWorkoutHeaderProps {
-    title?: string;
     onCollapse: () => void;
-    onFinish: () => void;
+    onAddExercises: () => void;
     onScanEquipment?: () => void;
     collapsePanHandlers?: GestureResponderHandlers;
 }
 
 export const ActiveWorkoutHeader: React.FC<ActiveWorkoutHeaderProps> = ({
-    title = 'workout',
     onCollapse,
-    onFinish,
+    onAddExercises,
     onScanEquipment,
     collapsePanHandlers,
 }) => {
     return (
         <View style={styles.container} {...collapsePanHandlers}>
             <View style={styles.topRow}>
-                <TouchableOpacity
+                <SquareActionButton
                     onPress={onCollapse}
-                    style={styles.iconButton}
+                    backgroundColor="#FFFFFF"
                     accessibilityLabel="Minimize workout"
                 >
-                    <PlatesIcon name="chevronDown" size={24} color={WORKOUT_COLORS.text} />
-                </TouchableOpacity>
-                <Text style={styles.title} numberOfLines={1}>
-                    {title.toLowerCase()}
-                </Text>
+                    <FlatArrowsIn color={WORKOUT_COLORS.text} size={22} />
+                </SquareActionButton>
+                <View style={styles.spacer} />
                 {onScanEquipment && (
-                    <TouchableOpacity
+                    <SquareActionButton
                         onPress={onScanEquipment}
-                        style={styles.scanButton}
+                        backgroundColor="#FFFFFF"
                         accessibilityLabel="Scan gym equipment"
                         accessibilityHint="Opens the camera to identify a machine or instruction label"
                     >
-                        <Icon name="camera-outline" size={23} color={WORKOUT_COLORS.text} />
-                    </TouchableOpacity>
+                        <FlatScan color={WORKOUT_COLORS.text} size={22} />
+                    </SquareActionButton>
                 )}
-                <Button
-                    title="finish"
-                    onPress={onFinish}
-                    containerStyle={styles.finishButtonWrap}
-                    buttonBodyStyle={styles.finishButtonBody}
-                    textStyle={styles.finishButtonText}
-                />
+                <SquareActionButton
+                    onPress={onAddExercises}
+                    backgroundColor={WORKOUT_COLORS.accent}
+                    accessibilityLabel="Add exercise"
+                >
+                    <FlatPlus color="#FFFFFF" size={20} />
+                </SquareActionButton>
             </View>
         </View>
     );
 };
 
+const SQUARE_SIZE = 50;
+const SQUARE_SHADOW = 4;
+
+function SquareActionButton({
+    onPress,
+    backgroundColor,
+    accessibilityLabel,
+    accessibilityHint,
+    children,
+}: {
+    onPress: () => void;
+    backgroundColor: string;
+    accessibilityLabel: string;
+    accessibilityHint?: string;
+    children: React.ReactNode;
+}) {
+    const translateY = useRef(new Animated.Value(0)).current;
+    const shadowHeight = useRef(new Animated.Value(SQUARE_SHADOW)).current;
+
+    const handlePressIn = () => {
+        Animated.parallel([
+            Animated.timing(translateY, {
+                toValue: SQUARE_SHADOW,
+                duration: 120,
+                easing: Easing.out(Easing.ease),
+                useNativeDriver: true,
+            }),
+            Animated.timing(shadowHeight, {
+                toValue: 0,
+                duration: 120,
+                easing: Easing.out(Easing.ease),
+                useNativeDriver: false,
+            }),
+        ]).start();
+    };
+
+    const handlePressOut = () => {
+        Animated.parallel([
+            Animated.timing(translateY, {
+                toValue: 0,
+                duration: 120,
+                easing: Easing.out(Easing.ease),
+                useNativeDriver: true,
+            }),
+            Animated.timing(shadowHeight, {
+                toValue: SQUARE_SHADOW,
+                duration: 120,
+                easing: Easing.out(Easing.ease),
+                useNativeDriver: false,
+            }),
+        ]).start();
+    };
+
+    return (
+        <View style={styles.squareWrap}>
+            <Animated.View
+                pointerEvents="none"
+                style={[
+                    styles.squareShadow,
+                    {
+                        opacity: shadowHeight.interpolate({
+                            inputRange: [0, SQUARE_SHADOW],
+                            outputRange: [0, 1],
+                        }),
+                    },
+                ]}
+            />
+            <TouchableOpacity
+                onPress={onPress}
+                onPressIn={handlePressIn}
+                onPressOut={handlePressOut}
+                activeOpacity={1}
+                accessibilityRole="button"
+                accessibilityLabel={accessibilityLabel}
+                accessibilityHint={accessibilityHint}
+            >
+                <Animated.View
+                    style={[styles.squareFace, { backgroundColor, transform: [{ translateY }] }]}
+                >
+                    {children}
+                </Animated.View>
+            </TouchableOpacity>
+        </View>
+    );
+}
+
 const styles = StyleSheet.create({
     container: {
-        paddingHorizontal: 12,
-        paddingTop: 6,
-        paddingBottom: 8,
+        paddingLeft: 16,
+        paddingRight: 16,
+        paddingTop: 16,
+        paddingBottom: 20,
         borderBottomWidth: 1,
         borderBottomColor: '#ECECEC',
         backgroundColor: WORKOUT_COLORS.background,
@@ -76,36 +157,30 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: 6,
     },
-    iconButton: {
-        width: 36,
-        height: 36,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    title: {
+    spacer: {
         flex: 1,
-        minWidth: 0,
-        fontFamily: fonts.bold,
-        fontSize: 18,
-        color: WORKOUT_COLORS.text,
-        textTransform: 'lowercase',
     },
-    finishButtonWrap: {
-        width: 84,
+    squareWrap: {
+        width: SQUARE_SIZE,
+        height: SQUARE_SIZE,
+        overflow: 'visible',
     },
-    scanButton: {
-        width: 36,
-        height: 36,
+    squareShadow: {
+        position: 'absolute',
+        top: SQUARE_SHADOW,
+        left: 0,
+        width: SQUARE_SIZE,
+        height: SQUARE_SIZE,
+        borderRadius: 12,
+        backgroundColor: '#252525',
+    },
+    squareFace: {
+        width: SQUARE_SIZE,
+        height: SQUARE_SIZE,
+        borderRadius: 12,
+        borderWidth: 2,
+        borderColor: '#252525',
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 2,
-    },
-    finishButtonBody: {
-        minHeight: 36,
-        paddingVertical: 8,
-        paddingHorizontal: 12,
-    },
-    finishButtonText: {
-        fontSize: 14,
     },
 });

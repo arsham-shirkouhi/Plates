@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing, LayoutChangeEvent } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import Reanimated, {
     Easing as ReanimatedEasing,
     interpolate,
@@ -13,23 +12,15 @@ import { fonts } from '../../constants/fonts';
 import { WORKOUT_COLORS } from '../../workout/constants';
 import { formatRestDuration } from '../../workout/workoutSelectors';
 import { Confetti, ConfettiParticle } from '../Confetti';
+import { FlatTick } from './FlatMark';
 
-const REST_PRESETS = [60, 90, 120] as const;
-
-function presetLabel(seconds: number): string {
-    const minutes = Math.floor(seconds / 60);
-    const rest = seconds % 60;
-    return `${minutes}:${rest.toString().padStart(2, '0')}`;
-}
+const DONE_SIZE = 36;
 
 interface RestTimerBarProps {
     visible: boolean;
     remainingSeconds: number;
-    durationSeconds?: number;
     progress: SharedValue<number>;
     celebrateAt?: number;
-    onAdjust: (deltaSeconds: number) => void;
-    onSetDuration: (seconds: number) => void;
     onSkip: () => void;
 }
 
@@ -38,21 +29,15 @@ const SHADOW_OFFSET = 4;
 const PRESS_ANIM_MS = 120;
 
 interface PressButtonProps {
-    label: string;
     onPress: () => void;
-    buttonStyle: object;
-    textStyle: object;
-    containerStyle?: object;
-    hitSlop?: { top: number; bottom: number; left: number; right: number };
+    children: React.ReactNode;
+    accessibilityLabel: string;
 }
 
 const PressButton: React.FC<PressButtonProps> = ({
-    label,
     onPress,
-    buttonStyle,
-    textStyle,
-    containerStyle,
-    hitSlop,
+    children,
+    accessibilityLabel,
 }) => {
     const translateY = useRef(new Animated.Value(0)).current;
     const shadowOpacity = useRef(new Animated.Value(1)).current;
@@ -92,17 +77,18 @@ const PressButton: React.FC<PressButtonProps> = ({
     };
 
     return (
-        <View style={[styles.pressWrap, containerStyle]}>
+        <View style={styles.pressWrap}>
             <Animated.View style={[styles.pressShadow, { opacity: shadowOpacity }]} pointerEvents="none" />
             <TouchableOpacity
                 onPress={onPress}
                 onPressIn={pressIn}
                 onPressOut={pressOut}
                 activeOpacity={1}
-                hitSlop={hitSlop}
+                accessibilityRole="button"
+                accessibilityLabel={accessibilityLabel}
             >
-                <Animated.View style={[buttonStyle, { transform: [{ translateY }] }]}>
-                    <Text style={textStyle}>{label}</Text>
+                <Animated.View style={[styles.doneFace, { transform: [{ translateY }] }]}>
+                    {children}
                 </Animated.View>
             </TouchableOpacity>
         </View>
@@ -112,11 +98,8 @@ const PressButton: React.FC<PressButtonProps> = ({
 export const RestTimerBar: React.FC<RestTimerBarProps> = ({
     visible,
     remainingSeconds,
-    durationSeconds = 0,
     progress,
     celebrateAt = 0,
-    onAdjust,
-    onSetDuration,
     onSkip,
 }) => {
     const [mounted, setMounted] = useState(visible);
@@ -135,9 +118,7 @@ export const RestTimerBar: React.FC<RestTimerBarProps> = ({
 
     useEffect(() => {
         visibleSV.value = visible ? 1 : 0;
-        if (!visible) {
-            frozenProgress.value = progress.value;
-        }
+        if (!visible) frozenProgress.value = progress.value;
     }, [visible, visibleSV, frozenProgress, progress]);
 
     useEffect(() => {
@@ -191,12 +172,11 @@ export const RestTimerBar: React.FC<RestTimerBarProps> = ({
 
     const toasterStyle = useAnimatedStyle(() => ({
         opacity: anim.value,
-        transform: [{ translateY: interpolate(anim.value, [0, 1], [36, 0]) }],
+        transform: [{ translateY: interpolate(anim.value, [0, 1], [10, 0]) }],
     }));
-
     const fillStyle = useAnimatedStyle(() => {
         const value = visibleSV.value ? progress.value : frozenProgress.value;
-        return { transform: [{ scaleX: Math.max(0, Math.min(1, value)) }] };
+        return { transform: [{ scaleX: Math.max(0, Math.min(1, 1 - value)) }] };
     });
 
     if (!mounted && !celebrating) return null;
@@ -208,63 +188,19 @@ export const RestTimerBar: React.FC<RestTimerBarProps> = ({
             {celebrating ? <Confetti particles={particles} /> : null}
             {mounted ? (
                 <Reanimated.View collapsable={false} style={[styles.toaster, toasterStyle]}>
-                    <LinearGradient
-                        pointerEvents="none"
-                        colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.92)', '#FFFFFF']}
-                        locations={[0, 0.45, 1]}
-                        style={styles.backdrop}
-                    />
                     <View onLayout={handleCardLayout} style={styles.card}>
-                <View style={styles.topRow}>
-                    <View style={styles.centerTop}>
-                        <Text style={styles.label}>rest</Text>
-                        <Text style={styles.countdown}>{formatRestDuration(shownRemaining)}</Text>
-                    </View>
-
-                    <View style={styles.buttons}>
-                        <PressButton
-                            label="-15"
-                            buttonStyle={styles.adjustButton}
-                            textStyle={styles.adjustText}
-                            hitSlop={{ top: 12, bottom: 12, left: 8, right: 6 }}
-                            onPress={() => onAdjust(-15)}
-                        />
-                        <PressButton
-                            label="+15"
-                            buttonStyle={styles.adjustButton}
-                            textStyle={styles.adjustText}
-                            hitSlop={{ top: 12, bottom: 12, left: 6, right: 8 }}
-                            onPress={() => onAdjust(15)}
-                        />
-                        <PressButton
-                            label="done"
-                            buttonStyle={styles.skipButton}
-                            textStyle={styles.skipText}
-                            hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
-                            onPress={onSkip}
-                        />
-                    </View>
-                </View>
-
-                    <View style={styles.presetRow}>
-                        {REST_PRESETS.map((seconds) => {
-                            const selected = durationSeconds === seconds;
-                            return (
-                                <PressButton
-                                    key={seconds}
-                                    label={presetLabel(seconds)}
-                                    containerStyle={styles.presetSlot}
-                                    buttonStyle={selected ? styles.presetButtonOn : styles.presetButton}
-                                    textStyle={selected ? styles.presetTextOn : styles.presetText}
-                                    onPress={() => onSetDuration(seconds)}
-                                />
-                            );
-                        })}
-                    </View>
-
-                    <View style={styles.progressTrack}>
-                        <Reanimated.View style={[styles.progressFill, fillStyle]} />
-                    </View>
+                        <View style={styles.row}>
+                            <Text style={styles.label}>
+                                resting:{' '}
+                                <Text style={styles.time}>{formatRestDuration(shownRemaining)}</Text>
+                            </Text>
+                            <PressButton onPress={onSkip} accessibilityLabel="Finish rest">
+                                <FlatTick color="#FFFFFF" size={16} strokeWidth={2.4} />
+                            </PressButton>
+                        </View>
+                        <View style={styles.progressTrack}>
+                            <Reanimated.View style={[styles.progressFill, fillStyle]} />
+                        </View>
                     </View>
                 </Reanimated.View>
             ) : null}
@@ -275,54 +211,30 @@ export const RestTimerBar: React.FC<RestTimerBarProps> = ({
 const styles = StyleSheet.create({
     wrapper: {
         paddingHorizontal: 16,
-        paddingTop: 40,
-        paddingBottom: 8,
         overflow: 'visible',
     },
     toaster: {
         overflow: 'visible',
     },
-    backdrop: {
-        ...StyleSheet.absoluteFill,
-    },
     card: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 16,
+        borderRadius: 14,
         borderWidth: 2,
-        borderColor: '#000000',
-        paddingVertical: 12,
-        paddingHorizontal: 14,
-        gap: 10,
+        borderColor: '#252525',
+        paddingHorizontal: 12,
+        paddingTop: 12,
+        paddingBottom: 12,
+        gap: 14,
+        overflow: 'visible',
     },
-    topRow: {
+    row: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
         gap: 10,
-    },
-    buttons: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
-    centerTop: {
-        flexDirection: 'row',
-        alignItems: 'baseline',
-        gap: 5,
-    },
-    label: {
-        fontFamily: fonts.regular,
-        fontSize: 12,
-        color: WORKOUT_COLORS.muted,
-        textTransform: 'lowercase',
-    },
-    countdown: {
-        fontFamily: fonts.bold,
-        fontSize: 20,
-        color: WORKOUT_COLORS.accent,
+        overflow: 'visible',
     },
     progressTrack: {
-        height: 8,
+        height: 4,
         borderRadius: 999,
         backgroundColor: '#DDE2FF',
         overflow: 'hidden',
@@ -334,83 +246,39 @@ const styles = StyleSheet.create({
         backgroundColor: WORKOUT_COLORS.accent,
         transformOrigin: 'left center',
     },
+    label: {
+        flex: 1,
+        fontFamily: fonts.bold,
+        fontSize: 16,
+        color: WORKOUT_COLORS.text,
+    },
+    time: {
+        fontFamily: fonts.bold,
+        fontSize: 16,
+        color: WORKOUT_COLORS.accent,
+    },
     pressWrap: {
-        position: 'relative',
+        width: DONE_SIZE,
+        height: DONE_SIZE,
         overflow: 'visible',
     },
     pressShadow: {
-        ...StyleSheet.absoluteFill,
+        position: 'absolute',
+        top: SHADOW_OFFSET,
+        left: 0,
+        width: DONE_SIZE,
+        height: DONE_SIZE,
+        borderRadius: 10,
         backgroundColor: '#252525',
-        borderRadius: 10,
-        transform: [{ translateY: SHADOW_OFFSET }],
     },
-    adjustButton: {
-        minWidth: 44,
-        paddingHorizontal: 10,
-        paddingVertical: 8,
-        borderRadius: 10,
-        borderWidth: 2,
-        borderColor: '#252525',
-        backgroundColor: '#FFFFFF',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    adjustText: {
-        fontFamily: fonts.bold,
-        fontSize: 13,
-        color: WORKOUT_COLORS.accent,
-    },
-    skipButton: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: 10,
-        borderWidth: 2,
-        borderColor: '#252525',
-        backgroundColor: WORKOUT_COLORS.accent,
-    },
-    skipText: {
-        fontFamily: fonts.bold,
-        fontSize: 13,
-        color: '#fff',
-    },
-    presetRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
-    presetSlot: {
-        flex: 1,
-    },
-    presetButton: {
-        width: '100%',
-        paddingVertical: 8,
-        borderRadius: 10,
-        borderWidth: 2,
-        borderColor: '#252525',
-        backgroundColor: '#FFFFFF',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    presetButtonOn: {
-        width: '100%',
-        paddingVertical: 8,
+    doneFace: {
+        width: DONE_SIZE,
+        height: DONE_SIZE,
         borderRadius: 10,
         borderWidth: 2,
         borderColor: '#252525',
         backgroundColor: WORKOUT_COLORS.accent,
         alignItems: 'center',
         justifyContent: 'center',
-    },
-    presetText: {
-        fontFamily: fonts.bold,
-        fontSize: 13,
-        color: WORKOUT_COLORS.accent,
-    },
-    presetTextOn: {
-        fontFamily: fonts.bold,
-        fontSize: 13,
-        color: '#fff',
     },
 });

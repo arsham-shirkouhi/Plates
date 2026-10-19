@@ -24,7 +24,7 @@ import {
     loadPersistedWorkoutState,
     persistWorkoutState,
 } from '../workout/workoutPersistence';
-import { getLastExercisePreviousSets, saveCompletedWorkout } from '../services/workoutHistoryService';
+import { getLastExercisePreviousSets, saveCompletedWorkout, withLastPerformance } from '../services/workoutHistoryService';
 import { useAuth } from '../context/AuthContext';
 
 interface ActiveWorkoutContextValue {
@@ -68,17 +68,28 @@ interface ActiveWorkoutContextValue {
 const ActiveWorkoutContext = createContext<ActiveWorkoutContextValue | null>(null);
 
 export const ActiveWorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { user } = useAuth();
+    const { user, loading: authLoading } = useAuth();
     const [state, dispatch] = useReducer(activeWorkoutReducer, undefined, getInitialStoreState);
     const [wrapUpSummary, setWrapUpSummary] = useState<WorkoutWrapUpSummary | null>(null);
     const hydratedRef = useRef(false);
     const lastPersistedRef = useRef<string>('');
-    const prevUserIdRef = useRef<string | null>(user?.id ?? null);
+    const ownerRef = useRef<string | null>(null);
 
     useEffect(() => {
+        if (authLoading) return;
+        ownerRef.current = null;
+        lastPersistedRef.current = '';
         let cancelled = false;
+
         (async () => {
-            const persisted = await loadPersistedWorkoutState();
+            if (!user?.id) {
+                dispatch({ type: 'DISCARD_WORKOUT' });
+                setWrapUpSummary(null);
+                hydratedRef.current = true;
+                return;
+            }
+
+            const persisted = await loadPersistedWorkoutState(user.id);
             if (cancelled) return;
             if (persisted?.workout) {
                 dispatch({
@@ -90,17 +101,19 @@ export const ActiveWorkoutProvider: React.FC<{ children: React.ReactNode }> = ({
                     },
                 });
             } else {
-                dispatch({ type: 'HYDRATE', payload: {} });
+                dispatch({ type: 'DISCARD_WORKOUT' });
             }
+            ownerRef.current = user.id;
             hydratedRef.current = true;
         })();
+
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [authLoading, user?.id]);
 
     useEffect(() => {
-        if (!state.isHydrated) return;
+        if (!state.isHydrated || !user?.id || ownerRef.current !== user.id) return;
 
         const payload = {
             workout: state.workout,
@@ -111,37 +124,29 @@ export const ActiveWorkoutProvider: React.FC<{ children: React.ReactNode }> = ({
         const serialized = JSON.stringify(payload);
         if (serialized === lastPersistedRef.current) return;
         lastPersistedRef.current = serialized;
-        persistWorkoutState(state);
+        persistWorkoutState(state, user.id);
     }, [
         state.isHydrated,
         state.workout,
         state.presentation,
         state.restTimer,
         state.settings,
+        user?.id,
     ]);
-
-    // The active workout belongs to the logged-in session only. Keep it running for
-    // the whole session, but once the user logs out clear it (and its persisted copy)
-    // so the minimized widget doesn't linger over the login screen or into another account.
-    useEffect(() => {
-        const currentUserId = user?.id ?? null;
-        const previousUserId = prevUserIdRef.current;
-        prevUserIdRef.current = currentUserId;
-
-        const loggedOut = !!previousUserId && !currentUserId;
-        if (!loggedOut) return;
-
-        dispatch({ type: 'DISCARD_WORKOUT' });
-        setWrapUpSummary(null);
-        lastPersistedRef.current = '';
-        void clearPersistedWorkoutState();
-    }, [user?.id]);
 
     const startWorkout = useCallback(
         (options?: { title?: string; exercises?: WorkoutExercise[] }) => {
-            dispatch({ type: 'START_WORKOUT', payload: options ?? {} });
+            void (async () => {
+                const exercises = options?.exercises?.length
+                    ? await withLastPerformance(options.exercises, user?.id)
+                    : options?.exercises;
+                dispatch({
+                    type: 'START_WORKOUT',
+                    payload: { ...options, exercises },
+                });
+            })();
         },
-        []
+        [user?.id]
     );
 
     const setPresentation = useCallback((presentation: OverlayPresentation) => {
@@ -261,15 +266,15 @@ export const ActiveWorkoutProvider: React.FC<{ children: React.ReactNode }> = ({
             dispatch({ type: 'DISCARD_WORKOUT' });
             setWrapUpSummary(null);
             lastPersistedRef.current = '';
-            await clearPersistedWorkoutState();
+            await clearPersistedWorkoutState(user?.id);
             return;
         }
 
         dispatch({ type: 'FINISH_WORKOUT' });
         setWrapUpSummary(null);
         lastPersistedRef.current = '';
-        await clearPersistedWorkoutState();
-    }, [state.workout]);
+        await clearPersistedWorkoutState(user?.id);
+    }, [state.workout, user?.id]);
 
     // Ends the current workout immediately (e.g. on logout). A workout that has
     // exercises is saved to history; an empty workout is discarded so it never
@@ -290,7 +295,7 @@ export const ActiveWorkoutProvider: React.FC<{ children: React.ReactNode }> = ({
         dispatch({ type: hasExercises ? 'FINISH_WORKOUT' : 'DISCARD_WORKOUT' });
         setWrapUpSummary(null);
         lastPersistedRef.current = '';
-        await clearPersistedWorkoutState();
+        await clearPersistedWorkoutState(user?.id);
     }, [state.workout, state.settings, user?.id]);
 
     const requestWrapUp = useCallback(() => {
@@ -307,8 +312,8 @@ export const ActiveWorkoutProvider: React.FC<{ children: React.ReactNode }> = ({
         dispatch({ type: 'FINISH_WORKOUT' });
         setWrapUpSummary(null);
         lastPersistedRef.current = '';
-        await clearPersistedWorkoutState();
-    }, []);
+        await clearPersistedWorkoutState(user?.id);
+    }, [user?.id]);
 
     const clearWrapUp = useCallback(() => {
         setWrapUpSummary(null);
